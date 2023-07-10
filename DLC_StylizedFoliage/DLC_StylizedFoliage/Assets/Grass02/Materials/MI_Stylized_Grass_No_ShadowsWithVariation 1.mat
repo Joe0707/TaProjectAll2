@@ -1,0 +1,98 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!21 &2100000
+Material:
+  serializedVersion: 8
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_Name: MI_Stylized_Grass_No_ShadowsWithVariation 1
+  m_Shader: {fileID: 4800000, guid: e0003a0ab3376cd4c933e9a866949286, type: 3}
+  m_ValidKeywords:
+  - _COLORGRADIENT_UV
+  - _WINDGRADIENT_UV
+  m_InvalidKeywords:
+  - _EMISSION
+  m_LightmapFlags: 4
+  m_EnableInstancingVariants: 0
+  m_DoubleSidedGI: 0
+  m_CustomRenderQueue: -1
+  stringTagMap: {}
+  disabledShaderPasses: []
+  m_SavedProperties:
+    serializedVersion: 3
+    m_TexEnvs:
+    - _Albedo:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _VariationMask:
+        m_Texture: {fileID: 2800000, guid: 37cf721143238594ca716960ee3a3058, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _WindLine:
+        m_Texture: {fileID: 2800000, guid: 0dc6145d2eb310147a7837d5a44f211b, type: 3}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - _texcoord:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_Lightmaps:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_LightmapsInd:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    - unity_ShadowMasks:
+        m_Texture: {fileID: 0}
+        m_Scale: {x: 1, y: 1}
+        m_Offset: {x: 0, y: 0}
+    m_Ints: []
+    m_Floats:
+    - _AO: 0
+    - _AlphaCutoff: 0.35
+    - _ColorGradient: 0
+    - _DirectLightIntensity: 1
+    - _FixedNormal: 0
+    - _IndirectLightIntensity: 1
+    - _QueueControl: -1
+    - _QueueOffset: 0
+    - _TipGradient: 1
+    - _UseTexColor: 0
+    - _VariationMaskScale: 50
+    - _WindDirection: 45
+    - _WindGradient: 0
+    - _WindIntensity: 0.2
+    - _WindLineRotate: 0.8
+    - _WindLineScale: 50
+    - _WindSizeBig: 10
+    - _WindSizeSmall: 4
+    - _WindSpeed: 0.5
+    m_Colors:
+    - _BaseColor: {r: 0.0470588, g: 0.44313726, b: 0.043137237, a: 0}
+    - _EmissionColor: {r: 1, g: 1, b: 1, a: 1}
+    - _SpecifyNormal: {r: 0, g: 1, b: 0, a: 0}
+    - _TipColor: {r: 0.43137258, g: 1, b: 0.007843138, a: 0}
+    - _VariationColorA: {r: 0.24705875, g: 1, b: 0, a: 0}
+    - _VariationColorB: {r: 0, g: 0.40392157, b: 0.42745098, a: 0}
+    - _WindLineColor: {r: 0.078431346, g: 0.29803917, b: 0, a: 0}
+    - _WindLineSpeed: {r: 0, g: 0.3, b: 0, a: 0}
+    - _WindStetch: {r: 0, g: 1, b: 0, a: 0}
+  m_BuildTextureStacks: []
+--- !u!114 &1689241127350922248
+MonoBehaviour:
+  m_ObjectHideFlags: 11
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: d0353a89b1f911e48b9e16bdc9f2e058, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  version: 5
