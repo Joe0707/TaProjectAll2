@@ -1,0 +1,162 @@
+﻿["matcap sahder"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang/xuzhuoliang/fanyu" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["光照贴图"]
+	uniform sampler LightTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		// path = "fx\\texture\\effect\\lighttex.png"
+	>;
+	
+	["遮罩贴图"]
+	uniform sampler Mask
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		// path = "fx\\texture\\effect\\ice_buff_1.png"
+	>;
+
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+
+	
+
+	["matcap亮度"]
+	uniform float matcap_brightness
+	<
+		artist = "1"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		init = "0.1"
+	>;
+
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float ghostlerp;
+	varying mediump float icelerp;
+	varying mediump float firelerp;
+	varying mediump float goldlerp;
+	varying mediump float2 petrify_uv;
+	varying mediump float petrify_shadow;
+	varying mediump float height_sm;
+	varying mediump float2 v_matcap_uv;
+	//varying lowp float v_height_fac;
+	
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+
+		vertex(pos);
+
+		float3x3 worldMat = float3x3(world);
+		mediump float3x3 view_mat = float3x3(view);
+		highp float3 normalWorld = float3(normalize(transform(normal.xyz, worldMat)));
+		mediump float3 matcap_uv_ = normalize(transform(normalWorld, view_mat));
+		mediump float2 matcap_uv = (matcap_uv_.xy) * float2(0.5f, -0.5f) + float2(0.5f);
+		out(v_matcap_uv, matcap_uv);
+
+
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		lowp float4 mask_map_color = sample(Mask,UV0.xy);
+		//lowp float height_fac = v_height_fac;
+		// alpha
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};		
+
+		lowp float4 matcap_map_color = sample(LightTex, v_matcap_uv);
+		lowp float3 matcap_color = matcap_map_color.rgb * matcap_brightness * mask_map_color.r;
+
+		lowp float final_alpha = alpha * AlphaMtl;
+		pixel(float4(diffuse_map_color.rgb + matcap_color.rgb, final_alpha));
+	}
+}

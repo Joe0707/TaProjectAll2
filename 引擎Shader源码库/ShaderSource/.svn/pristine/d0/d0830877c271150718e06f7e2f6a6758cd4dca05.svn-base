@@ -1,0 +1,30 @@
+["comm sys"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+	
+	attribute float4 position: POSITION;
+  attribute float4 diffuse: DIFFUSE;
+	
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+  varying lowp float4 Color;
+	
+	vertex
+	{
+		vertex(transform(position, wvp));
+    out(Color, diffuse);
+	}
+	
+	pixel
+	{
+    lowp float4 result = Color;
+    pixel(result);
+	}
+	
+}

@@ -1,0 +1,615 @@
+["流动+溶解效果的Shader，暂时不考虑光照和雾效"]
+pipeline
+<
+    version = "1.0.0"
+    author = "ly"
+    company = "Netease"
+    technique = "TShader"
+>
+{
+    // ------------- 定义并设置宏 ------------------
+
+    ["启用BLOOM"]
+    eitheror BLOOM_ENABLE;
+    macro(BLOOM_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+    ["使用diffuse贴图"]
+    eitheror DIFFUSE_ENABLE;
+    macro(DIFFUSE_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+    ["使用第二张发光图"]
+    eitheror SEC_EMISSIVE_ENABLE;
+    macro(SEC_EMISSIVE_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+    ["使用叠加的方式处理第二张发光贴图"]
+    eitheror SEC_EMISSIVE_ADD;
+    macro(SEC_EMISSIVE_ADD)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+    ["使用溶解效果"]
+    eitheror DISSOLVE_ENABLE;
+    macro(DISSOLVE_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+    ["使用边缘光"]
+    eitheror RIMLIGHT_ENABLE;
+    macro(RIMLIGHT_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+
+    ["轮廓光加强版"]
+    eitheror NEW_RIM_ENABLE;
+    macro(NEW_RIM_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;  
+
+
+    ["自发光动画参数控制"]
+    eitheror EMISSIVE_ANIMATION_ENABLE;
+    macro(EMISSIVE_ANIMATION_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "0"
+        export = "1"
+	>;
+
+    // ------------- uniforms from editor ------------------
+    ["滚动贴图1"]
+    uniform sampler u_tex0: DIFFUSE
+    <
+        artist = "1"
+        mip = "linear"
+        min = "linear"
+        mag = "linear"
+        lodbias = "-0.5"
+    >;
+
+    ["滚动贴图2"]
+    uniform sampler u_tex1
+    <
+        artist = "1"
+        min = "linear"
+        mag = "linear"
+    >;
+
+    ["溶解贴图"]
+    uniform sampler u_tex_dissolve
+    <
+        artist = "1"
+        min = "linear"
+        mag = "linear"
+    >;
+
+    ["遮罩贴图"]
+    uniform sampler u_tex_mask
+    <
+        artist = "1"
+        min = "linear"
+        mag = "linear"
+        addressu = "clamp"
+        addressv = "clamp"
+    >;
+
+    ["DIFFUSE贴图"]
+    uniform sampler u_diffuse
+    <
+        artist = "1"
+        min = "linear"
+        mag = "linear"
+    >;
+
+    ["流动光颜色"]
+    uniform lowp float4 u_emissive_color
+    <
+        color = "1"
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 0.5)"
+        uigroup = "流动光"
+    >;
+    ["流动光参数:XY:第一张Tilling;ZW:第二Tilling"]
+    uniform mediump float4 u_emissive_tilling
+    <
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+        uigroup = "流动光"
+    >;
+
+    ["流动光速度参数:XY:第一张UV;ZW:第二UV"]
+    uniform mediump float4 u_emissive_speed
+    <
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+        uigroup = "流动光"
+    >;
+
+    ["自发光流动控制"]
+    uniform mediump float u_emissive_animation_ctrl 
+    <
+        artist = "1"
+        init = "0.0"
+        min = "0.0"
+        max = "1.0"
+        uigroup = "流动光"
+    >;
+
+    ["溶解颜色"]
+    uniform lowp float4 u_dissolve_color
+    <
+        color = "1"
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+        uigroup = "溶解"
+    >;
+
+    ["溶解强度"]
+    uniform lowp float u_dissolve_intensity
+    <
+        artist = "1"
+        max = "1.0"
+        min = "-1.0"
+        init = "0.0"
+        uistep = "0.01"
+        uigroup = "溶解"
+    >;
+
+    ["其余调节参数:XY:DissolveTilling;Z:AnimationSpeed;W:EmissiveIntensity"]
+    uniform mediump float4 u_shader_attributes
+    <
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+
+    // —————————————————— FRESNEL ——————————————————
+
+
+    ["覆盖范围"]
+    uniform mediump float rim_power
+    <
+        uigroup = "rim"
+        init = "0"
+        uistep = "0.001"
+        artist = "1"
+        max = "1.0"
+        min = "5.0"
+    >;
+    ["强度"]
+    uniform mediump float rim_multi
+    <
+        uigroup = "rim"
+        init = "1"
+        uistep = "0.001"
+        artist = "1"    
+        max = "10.0"
+        min = "0.0"
+    >;
+
+    ["轮廓颜色"]
+    uniform mediump float4 u_rim_color
+    <
+        uigroup = "rim"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+        color = "1"
+        artist = "1"
+    >;
+
+    ["内部颜色"]
+    uniform mediump float4 adjust_inner
+    <
+        uigroup = "rim"
+        init = "1"
+        artist = "1"
+        color ="1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;  
+
+    ["内部透明度"]
+    uniform mediump float inner_alpha
+    <
+        uigroup = "rim"
+        uistep = "0.001"
+        init = "1"
+        max = "1.0"
+        min = "-0.5"
+        artist = "1"
+    >;
+
+    ["rim 开始"]
+    uniform mediump float u_rim_start
+    <
+        uigroup = "rim"
+        uistep = "0.001"
+        init = "0"
+        max = "1.0"
+        min = "0.0"
+        artist = "1"
+    >;
+    ["rim 结束"]
+    uniform mediump float u_rim_end
+    <
+        uigroup = "rim"
+        uistep = "0.001"
+        init = "1"
+        max = "1.0"
+        min = "0.0"
+        artist = "1"
+    >;
+
+    ["边缘光范围控制"]
+    uniform mediump float u_rim_pow
+    <
+        uigroup = "rim"
+        artist = "1"
+        init = "2.0"
+        min = "0.1"
+        max = "8.0"
+        uistep = "0.01"
+    >;
+
+    // ------------- uniforms ------------------
+    uniform highp float4x4 u_world: WORLD;
+    uniform highp float4x4 u_wvp: WORLD_VIEW_PROJECTION;
+    uniform highp float4x4 u_tex_trans0: TEXTURE_TRANS0;
+    uniform highp float4x4 u_proj: PROJECTION;
+    uniform highp float4 u_camera_pos: CAMERA_POSITION;
+    uniform highp float u_frame_time: FRAME_TIME;
+    uniform mediump float frame_rate
+    <
+        init = "1.0"
+    >;
+    uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+    uniform highp float4 u_fog_info: FOG_INFO;
+
+    // ------------- attributes ------------------
+    attribute float4 a_position: POSITION;
+    attribute float4 a_uv0: TEXTURE0;
+    attribute float4 a_normal: NORMAL;
+    attribute float4 a_blend_weight: BLENDWEIGHT;
+    attribute float4 a_blend_indice: BLENDINDICES;
+
+    // ------------- varyings ------------------
+    varying mediump float4 v_raw_uv0;
+    varying highp float4 v_pos_world;
+    varying highp float3 v_normal_world;
+
+    uniform float AlphaMtl : ALPHA_MTL
+    <
+        init = "1.0"
+    >;
+
+    ["R通道因子"]
+    uniform float modul_r
+    <
+        artist = "1"
+        init = "1.0"
+        min ="1.0"
+        max = "10.0"
+    >;  
+    ["G通道因子"]
+    uniform float modul_g
+    <
+        artist = "1"
+        init = "1.0"
+        min ="1.0"
+        max = "10.0"
+    >;  
+    ["B通道因子"]
+    uniform float modul_b
+    <
+        artist = "1"
+        init = "1.0"
+        min ="1.0"
+        max = "10.0"
+    >;  
+    ["A通道因子"]
+    uniform float modul_a
+    <
+        artist = "1"
+        init = "1.0"
+        min ="1.0"
+        max = "10.0"
+    >;
+    ["颜色整体缩放"]
+    uniform float color_scale
+    <
+        artist = "1"
+        init = "1.0"
+        min = "0.0"
+        max = "10.0"
+    >;
+
+    uniform highp float4 u_clipplane1
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float4 u_clipplane2
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float soft_edge_width
+    <
+        init = "10.0"
+    >;
+    // —————————————————— Sphere Gassian ——————————————————
+    function SG in (lowp float x, mediump float k) out (lowp float result)
+    {
+        mediump float a = k * 1.44269504f + 1.089234755f;
+        out (result, exp2(a * x - a));
+    };
+
+    /* 自发光效果获取函数
+     * 根据时间和速度变换uv坐标，然后从前两层贴图采样出颜色，再混合边缘光颜色
+     * 输出计算后的颜色值
+    */
+    vertex
+    {
+        // 是否使用GPU蒙皮
+        macro(GPU_SKIN_ENABLE) out(float4 pos, float4 nor)
+        {
+            branch("1")
+            {
+                function get_skin_pos_normal(a_blend_weight, uint4(a_blend_indice),a_position, a_normal, u_bone_vec)
+                out(float4 out_pos, float4 out_nor);
+                out(pos, out_pos);
+                out(nor, out_nor);
+            }
+            branch("0")
+            {
+                out(pos, a_position);
+                out(nor, a_normal);
+            }
+        };
+
+        // 计算顶点与世界法线
+        float4 pos_wvp = transform(pos, u_wvp);
+        float4 pos_world = transform(pos, u_world);
+        float3x3 u_world_s = float3x3(u_world);
+        float3 normal_world = normalize(transform(nor.xyz, u_world_s));
+
+        // out varying
+        mediump float4 raw_uv0 = transform(float4(a_uv0.xy, 1.0f, 0.0f), u_tex_trans0);
+
+        out(v_raw_uv0, raw_uv0);
+        out(v_pos_world, pos_world);
+        macro(RIMLIGHT_ENABLE)
+        {
+            branch("1"){
+                out(v_normal_world, normal_world);
+            }
+            branch("0")
+            {
+            }
+        };
+
+        vertex(pos_wvp);
+    }
+
+    pixel
+    {
+        macro(DIFFUSE_ENABLE) out(lowp float3 diffuse_color) {
+            branch ("1") {
+                out(diffuse_color, sample(u_diffuse, v_raw_uv0.xy).rgb);
+            }
+            branch("0"){
+                out(diffuse_color, float3(0.0f));
+            }
+        };
+        // get rgba
+        mediump float4 p_view_dir_world = u_camera_pos - v_pos_world;
+        macro(EMISSIVE_ANIMATION_ENABLE) out(highp float animation_time)
+        {
+            // 固定在某一时间点
+            branch("1") { out(animation_time, u_emissive_animation_ctrl); }
+            // 流动
+            branch("0") { out(animation_time, frame_rate * u_frame_time * 0.1f); }
+        };
+
+        // 计算第一层贴图的 emissive color
+        highp float2 anim_uv1 = v_raw_uv0.xy  + u_emissive_speed.xy * animation_time;
+        lowp float3 emissive_color_lvl1 = sample(u_tex0, anim_uv1 * u_emissive_tilling.xy).rgb;
+
+        // 计算第二层贴图的 emissive color
+        macro(SEC_EMISSIVE_ENABLE) out(lowp float3 emissive_color_lvl2)
+        {
+            branch("1")
+            {
+                highp float2 anim_uv2 = v_raw_uv0.xy + u_emissive_speed.zw * animation_time;
+                out(emissive_color_lvl2, sample(u_tex1, anim_uv2 * u_emissive_tilling.zw).rgb);
+            }
+            branch("0")
+            {
+                out(emissive_color_lvl2, float3(0.0f));
+            }
+        };
+
+        // 根据第一层贴图和第二层贴图的混合模式计算混合后的 emissive color
+        macro(SEC_EMISSIVE_ENABLE) out(mediump float3 emissive_color_mix_0)
+        {
+            branch("1")
+            {
+                macro(SEC_EMISSIVE_ADD) out(mediump float3 out_emissive_color)
+                {
+                    branch("1")
+                    {
+                        out(out_emissive_color, emissive_color_lvl1 + emissive_color_lvl2);
+                    }
+                    branch("0")
+                    {
+                        out(out_emissive_color, min(emissive_color_lvl1, emissive_color_lvl2));
+                    }
+                };
+                out(emissive_color_mix_0, out_emissive_color);
+            }
+            branch("0")
+            {
+                out(emissive_color_mix_0, emissive_color_lvl1);
+            }
+        };
+        mediump float3 emissive_color_mix_1 = emissive_color_mix_0 * u_emissive_color.rgb
+                                              * u_emissive_color.a * u_shader_attributes.w * 4.0f;
+        mediump float emissive_alpha = emissive_color_mix_0.r * u_shader_attributes.w;
+
+
+        macro(RIMLIGHT_ENABLE) out(mediump float3 emissive_color_rim,
+                                   lowp float emissive_rim_alpha)
+        {
+            branch("1")
+            {
+                 // 计算法线和视向量的 cos(Theta), 若为0（即法线与视线垂直）则在边缘
+                 highp float3 normal_dir = normalize(v_normal_world.xyz);
+                 highp float3 view_dir = normalize(p_view_dir_world.xyz);
+                 highp float ndotv = saturate(dot(normal_dir, view_dir));
+                macro(NEW_RIM_ENABLE) out (lowp float3 mix_color_new, lowp float mix_alpha_new){
+                    branch("0"){    
+                        // 透明度，越边缘越低
+                        mediump float rim_alpha = u_rim_color.a * pow(1.0f - ndotv, u_rim_pow);
+                        // 边缘发光颜色
+                        mediump float3 rim_color = u_rim_color.rgb * rim_alpha * rim_multi;
+                        // 自发光与边缘光混合后的透明度
+                        out(mix_alpha_new, emissive_alpha + rim_alpha);
+                        // 自发光与边缘光混合后的颜色
+                        // 这里没有直接叠加两种光，而是让物体吸收了一部分光
+                        out(mix_color_new, saturate(emissive_color_mix_1 + rim_color - emissive_color_mix_1 * rim_color));
+                    }
+                    // 移植角色用的边缘光
+                    branch("1"){
+                        lowp float rim_ = 1.0f - ndotv;
+                        function SG(rim_, rim_power) out (lowp float rim_factor);
+                        mediump float3 n_rim = smoothstep(u_rim_start, u_rim_end, rim_factor) * u_rim_color.xyz * rim_multi;
+                        mediump float3 final_rim_color = emissive_color_mix_1 * adjust_inner.rgb + n_rim.xyz;
+                        out(mix_color_new, final_rim_color);
+                        out(mix_alpha_new, emissive_alpha * (rim_ + inner_alpha) * ceil(ndotv));
+                    }
+                };
+                out(emissive_color_rim, mix_color_new);
+                out(emissive_rim_alpha, mix_alpha_new);
+
+            }
+            branch("0")
+            {
+                out(emissive_rim_alpha, emissive_alpha);
+                out(emissive_color_rim, emissive_color_mix_1);
+            }
+        };
+
+        mediump float4 emissive_color = float4(emissive_color_rim, emissive_rim_alpha); 
+        float3 mask_color = sample(u_tex_mask, v_raw_uv0.xy).rgb;
+
+        // if dissolve
+        macro(DISSOLVE_ENABLE) out(lowp float3 mix_color, lowp float mix_alpha)
+        {
+            branch("1")
+            {
+                float2 dissolve_tilting = u_shader_attributes.xy; 
+                float3 dissolve_color = saturate(sample(u_tex_dissolve,
+                                                        v_raw_uv0.xy * dissolve_tilting).rgb - float3(u_dissolve_intensity));
+                // 通过溶解效果贴图来采样溶解控制图, 获取最终的溶解状态
+                // mask贴图：g通道控制溶解边缘及样式, b通道控制边缘描边宽度
+                float3 dissolve_attribute = saturate(sample(u_tex_mask, dissolve_color.xy).rgb * 2.0f);
+
+                out(mix_color, emissive_color.rgb * saturate(dissolve_attribute.g - dissolve_attribute.b)
+                           + u_dissolve_color.rgb * u_dissolve_color.a * dissolve_attribute.b);
+
+                
+                out(mix_alpha, (dissolve_attribute.g * emissive_color.a + dissolve_attribute.b) * mask_color.r);
+            }
+            branch("0")
+            {
+                out(mix_color, emissive_color.rgb);
+                out(mix_alpha, emissive_color.a * mask_color.r);
+            }
+        };
+
+
+        macro(DIFFUSE_ENABLE) out(mediump float4 result) {
+            branch ("1") {
+                out(result, float4(mix_color * diffuse_color, mix_alpha * AlphaMtl));
+            }
+            branch("0"){
+                out(result, float4(mix_color, mix_alpha * AlphaMtl));
+            }
+        };
+        
+        macro(EDITOR) out(mediump float4 final_result) {
+            branch ("1") {
+                macro(BLOOM_ENABLE) out (mediump float4 inner_result)
+                {
+                    branch("1"){
+                        mediump float3 color = result.xyz * 0.25f * float3(modul_r, modul_g, modul_b) * color_scale;
+                        mediump float a = result.a * modul_a * color_scale;
+                        out(inner_result, float4(color, a));
+                    }
+                    branch("0")
+                    {
+                        out(inner_result, result);
+                    }
+                };
+                out(final_result, result);
+            }
+            branch("0"){
+                macro(BLOOM_ENABLE) out (mediump float4 inner_result)
+                {
+                    branch("1"){
+                        mediump float3 color = result.xyz * 0.25f * float3(modul_r, modul_g, modul_b) * color_scale;
+                        mediump float a = result.a * modul_a * color_scale;
+                        out(inner_result, float4(color, a));
+                    }
+                    branch("0")
+                    {
+                        out(inner_result, result);
+                    }
+                };
+                out(final_result, inner_result);
+            }
+        };
+
+        // 裁剪平面
+        macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+        {
+            branch("1")
+            {
+                highp float2 p1_1 = u_clipplane1.xy;
+                highp float2 p2_1 = u_clipplane1.zw;
+                function bcross(p1_1, p2_1, v_pos_world.xz, soft_edge_width) out(highp float t_value1);
+                highp float2 p1_2 = u_clipplane2.xy;
+                highp float2 p2_2 = u_clipplane2.zw;
+                function bcross(p1_2, p2_2, v_pos_world.xz, soft_edge_width) out(highp float t_value2);
+
+                out(clipAlpha, t_value1 * t_value2);
+            }
+            branch("0")
+            {
+                out(clipAlpha, 1.0f);
+            }
+        };
+
+        pixel(float4(final_result.rgb, final_result.a * clipAlpha));
+    }
+}

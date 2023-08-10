@@ -1,0 +1,360 @@
+["vbr for gem"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+>
+{
+// 宏
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	// ----------------------------钻石属性
+	["钻石内部贴图"]
+	uniform sampler InSideTex
+	<
+		artist = "1"
+		uigroup = "gem"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "hero\\hero30_39\\1032_baihuanghou\\1_cycle.png"
+	>;
+	["钻石内部贴图Tilling X"]
+	uniform float InSideTex_tilling_x
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "1"
+	>;
+	["钻石内部贴图Tilling Y"]
+	uniform float InSideTex_tilling_y
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "1"
+	>;
+	["钻石内部折射Height"]
+	uniform float InSideHeight
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+	["钻石内部贴图强度"]
+	uniform float InSideIntensity
+	<
+		uigroup = "gem"
+		init = "1.0"
+		artist = "1"
+	>;
+	["钻石反射贴图"]
+	uniform sampler ReflectTex
+	<
+		artist = "1"
+		uigroup = "gem"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "hero\\hero30_39\\1032_baihuanghou\\1_cycle.png"
+	>;
+	["反射贴图强度"]
+	uniform float ReflectIntensity
+	<
+		uigroup = "gem"
+		artist = "1"
+		init = "1.0"
+	>;
+	["Rim Color"]
+	uniform float4 RimColor
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.63, 0.58, 0.75,1.0"
+		artist = "1"
+	>;
+	["Rim Bias"]
+	uniform float RimBias
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "0.2"
+	>;
+	["Rim Scale"]
+	uniform float RimScale
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "1.0"
+	>;
+	["Rim Power"]
+	uniform float RimPower
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "1.5"
+	>;
+
+	["World Scale"]
+	uniform float WorldScale
+	<
+		uigroup = "gem_dissolve"
+		artist = "1"
+		init = "0.02"
+	>;
+	["Sphere Center"]
+	uniform float4 SphereCenter
+	<
+		uigroup = "gem_dissolve"
+		init = "0.06, 0.7, 0.36,0.0"
+		artist = "1"
+	>;
+	["Normal Bias"]
+	uniform float4 NormalBias
+	<
+		uigroup = "gem_dissolve"
+		init = "0.05, 0.1, -0.1,0.0"
+		artist = "1"
+	>;
+	["Radius"]
+	uniform float Radius
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.65"
+	>;
+	["Hardness"]
+	uniform float Hardness
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "10.0"
+	>;
+	["EdgeDistance"]
+	uniform float EdgeDistance
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.38"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["EdgeWidth"]
+	uniform float EdgeWidth
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.15"
+	>;
+	["EdgeHardness"]
+	uniform float EdgeHardness
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "1.0"
+	>;
+	["EdgeIntensity"]
+	uniform float EdgeIntensity
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "1.0"
+	>;
+	["Opacity_Min"]
+	uniform float Opacity_Min
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.6"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["ChangeAmount"]
+	uniform float ChangeAmount
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.0"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["Opacity"]
+	uniform float Opacity
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "1.0"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["DepthBias"]
+	uniform float DepthBias
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["Debug"]
+	uniform float DebugFactor
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "0.0"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 inv_world : INV_WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	varying mediump float4 UV0;
+	varying mediump float3 v_worldNormal;
+	varying mediump float3 v_worldViewDir;
+	varying mediump float3 v_viewDir_tSpace;
+	varying mediump float3 v_localPos;
+	varying mediump float3 v_localNormal;
+
+	function ToRadialCoords in(float3 coords) out (float2 panoramauv)
+    {
+        float3 normalizedCoords = normalize(coords);
+        float latitude = acos(normalizedCoords.y);
+        float longitude = atan2(normalizedCoords.z, normalizedCoords.x);
+        float2 sphereCoords = float2(longitude, latitude) * float2(0.15915494309189533576888376337251f, 0.31830988618379067153776752674503f);
+        out(panoramauv,float2(0.5f,1.0f) - sphereCoords);
+    };
+    function RotateAroundYInDegrees in (float3 vertex, float degrees) out(float3 rotatedVec)
+    {
+        float alpha = degrees * 3.1415926f / 180.0f;
+        float sina = sin(alpha);
+        float cosa = cos(alpha);
+        float2x2 m = float2x2(float2(cosa, -sina),float2(sina, cosa));
+        out(rotatedVec,float3(transform(vertex.xz,m), vertex.y).xzy);
+    };
+	vertex
+	{	
+		highp float4 position = a_position;	
+		highp float4 normal = a_normal;
+		
+		highp float4 pos = transform(position, wvp);
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float z_offset)
+		{
+			branch("1")
+			{
+				["GL渲染系统下"]
+				out(z_offset, DepthBias * 0.001f);
+			}
+			branch("0")
+			{
+				["Dx和Metal渲染系统下"]
+				out(z_offset, DepthBias * 0.0005f);
+			}
+		};
+		highp float4 pos_bias = pos - float4(0.0f,0.0f,1.0f,0.0f) * z_offset;
+		highp float4 pos_world = transform(position, world);
+		
+		mediump float3 localPos = position.xyz;
+		mediump float3 worldNormal = normalize((transform(normal.xyz,float3x3(world))));
+		mediump float3 worldViewDir = normalize(camera_pos.rgb - pos_world.rgb);
+
+		mediump float3 tangent = float3(a_tangent.x,a_tangent.z,a_tangent.y); // 切线修正
+		mediump float3 binormal = cross(tangent, normal.xyz);
+		float3x3 tbn = float3x3(tangent, binormal,normal.xyz);
+
+		mediump float3 camPos_local = transform(camera_pos,inv_world).xyz;
+		mediump float3 viewDir_local = camPos_local - localPos;
+		mediump float3 viewDir_tSpace = transform(viewDir_local,tbn);
+		out(v_worldNormal,worldNormal);
+		out(v_worldViewDir,worldViewDir);
+		out(v_viewDir_tSpace,viewDir_tSpace);
+
+		out(v_localPos,localPos);
+		out(v_localNormal,normal.xyz);
+
+		vertex(pos_bias);
+
+		out(UV0, float4(texcoord0.x, texcoord0.y, 0.0f, 0.0f));
+    }
+
+	pixel
+	{
+		// diffuse
+		//lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+
+		float h = -InSideHeight / 2.0f;
+		float3 v = normalize(v_viewDir_tSpace);
+		float v_z = v.z + 0.42f;
+		mediump float2 parallaxuv = UV0.xy + h * (v.xy / float2(v_z));
+		float3 color_Inside = sample(InSideTex, parallaxuv * float2(InSideTex_tilling_x,InSideTex_tilling_y)).xyz * float3(InSideIntensity);
+
+		float3 worldNormal = normalize(v_worldNormal);
+		float3 worldViewDir = normalize(v_worldViewDir);
+		float3 worldRelf = reflect(-worldViewDir, worldNormal);
+		function ToRadialCoords (worldRelf) out(float2 radialRelUV);
+		float3 color_Reflect = sample(ReflectTex, radialRelUV).xyz * float3(ReflectIntensity);
+
+		float NdotV = dot(worldNormal,worldViewDir);
+		float fresnelFactor = (RimBias + RimScale * pow(1.0f - NdotV, RimPower));
+		float3 color_Fresnel = float3(fresnelFactor) * RimColor.xyz;
+
+		float3 combined_color = color_Inside + color_Reflect + color_Fresnel;
+
+		float3 sphereDistance = (v_localPos * float3(WorldScale) - (SphereCenter.xyz + normalize(v_localNormal) * NormalBias.xyz))/ float3(Radius);
+		float sphere_distance = saturate(dot(sphereDistance, sphereDistance));
+		float sphere_mask = saturate(pow(sphere_distance , Hardness));
+		float edge_distance = smoothstep(1.0f,0.0f,abs(sphere_mask - EdgeDistance) / EdgeWidth);
+		float edge_mask = pow(edge_distance,EdgeHardness) * (EdgeIntensity * (1.0f - ChangeAmount));
+		float combined_alpha = max(saturate((sphere_mask + edge_mask)), Opacity_Min) * Opacity;
+		
+		float3 combined_addedge_color = combined_color + combined_color * float3(edge_mask);
+		
+		float3 debug_color = lerp(combined_addedge_color,float3(combined_alpha),float3(DebugFactor));
+		float debug_alpha = lerp(combined_alpha,1.0f,DebugFactor);
+
+		pixel(float4(debug_color, debug_alpha));
+	}
+}

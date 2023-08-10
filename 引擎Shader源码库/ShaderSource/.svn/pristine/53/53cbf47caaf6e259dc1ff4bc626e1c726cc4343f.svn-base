@@ -1,0 +1,86 @@
+["emphasize2"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "ext technique"
+	zenable = "1"
+	zwritable = "0"
+	alphablend = "1"
+	srccolor = "srcalpha"
+	dstcolor = "1-src_alpha"
+	srcalpha = "srcalpha"
+	dstalpha = "1-src_alpha"
+>
+{
+	macro(GPU_SKIN_ENABLE)
+	<
+		default = "0"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	macro(SKIN_VEC_PER_BONE)
+	<
+		default = "SKIN_VEC_PER_BONE_QUAT"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_normal: NORMAL;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+	
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world_mat: WORLD;
+	uniform highp float4x4 view_mat : VIEW;
+	
+	["fresnel轮廓控制"]
+	uniform float emphasize_exp: OTHER0
+	<
+		artist = "1"
+		init = "0.2"
+		min = "0.0"
+		max = "1.0"
+	>;
+	
+	["轮廓光颜色"]
+	uniform lowp float4 emphasize_color: OTHER1
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,1.0,0.0,1.0"
+	>;
+	
+	uniform float emphasize_intensity: OTHER2
+	<
+		init = "1.0"
+	>;
+	
+	uniform float alpha_threshold: OTHER3
+	<
+		init = "0.0"
+	>;
+	
+	uniform float src_color_factor: OTHER4
+	<
+		init = "0.0"
+	>;
+	
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	varying mediump float v_texture0: TEXTURE0;
+	
+	vertex
+	{	
+		vertex(transform(a_position, wvp));
+	}
+	
+	pixel
+	{
+		pixel(float4(float3(emphasize_color), emphasize_intensity));
+	}
+	
+}

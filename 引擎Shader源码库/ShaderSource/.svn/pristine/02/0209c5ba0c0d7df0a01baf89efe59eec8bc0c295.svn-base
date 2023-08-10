@@ -1,0 +1,66 @@
+pipeline
+<
+	author = "zhang ying peng"
+	// alphablend = "1"
+	// blendadd = "1"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	uniform sampler Tex1
+	<
+		export = "0"
+	>;
+	
+	uniform mediump float rt_w;
+	uniform mediump float rt_h;
+	uniform mediump float time_elapse;
+	uniform mediump float radius;
+	uniform mediump float angle_rate
+	<
+		init = "20"
+	>;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	varying mediump float2 TexCoordOrgin;
+	
+	vertex vs_main
+	{
+		vertex(a_position);
+	
+		out(TexCoordOrgin, a_texture0.xy);
+	}
+	
+	pixel ps_main
+	{		
+		// float radius = 800.0f;
+		// float time = Fmod(FrameTime, 2f) / 2.0f;
+		float angle = time_elapse * angle_rate;
+		
+		float2 texSize = float2(rt_w, rt_h);
+		float2 center = texSize / 2.0f;
+		float2 tc1 = TexCoordOrgin * texSize - center;
+		
+		float dist = length(tc1);
+		
+		float percent = (dist) / radius;
+		// float percent =(radius - dist)/ radius;
+		float theta = sqrt(percent) * angle;
+		float s = sin(theta);
+		float c = cos(theta);
+		float2 tc2 = float2(dot(tc1, float2(c,-s)), dot(tc1, float2(s, c)));
+
+		// float2 tc3 = lerp(tc1, tc2, float2(step(dist, radius))) + center;
+
+		float3 color = sample(Tex1, tc2 / texSize).rgb + sample(Tex0, TexCoordOrgin.xy).xyz * 0f;
+		
+		pixel(float4(color, 1.0f));
+	}
+}

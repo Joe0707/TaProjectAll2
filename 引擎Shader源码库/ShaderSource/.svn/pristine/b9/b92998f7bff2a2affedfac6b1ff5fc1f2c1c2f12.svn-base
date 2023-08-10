@@ -1,0 +1,239 @@
+["bear wants a  uv flow"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "0"
+		export = "1"
+	>;
+
+	uniform highp float4 u_clipplane1
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float4 u_clipplane2
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float soft_edge_width
+    <
+    	init = "10.0"
+    >;
+	varying highp float4 v_pos_world;
+
+	// 贴图
+	["diffuse贴图(R通道控制颜色)"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["遮罩贴图(R通道控制透明度)"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+// 参数
+	["颜色贴图横向平铺数"]
+	uniform float diffuse_uv_tilling_1
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["颜色贴图纵向平铺数"]
+	uniform float diffuse_uv_tilling_2
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["颜色贴图横向位移"]
+	uniform float diffuse_uv_offset_1
+	<
+		artist = "1"
+		init = "0"
+	>;
+
+	["颜色贴图纵向位移"]
+	uniform float diffuse_uv_offset_2
+	<
+		artist = "1"
+		init = "0"
+	>;
+
+	["颜色贴图位移缩放"]
+	uniform float diffuse_uv_offset_scale
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["遮罩贴图横向平铺数"]
+	uniform float mask_uv_tilling_1
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["遮罩贴图纵向平铺数"]
+	uniform float mask_uv_tilling_2
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["遮罩贴图横向位移"]
+	uniform float mask_uv_offset_1
+	<
+		artist = "1"
+		init = "0"
+	>;
+
+	["遮罩贴图纵向位移"]
+	uniform float mask_uv_offset_2
+	<
+		artist = "1"
+		init = "0"
+	>;
+
+	["遮罩贴图位移缩放"]
+	uniform float mask_uv_offset_scale
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["色彩倾向"]
+	uniform float4 tone_color
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+	>;
+
+	["色彩强度"]
+	uniform lowp float tone_intensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	attribute float4 normal : NORMAL;
+	attribute float4 tangent : TANGENT;
+	
+// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float2 ShadowMapUV;
+	varying mediump float2 diffuse_uv;
+	varying lowp float3 NormalWorld;
+	varying mediump float2 v_diffuse_uv;
+	varying mediump float2 v_mask_uv;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float FrameTime: FRAME_TIME;
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	function calculate_uv in(lowp float tilling1, lowp float tilling2, mediump float2 uv, lowp float offset1, lowp float offset2, lowp float offset_scale) out(mediump float2 output_uv) {
+			out(output_uv, uv * float2(tilling1,tilling2) + float2(offset1,offset2)* offset_scale);
+	};
+
+	vertex {
+		highp float4 pos = float4(transform(position, wvp));
+		highp float4 screen_pos = pos;
+		vertex(screen_pos);
+
+		function calculate_uv(diffuse_uv_tilling_1, diffuse_uv_tilling_2, texcoord0.xy, diffuse_uv_offset_1, diffuse_uv_offset_2, diffuse_uv_offset_scale) out(mediump float2 out_diffuse_uv);
+		out(v_diffuse_uv, out_diffuse_uv);
+
+		function calculate_uv(mask_uv_tilling_1, mask_uv_tilling_2, texcoord0.xy, mask_uv_offset_1, mask_uv_offset_2, mask_uv_offset_scale) out(mediump float2 out_mask_uv);
+		out(v_mask_uv, out_mask_uv);
+		macro(CLIPPLANE_ENABLE)
+		{
+			branch("1")
+			{
+				highp float4 pos_world = transform(position, world);
+				out(v_pos_world, pos_world);
+			}
+			branch("0")
+			{}
+		};
+
+		
+	}
+	pixel {
+
+		lowp float4 diffuse_map_color = sample(Tex0, v_diffuse_uv);
+		lowp float4 mask_map_color = sample(Tex1, v_mask_uv);
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 diffuse_map_color1)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, v_mask_uv);
+				out(diffuse_map_color1, float4(diffuse_map_color.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(diffuse_map_color1, diffuse_map_color);
+			}
+		};
+
+		// 裁剪平面
+        macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+        {
+            branch("1")
+            {
+                highp float2 p1_1 = u_clipplane1.xy;
+                highp float2 p2_1 = u_clipplane1.zw;
+                function bcross(p1_1, p2_1, v_pos_world.xz, soft_edge_width) out(highp float t_value1);
+                highp float2 p1_2 = u_clipplane2.xy;
+                highp float2 p2_2 = u_clipplane2.zw;
+                function bcross(p1_2, p2_2, v_pos_world.xz, soft_edge_width) out(highp float t_value2);
+
+				out(clipAlpha, t_value1 * t_value2);
+            }
+            branch("0")
+            {
+                out(clipAlpha, 1.0f);
+            }
+        };
+
+		pixel(float4(diffuse_map_color.rgb * tone_color.rgb * tone_intensity, diffuse_map_color1.a * mask_map_color.r * AlphaMtl* clipAlpha));
+	}
+}

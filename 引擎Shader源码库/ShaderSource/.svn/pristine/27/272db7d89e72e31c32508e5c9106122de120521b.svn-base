@@ -1,0 +1,766 @@
+["HDR Tonemap"]
+pipeline
+<
+	author = "ynj"
+	company = "netease"
+	category = "postprocess"
+	technique = "hdr_tonemap"
+>
+{
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float2 TexCoord0;
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+
+	["Tonemap类型(1-Unreal4.16, 2-Unreal4.22, 3-Uncharted2, 4-ACES Aproxmation, 5-Reinhard, 6-Reinhard2, 7-Uchimura, 8-Lottes)"]
+	uniform float tonemapType
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		init = "0.0"
+	>;
+
+	["曝光值!!"]
+	uniform float Exposed
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		init = "1"
+	>;
+
+	["S曲线坡度"]
+	uniform float  FilmSlope
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.88"
+	>;
+
+	["S曲线暗部"]
+	uniform float  FilmToe
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.55"
+	>;
+
+	["S曲线亮部"]
+	uniform float  FilmShoulder
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.26"
+	>;
+
+	["S曲线黑色部分"]
+	uniform float  FilmBlackClip
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.0"
+	>;
+	
+	["S曲线白色部分"]
+	uniform float  FilmWhiteClip
+	<
+		uigroup = "FilmicTonemap"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.04"
+	>;
+
+	["GT MaxBrightness"]
+	uniform float  MaxBrightness
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "1.0" 
+		max = "100.0" 
+		init = "1.0"
+	>;
+	["GT Constrast"]
+	uniform float  Constrast
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "1.0" 
+		max = "3.0" 
+		init = "1.0"
+	>;
+
+	["GT LinearStart"]
+	uniform float  LinearStart
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.22"
+	>;
+
+	["GT LinearLength"]
+	uniform float  LinearLength
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.4"
+	>;
+	["GT BlackTightness"]
+	uniform float  BlackTightness
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "1.0" 
+		max = "3.0" 
+		init = "1.1"
+	>;
+
+
+	["GT Pedestal"]
+	uniform float  Pedestal
+	<
+		uigroup = "GTTonemap"
+		artist = "1" 
+		uistep = "1"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.0"
+	>;
+
+	["Reinhard(2) MiddleGrey"]
+	uniform float  MiddleGrey
+	<
+		uigroup = "Reinhard"
+		artist = "1" 
+		uistep = "1"
+		min = "0.0" 
+		max = "1.0" 
+		init = "1.0"
+	>;
+
+
+	["Reinhard2 L_white"]
+	uniform float  L_white
+	<
+		uigroup = "Reinhard"
+		artist = "1" 
+		uistep = "1"
+		min = "1.0" 
+		max = "10.0" 
+		init = "4.0"
+	>;
+
+	["Uncharted WHITE"]
+	uniform float  WHITE
+	<
+		uigroup = "Uncharted"
+		artist = "1" 
+		uistep = "1"
+		min = "1.0" 
+		max = "100.0" 
+		init = "11.2"
+	>;
+	["Uncharted ExposureAdjust"]
+	uniform float  ExposureAdjust
+	<
+		uigroup = "Uncharted"
+		artist = "1" 
+		init = "2.0"
+	>;
+
+
+
+	function rgb_2_saturation in ( float3 rgb ) out(float sat)
+	{
+		float minrgb = min( min(rgb.r, rgb.g ), rgb.b );
+		float maxrgb = max( max(rgb.r, rgb.g ), rgb.b );
+		out(sat, ( max( maxrgb, 0.0000000001f ) - max( minrgb,  0.0000000001f ) ) / max( maxrgb, 0.01f ));
+	};
+
+	function rgb_2_yc in( float3 rgb) out(float yc)
+	{
+		// Converts RGB to a luminance proxy, here called YC
+		// YC is ~ Y + K * Chroma
+		// Constant YC is a cone-shaped surface in RGB space, with the tip on the 
+		// neutral axis, towards white.
+		// YC is normalized: RGB 1 1 1 maps to YC = 1
+		//
+		// ycRadiusWeight defaults to 1.75, although can be overridden in function 
+		// call to rgb_2_yc
+		// ycRadiusWeight = 1 -> YC for pure cyan, magenta, yellow == YC for neutral 
+		// of same value
+		// ycRadiusWeight = 2 -> YC for pure red, green, blue  == YC for  neutral of 
+		// same value.
+		float ycRadiusWeight = 1.75f;
+		float r = rgb.x; 
+		float g = rgb.y; 
+		float b = rgb.z;
+	  
+		float chroma = sqrt(b*(b-g)+g*(g-r)+r*(r-b));
+
+		out(yc, ( b + g + r + ycRadiusWeight * chroma) / 3.0f);
+	};
+
+	function sigmoid_shaper in(float x) out(float sigmoid)
+	{
+		// Sigmoid function in the range 0 to 1 spanning -2 to +2.
+
+		float t = max( 1.0f - abs( 0.5f * x ), 0.0f );
+		float y = 1.0f + sign(x) * (1.0f - t*t);
+		out(sigmoid, 0.5f * y);
+	};
+
+	function glow_fwd in( float ycIn, float glowGainIn, float glowMid) out(float glowGainOut)
+	{
+		condition(ycIn, 2.0f/3.0f * glowMid, 2.0f * glowMid) out(float ret)
+		{
+			branch("%0% <= %1%")
+			{
+	           out(ret,glowGainIn);
+			}
+			branch("%0% >= %2%")
+			{
+				out(ret, 0.0f);
+			}
+			default
+			{
+	            out(ret, glowGainIn * (glowMid / ycIn - 0.5f));    
+			}
+		};
+		out(glowGainOut, ret);      
+	};
+
+	// Transformations from RGB to other color representations
+	function rgb_2_hue in( float3 color )  out(float huefinal)
+	{
+		// Returns a geometric hue angle in degrees (0-360) based on RGB values.
+		// For neutral colors, hue is undefined and the function will return a quiet NaN value.
+		condition(color.x, color.y, color.z) out(float hue)
+		{
+			branch("%0%==%1% && %1%==%2%")
+			{
+				out(hue, 0.0f);
+			}
+			default
+			{
+				out(hue,  (180.0f / 3.1415926f) * atan2(sqrt(3.0f)*(color.g - color.b), 2.0f * color.r - color.g - color.b));
+			}
+		};
+
+		condition(hue, 0.0f) out(float hue2)
+		{
+			branch("%0% < %1%")
+			{
+				out(hue2, hue+360.0f);
+			}
+			default
+			{
+				out(hue2, clamp(hue, 0.0f, 360.0f));
+			}
+		};
+		out(huefinal, hue2);
+	};
+
+	function center_hue in(float hue, float centerH) out(float hueCenteredfinal)
+	{
+		float hueCentered = hue - centerH;
+		condition(hueCentered, 180.0f) out(float hueCenteredTmp)
+		{
+			branch("%0% < -%1%")
+			{
+				out(hueCenteredTmp, hueCentered + 360.0f);
+			}		
+			branch("%0% > %1%")
+			{
+				out(hueCenteredTmp, hueCentered - 360.0f);
+			}
+			default
+			{
+				out(hueCenteredTmp, hueCentered);
+			}
+		};
+		out(hueCenteredfinal, hueCenteredTmp);
+	};
+
+	function Square in(float x) out(float sq)
+	{
+		out(sq, x*x);
+	};
+
+	function log10 in(float x) out(float ret)
+	{
+		out(ret, log(x) / log(10.0f));
+	};
+
+	function log10_rgb in(float3 color) out(float3 ret)
+	{
+		out(ret, log(color) / float3(log(10.0f)));
+	};
+
+	function ColorCmpFloat in(float3 color, float scaler, float3 ret1, float3 ret2) out(float3 outCorlor)
+	{
+		condition(color.r,color.g, color.b, scaler) out(float3 ret) {
+			branch ("%0% > %3% && %1% > %3% && %2% > %3%") {
+				out(ret, ret1);
+			}
+			branch ("%0% < %3% && %1% < %3% && %2% < %3%") {
+				out(ret, ret2);
+			}	
+			default {
+				out(ret, ret2);
+			}
+		};
+		out(outCorlor, ret);
+	};
+	/*
+	// Uncharted settings
+	Slope = 0.63;
+	Toe = 0.55;
+	Shoulder = 0.47;
+	BlackClip= 0;
+	WhiteClip = 0.01;
+
+	// HP settings
+	Slope = 0.65;
+	Toe = 0.63;
+	Shoulder = 0.45;
+	BlackClip = 0;
+	WhiteClip = 0;
+
+	// Legacy settings
+	Slope = 0.98;
+	Toe = 0.3;
+	Shoulder = 0.22;
+	BlackClip = 0;
+	WhiteClip = 0.025;
+
+	// ACES settings
+	Slope = 0.91;
+	Toe = 0.53;
+	Shoulder = 0.23;
+	BlackClip = 0;
+	WhiteClip = 0.035;
+	===========================================
+	*/
+	//float FilmSlope = 0.91;
+	//float FilmToe = 0.53;
+	//float FilmShoulder = 0.23;
+	//float FilmBlackClip = 0;
+	//float FilmWhiteClip = 0.035;
+
+	function FilmToneMap in(float3 ColorAP1,float Exposed, float FilmSlope, float FilmToe, float FilmShoulder, float FilmBlackClip, float FilmWhiteClip) out(float3 ToneColor)
+	{
+		// float FilmSlope = 0.63f;
+		// float FilmToe = 0.55f;
+		// float FilmShoulder = 0.47f;
+		// float FilmBlackClip= 0.0f;
+		// float FilmWhiteClip = 0.01f;
+
+	 	float3x3 XYZ_2_AP1_MAT =
+		float3x3(
+			float3(1.6410233797f, -0.3248032942f, -0.2364246952f),
+			float3(-0.6636628587f,  1.6153315917f,  0.0167563477f),
+			float3(0.0117218943f, -0.0082844420f,  0.9883948585f)
+		);
+		float3x3 AP0_2_XYZ_MAT =
+		float3x3(
+			float3(0.9525523959f, 0.0000000000f, 0.0000936786f),
+			float3(0.3439664498f, 0.7281660966f,-0.0721325464f),
+			float3(0.0000000000f, 0.0000000000f, 1.0088251844f)
+		);
+		float3x3 XYZ_2_AP0_MAT =
+		float3x3(
+			float3(1.0498110175f, 0.0000000000f,-0.0000974845f),
+			float3(-0.4959030231f, 1.3733130458f, 0.0982400361f),
+			float3(0.0000000000f, 0.0000000000f, 0.9912520182f)
+		);
+
+		float3x3 AP1_2_XYZ_MAT = 
+		float3x3(
+			float3( 0.6624541811f, 0.1340042065f, 0.1561876870f),
+			float3(0.2722287168f, 0.6740817658f, 0.0536895174f),
+			float3(-0.0055746495f, 0.0040607335f, 1.0103391003f)
+		);
+
+		float3x3 AP0_2_AP1_MAT = //mul( AP0_2_XYZ_MAT, XYZ_2_AP1_MAT );
+		float3x3(
+			float3(1.4514393161f, -0.2365107469f, -0.2149285693f),
+			float3(-0.0765537734f,  1.1762296998f, -0.0996759264f),
+			float3(0.0083161484f, -0.0060324498f,  0.9977163014f)
+		);
+
+		float3x3 AP1_2_AP0_MAT = //mul( AP1_2_XYZ_MAT, XYZ_2_AP0_MAT );
+		float3x3(
+			float3(0.6954522414f,  0.1406786965f,  0.1638690622f),
+			float3(0.0447945634f,  0.8596711185f,  0.0955343182f),
+			float3(-0.0055258826f,  0.0040252103f,  1.0015006723f)
+		);
+
+		float3 AP1_RGB2Y = float3(
+			0.2722287168f, //AP1_2_XYZ_MAT[0][1],
+			0.6740817658f, //AP1_2_XYZ_MAT[1][1],
+			0.0536895174f //AP1_2_XYZ_MAT[2][1]
+		);
+
+		//float3x3 AP0_2_AP1 = transform(AP0_2_XYZ_MAT, XYZ_2_AP1_MAT);//todo:行优先计算??
+
+		float3x3 AP1_2_AP0 =transform(AP1_2_XYZ_MAT, XYZ_2_AP0_MAT);//todo:行优先计算??
+		
+		float3 ColorAP0_tmp = transform( ColorAP1, transpose(AP1_2_AP0));
+
+		// "Glow" module constants
+		float RRT_GLOW_GAIN = 0.05f;
+		float RRT_GLOW_MID = 0.08f;
+
+		function rgb_2_saturation( ColorAP0_tmp ) out(float saturation);
+		function rgb_2_yc( ColorAP0_tmp ) out(float ycIn);
+		function sigmoid_shaper( (saturation - 0.4f) / 0.2f) out(float s);
+		function glow_fwd( ycIn, RRT_GLOW_GAIN * s, RRT_GLOW_MID) out(float glowfwd);
+		float addedGlow = 1.0f + glowfwd;
+		float3 ColorAP0_tmp2 = ColorAP0_tmp * addedGlow;
+
+		// --- Red modifier --- //
+		float RRT_RED_SCALE = 0.82f;
+		float RRT_RED_PIVOT = 0.03f;
+		float RRT_RED_HUE = 0.0f;
+		float RRT_RED_WIDTH = 135.0f;
+		function rgb_2_hue( ColorAP0_tmp2 ) out(float hue);
+		function center_hue( hue, RRT_RED_HUE ) out(float centeredHue);
+		function Square( smoothstep( 0.0f, 1.0f, 1.0f - abs( 2.0f * centeredHue / RRT_RED_WIDTH ) ) ) out(float hueWeight);
+			
+		float r =  ColorAP0_tmp2.r + hueWeight * saturation * (RRT_RED_PIVOT - ColorAP0_tmp2.r) * (1.0f - RRT_RED_SCALE);
+		float3 ColorAP0= float3(r, ColorAP0_tmp2.g, ColorAP0_tmp2.b);
+		
+		// Use ACEScg primaries as working space
+		float3 WorkingColortmp = transform(ColorAP0, transpose(AP0_2_AP1_MAT));
+
+		float3 WorkingColortmp2 = max( float3(0.0f), WorkingColortmp );
+
+		// Pre desaturate
+		float3 WorkingColor = lerp( float3(dot( WorkingColortmp2, AP1_RGB2Y )), WorkingColortmp2, float3(0.96f) );
+		
+		float ToeScale = 1.0f + FilmBlackClip - FilmToe;
+		float ShoulderScale	= 1.0f + FilmWhiteClip - FilmShoulder;
+		
+		float InMatch = 0.18f;
+		float OutMatch = 0.18f;
+
+		condition(FilmToe, 0.8f) out(float ToeMatch)
+		{
+			branch("%0% > %1%")
+			{
+				// 0.18 will be on straight segment
+				function log10( InMatch ) out(float logMatch);
+				out(ToeMatch, ( 1.0f - FilmToe  - OutMatch ) / FilmSlope + logMatch);	
+			}
+			default
+			{
+				// 0.18 will be on toe segment
+				// Solve for ToeMatch such that input of InMatch gives output of OutMatch.
+				function log10( InMatch ) out(float logMatch);
+				float bt = ( OutMatch + FilmBlackClip ) / ToeScale - 1.0f;
+				out(ToeMatch, logMatch - 0.5f * log( (1.0f+bt)/(1.0f-bt) ) * (ToeScale / FilmSlope));
+			}
+		};
+
+		float StraightMatch = ( 1.0f - FilmToe ) / FilmSlope - ToeMatch;
+		float ShoulderMatch = FilmShoulder / FilmSlope - StraightMatch;
+
+		function log10_rgb( WorkingColor ) out(float3 LogColor);
+
+		float3 StraightColor = float3(FilmSlope) * ( LogColor + float3(StraightMatch) );
+		
+		float3 ToeColorTmp = float3(-FilmBlackClip) + float3(2.0f * ToeScale) /(float3(1.0f) + exp((-2.0f * FilmSlope/ToeScale) * ( LogColor - float3(ToeMatch))));
+
+		float3 ShoulderColorTmp	= float3( 1.0f + FilmWhiteClip ) - float3(2.0f * ShoulderScale) / ( float3(1.0f) + exp( ( 2.0f * FilmSlope / ShoulderScale) * ( LogColor - float3(ShoulderMatch) ) ) );
+
+		function ColorCmpFloat(LogColor, ToeMatch, StraightColor, ToeColorTmp) out(float3 ToeColor);
+		function ColorCmpFloat(LogColor, ShoulderMatch, ShoulderColorTmp, StraightColor) out(float3 ShoulderColor);
+		//ToeColor		= LogColor <      ToeMatch ?      ToeColor : StraightColor;
+		//ShoulderColor	= LogColor > ShoulderMatch ? ShoulderColor : StraightColor;
+
+		float3 t = saturate( ( LogColor - float3(ToeMatch) ) / float3( ShoulderMatch - ToeMatch ) );
+		float isT = step(ToeMatch, ShoulderMatch);
+		float3 tt = isT*t + (1.0f - isT)*(float3(1.0f) - t);
+
+		float3 ttt = (float3(3.0f)-2.0f*tt)*tt*tt;
+		float3 ToneColorTmp = lerp( ToeColor, ShoulderColor, ttt );
+
+		// Post desaturate
+		float3 ToneColorTmp2 = lerp( float3(dot( float3(ToneColorTmp), AP1_RGB2Y )), ToneColorTmp, float3(0.93f) );
+
+		// Returning positive AP1 values
+		float3 ToneColorTmp2_positive = max(float3(0.0f), ToneColorTmp2);
+		float3 tonecolor_gamma = pow(ToneColorTmp2_positive,float3(1.0f/2.2f));
+		out(ToneColor,tonecolor_gamma);
+	};
+
+
+	["unreal tonemapping"]
+	function unreal_tonemapping in(float3 WorkingColor, float Exposed, float FilmSlope, float FilmToe, float FilmShoulder, float FilmBlackClip, float FilmWhiteClip) out(float3 tonemapping_color) {
+		["加入新tonemapping的色彩空间转换"]
+		float3x3 sRGB_2_AP1 =
+		float3x3(
+		float3(0.6131914784f, 0.3395120888f, 0.0473663312f),
+		float3(0.0702069045f, 0.9163358171f, 0.0134500113f),
+		float3(0.0206188714f, 0.1095672943f, 0.8696067475f)
+		);
+		float3 ColorAP1_ = transform(WorkingColor, transpose(sRGB_2_AP1));	
+		float3 ColorAP1 = max(float3(0.0f), ColorAP1_);
+		float3 Linear_color = ColorAP1 * Exposed;
+
+		float ToeScale = 1.0f + FilmBlackClip - FilmToe;
+		float ShoulderScale = 1.0f + FilmWhiteClip - FilmShoulder;
+		float InMatch = 0.18f;
+		float OutMatch = 0.18f;
+		["FilmToe默认0.8以下"]
+		float bt = ( OutMatch + FilmBlackClip ) / ToeScale - 1.0f;
+		float ToeMatch = log( InMatch )/log(10.0f) - 0.5f * log( (1.0f+bt)/(1.0f-bt) ) * (ToeScale / FilmSlope);
+		float StraightMatch = ( 1.0f - FilmToe ) / FilmSlope - ToeMatch;
+		float ShoulderMatch = FilmShoulder / FilmSlope - StraightMatch;
+		float3 LogColor = log( Linear_color)/float3(log(10.0f));
+		float3 StraightColor = FilmSlope * ( LogColor + float3(StraightMatch) );
+		float3 ToeColor1 = float3(-FilmBlackClip ) + float3(2.0f * ToeScale) / (float3(1.0f) + exp( (-2.0f * FilmSlope / ToeScale) * ( LogColor - float3(ToeMatch))));
+		float3 ShoulderColor1 = float3( 1.0f + FilmWhiteClip ) - float3(2.0f * ShoulderScale) / (float3(1.0f) + exp((2.0f * FilmSlope / ShoulderScale) * (LogColor - float3(ShoulderMatch))));
+		float3 ToeColor = lerp(StraightColor, ToeColor1, step(LogColor, float3(ToeMatch)));
+		float3 ShoulderColor = lerp(ShoulderColor1, StraightColor, step(LogColor, float3(ShoulderMatch)));
+		float3 t1 = saturate((LogColor - float3(ToeMatch) ) / ( ShoulderMatch - ToeMatch));
+		float3 t2 = lerp(t1, float3(1.0f) - t1, float3(step(ShoulderMatch, ToeMatch)));
+		float3 t3 = (float3(3.0f) - 2.0f * t2)*t2*t2;
+		float3 ToneColor1 = lerp(ToeColor, ShoulderColor, t3);
+
+		["加入新tonemapping的色彩空间转换"]
+		float3x3 AP1_2_sRGB =
+		float3x3(
+		float3(1.6895745081f, -0.6249214450f, -0.0869074384f),
+		float3(-0.1113715342f, 1.1446231561f, -0.0060958435f),
+		float3(-0.0260567377f, -0.1293841529f, 1.1524875603f)
+		);
+		float3 ToneColor_srgb = transform(ToneColor1, transpose(AP1_2_sRGB));		
+		float3 outcolor_aces = pow(max(float3(0.0f), ToneColor_srgb), float3(1.0f/2.2f));
+		out(tonemapping_color, outcolor_aces);
+	};
+
+	function Uncharted2Tonemap_float3 in (mediump float3 color) out (mediump float3 mapping_color)
+	{
+		mediump float3 A = float3(0.22f);
+		mediump float3 B = float3(0.30f);
+		mediump float3 C = float3(0.10f);
+		mediump float3 D = float3(0.20f);
+		mediump float3 E = float3(0.01f);
+		mediump float3 F = float3(0.30f);
+		float3 x = color;
+		out(mapping_color, ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F);	     
+	};
+	function Uncharted2Tonemap_float1 in (mediump float whitescale) out (mediump float mapping_whitescale)
+	{
+		mediump float A = 0.22f;
+		mediump float B = 0.30f;
+		mediump float C = 0.10f;
+		mediump float D = 0.20f;
+		mediump float E = 0.01f;
+		mediump float F = 0.30f;
+		float x = whitescale;
+		out(mapping_whitescale, ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F);	     
+	};
+
+	function Uncharted2Tonemap in (mediump float3 color, float Exposed, float ExposureAdjust) out (mediump float3 mapping_color)
+	{
+		float W = 11.2f;
+		function Uncharted2Tonemap_float3(Exposed * color * ExposureAdjust) out(float3 color1); 
+		function Uncharted2Tonemap_float1(W) out(float whiteScale);
+		float white_scale = 1.0f / whiteScale;
+		float3 tone_color = color1 * white_scale;
+		float3 tone_color_gamma = pow(tone_color,float3(1.0f / 2.2f));
+		out(mapping_color,tone_color_gamma);
+	};
+
+
+	function ACES_ToneMapping in (mediump float3 color, mediump float Exposed) out (mediump float3 mapping_color)
+	{
+		mediump float3 A = float3(2.54f);
+		mediump float3 B = float3(0.04f);
+		mediump float3 C = float3(2.42f);
+		mediump float3 D = float3(0.75f);
+		mediump float3 E = float3(0.1f);
+		mediump float3 adapted_color = color * Exposed * 0.8f;
+		float3 tone_color = adapted_color * (A * adapted_color + B) / (adapted_color * (C * adapted_color + D) + E);
+		float3 tone_color_gamma = pow(tone_color,float3(1.0f / 2.2f));
+		out(mapping_color, tone_color_gamma);
+	};
+
+
+	function Tonemap_Uchimura_Base in(float3 x, float Exposed, float P, float a, float m, float l, float c, float b) out(float3 toneColor)
+	{
+		float3 color = x*Exposed;
+	    // Uchimura 2017, "HDR theory and practice"
+	    // Math: https://www.desmos.com/calculator/gslcdxvipg
+	    // Source: https://www.slideshare.net/nikuque/hdr-theory-and-practicce-jp
+	    float l0 = ((P - m) * l) / a;
+	    float S0 = m + l0;
+	    float S1 = m + a * l0;
+	    float C2 = (a * P) / (P - S1);
+	    float CP = -C2 / P;
+
+	    float3 w0 = float3(1.0f) - smoothstep(float3(0.0f), float3(m), color);
+	    float3 w2 = step(float3(m + l0), color);
+	    float3 w1 = float3(1.0f) - w0 - w2;
+
+	    float3 T = m * pow(color / float3(m), float3(c)) + float3(b);
+	    float3 S = float3(P) - (P - S1) * exp(CP * (color - float3(S0)));
+	    float3 L = float3(m) + a * (color - float3(m));
+	    float3 tonecolor = (T * w0 + L * w1 + S * w2);
+	    float3 tonecolor_gamma = pow(tonecolor,float3(1.0f/2.2f));
+	    out(toneColor, tonecolor_gamma);
+	};
+
+	function Tonemap_Uchimura in (float3 x, float Exposed)  out(float3 toneColor)
+	{
+	    float P = 1.0f;  // max display brightness
+	    float a = 1.0f;  // contrast
+	    float m = 0.22f; // linear section start
+	    float l = 0.4f;  // linear section length
+	    float c = 1.33f; // black
+	    float b = 0.0f;  // pedestal
+	    function Tonemap_Uchimura_Base(x, Exposed, P, a, m, l, c, b) out(float3 toneColor1);
+	    out(toneColor, toneColor1);
+	};
+
+	function Tonemap_Lottes in(float3 x, float Exposed) out(float3 toneColor)
+	{
+	    // Lottes 2016, "Advanced Techniques and Optimization of HDR Color Pipelines"
+	    float a = 1.6f;
+	    float d = 0.977f;
+	    float hdrMax = 8.0f;
+	    float midIn = 0.18f;
+	    float midOut = 0.267f;
+
+	    // Can be precomputed
+	    float b =
+	        (-pow(midIn, a) + pow(hdrMax, a) * midOut) /
+	        ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
+	    float c =
+	        (pow(hdrMax, a * d) * pow(midIn, a) - pow(hdrMax, a) * pow(midIn, a * d) * midOut) /
+	        ((pow(hdrMax, a * d) - pow(midIn, a * d)) * midOut);
+	    float3 tonecolor = pow(x*Exposed, float3(a)) / (pow(x*Exposed, float3(a * d)) * b + float3(c));
+	    float3 tonecolor_gamma = pow(tonecolor,float3(1.0f/2.2f));
+	    out(toneColor, tonecolor_gamma);
+	};
+
+
+	function ReinhardToneMapping in(float3 color, float Exposed, float MiddleGrey) out(float3 toneColor)
+	{
+	    // float3 color1 = color * MiddleGrey / Exposed;
+	    // float3 decode_color = color1 / (float3(1.0f) + color1);
+	    // out(toneColor, pow(decode_color,1.0f/ 2.2f));
+	    float3 color1 = color * MiddleGrey / Exposed;
+	    float lumRgb = dot(color1,float3(0.2126f, 0.7152f, 0.0722f));
+	    float lumScale = lumRgb / (lumRgb + 1.0f);
+	    float3 tone_color = color1 * lumScale / lumRgb;
+	    float3 tone_color_gamma = pow(tone_color,float3(1.0f/ 2.2f));
+	    out(toneColor,tone_color_gamma);
+	};
+
+
+	function ReinhardToneMapping2 in(float3 color, float Exposed, float MiddleGrey, float L_white) out(float3 toneColor)
+	 {
+	  	// float3 x = color * MiddleGrey / Exposed;
+	   // 	out(toneColor,  (x * (float3(1.0f) + x / (L_white * L_white))) / (float3(1.0f) + x));
+	   	float3 color1 = color * MiddleGrey / Exposed;
+	    float lumRgb = dot(color1,float3(0.2126f, 0.7152f, 0.0722f));
+	    float lumScale = (lumRgb * (1.0f + lumRgb / L_white))/(1.0f + lumRgb);
+	    float3 tone_color = color1 * lumScale / lumRgb;
+	    float3 tone_color_gamma = pow(tone_color,float3(1.0f/ 2.2f));
+	    out(toneColor,tone_color_gamma);
+	};
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		float4 tex_color1 = sample(Tex0, TexCoord0);
+		float3 tex_color = pow(tex_color1.rgb, float3(2.2f));//tex_color1.rgb*tex_color1.rgb;
+		condition(tonemapType) out(float3 toneColor) {
+			branch ("%0% == 1.0") {
+				function unreal_tonemapping(tex_color, Exposed, FilmSlope, FilmToe, FilmShoulder, FilmBlackClip, FilmWhiteClip) out(float3 toneColor1);
+				out(toneColor, toneColor1);
+			}
+			branch ("%0% == 2.0") {
+				function FilmToneMap(tex_color.rgb, Exposed, FilmSlope, FilmToe, FilmShoulder, FilmBlackClip, FilmWhiteClip) out(float3 toneColor1);
+				out(toneColor, toneColor1);
+			}
+			branch ("%0% == 3.0") {
+				function Uncharted2Tonemap(tex_color, Exposed, ExposureAdjust) out(float3 toneColor1);
+				out(toneColor, toneColor1);	
+			}
+			branch("%0% == 4.0")
+			{
+				function ACES_ToneMapping(tex_color, Exposed) out(float3 toneColor1);
+				out(toneColor, toneColor1);		
+			}
+			branch("%0% == 5.0")
+			{
+				function ReinhardToneMapping(tex_color, Exposed, MiddleGrey) out(float3 toneColor1);
+				out(toneColor, toneColor1);		
+			}
+			branch("%0% == 6.0")
+			{
+				function ReinhardToneMapping2(tex_color, Exposed, MiddleGrey, L_white) out(float3 toneColor1);
+				out(toneColor, toneColor1);		
+			}
+			branch("%0% == 7.0")
+			{
+				function Tonemap_Uchimura_Base(tex_color, Exposed, MaxBrightness, Constrast, LinearStart, LinearLength, BlackTightness, Pedestal ) out(float3 toneColor1);
+				out(toneColor, toneColor1);		
+			}
+			branch("%0% == 8.0")
+			{
+				function Tonemap_Lottes(tex_color, Exposed) out(float3 toneColor1);
+				out(toneColor, toneColor1);		
+			}
+			default {
+				out(toneColor, pow(tex_color.rgb, float3(1.0f/2.2f)));
+			}
+		};
+
+		pixel(float4(toneColor.rgb, tex_color1.a));
+		// pixel(float4(pow(toneColor.rgb, float3(1.0f/2.2f)), tex_color1.a));
+
+	}
+}

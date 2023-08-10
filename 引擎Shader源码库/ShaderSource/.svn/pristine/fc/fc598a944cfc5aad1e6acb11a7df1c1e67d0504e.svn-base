@@ -1,0 +1,73 @@
+["common no z-test"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+  	zenable = "0"
+>
+{
+	// 宏
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	
+	// varying变量
+	varying mediump float4 UV0;
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+	    vertex(pos);
+
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_map_color.a);
+			}
+	    };
+
+		pixel(float4(diffuse_map_color.xyz, alpha * AlphaMtl));
+	}
+}

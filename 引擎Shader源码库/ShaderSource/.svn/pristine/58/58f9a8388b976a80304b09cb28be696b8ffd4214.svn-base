@@ -1,0 +1,29 @@
+["cocos"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_MVPMatrix;
+
+  varying mediump float2 v_texCoord;
+  varying lowp float4 v_color;
+
+  vertex main
+  {
+    vertex(position * CC_MVPMatrix);
+    out(v_color, float4(diffuse.rgb * diffuse.a, diffuse.a));
+    out(v_texCoord, texCoord0);
+  }
+  pixel main
+  {
+    lowp float4 temp = v_color * step(0.0f, 1.0f - length(v_texCoord));
+    pixel(temp);
+  }
+}

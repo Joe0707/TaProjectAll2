@@ -1,0 +1,696 @@
+["dissolve_void"]
+pipeline
+<
+    author = "chenwei"
+    category = "g48"
+    company = "netease"
+    version = "1.0.0"
+    techinque = "TShader"
+    merge = "1"
+>
+{
+    ["是否单独alpha通道"]
+    eitheror SEPARATE_ALPHA_TEX;
+    macro(SEPARATE_ALPHA_TEX)
+    <
+        default = "0"
+    >;
+
+    ["使用纹理贴图"]
+    eitheror TEX_ENABLE;
+    macro(TEX_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+    // ["第二层贴图"]
+    // eitheror SECOND_ENABLE;
+    // macro(SECOND_ENABLE)
+    // <
+    //     artist = "1"
+    //     default = "0"
+    //     customizable = "1"
+    // >;
+
+    ["开启溶解"]
+    eitheror DISSOLVE_ENABLE;
+    macro(DISSOLVE_ENABLE)
+    <
+        customizable = "1"
+        default = "1"
+    >;
+
+    ["使用渐变贴图"]
+    eitheror DISSOLVE_GRADIENT_TEX;
+    macro(DISSOLVE_GRADIENT_TEX)
+    <
+        customizable = "1"
+        default = "0"
+    >;
+
+    ["虚体"]
+    eitheror FRESNEL_ENABLE;
+    macro(FRESNEL_ENABLE)
+    <
+        customizable = "1"
+        default = "1"
+    >;
+
+    ["膨胀"]
+    eitheror EXPAND_ENABLE;
+    macro(EXPAND_ENABLE)
+    <
+        customizable = "1"
+        default = "0"
+    >;
+
+    ["没用的"]
+    eitheror USELESS;
+    macro(USELESS)
+    <
+        default = "0"
+    >;
+
+    macro(LIGHT_ATTR_ITEM_NUM)
+    <
+        customizable = "0"
+        cache = "0"
+        default = "LIGHT_ATTR_ITEM_NUM_5"
+    >;
+
+    macro(FOG_ENABLE)
+    <
+        default = "1"
+    >;
+
+    macro(FOG_TYPE)
+    <
+        default = "FOG_TYPE_LINEAR"
+    >;
+
+    ["强制打开雾效"]
+    eitheror FORCE_FOG_ENABLE;
+    macro(FORCE_FOG_ENABLE)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+    ["不被天空盒剪裁"]
+    eitheror NO_CLIP;
+    macro(NO_CLIP)
+    <
+        default = "0"
+        customizable = "1"
+    >;
+
+    attribute float4 a_texcoord0 : TEXTURE0;
+    attribute float4 a_position : POSITION;
+    attribute float4 a_normal : NORMAL;
+    attribute float4 a_color: DIFFUSE;
+
+    uniform highp float4[LIGHT_ATTR_ITEM_NUM] u_shadow_light_attr: SHADOW_LIGHT_ATTR;
+
+    uniform highp float4x4 u_wvp : WORLD_VIEW_PROJECTION;
+    uniform highp float4x4 u_world: WORLD;
+    uniform highp float4x4 u_view: VIEW;
+    uniform highp float4x4 u_wv: WORLD_VIEW;
+    uniform highp float4x4 u_vp: VIEW_PROJECTION;
+
+    uniform highp float4x4 u_projection: PROJECTION;
+    uniform highp float4x4 u_texTrans0 : TEXTURE_TRANS0;
+    uniform highp float4x4 u_texTrans1 : TEXTURE_TRANS1;
+    uniform highp float4x4 lvp: LIGHT_VIEW_PROJ;
+
+    // uniform highp float4x4 lightmapTrans: LIGHTMAP_TRANSFORM;
+    // uniform float4 LightMapScale: LIGHT_MAP_SCALE;
+    // uniform lowp float4 LightmapTintColor: LIGHTMAP_TINT_COLOR;
+    // uniform lowp float4 LightmapTintAmbient: LIGHTMAP_TINT_AMBIENT;
+
+    uniform float4 u_cameraZPlanes: CAMERA_INFO;
+
+    uniform float4 u_camera_position: CAMERA_POSITION;
+    uniform float alphaRef: ALPHA_REF;
+    uniform float AlphaMtl: ALPHA_MTL;
+	// uniform lowp float u_tone_factor:TONE_FACTOR;
+	// uniform lowp float u_adapt_factor:ADAPT_FACTOR;
+    uniform float u_frametime:FRAME_TIME;
+
+    // ["lightmap颜色最小值"]
+    // uniform lowp float4 u_lightmap_color_min : LIGHTMAP_MIN_COLOR
+    // <
+    //     //artist = "1"
+    //     //color = "1"
+    //     init = "0.356, 0.557, 1.0, 1.0"
+    // >;
+
+    // ["环境光"]
+    // uniform float4 u_ambient: AMBIENT
+    // <
+    //     init = "0,0,0,0"
+    //     color = "1"
+    //     artist = "1"
+    // >;
+
+    // ["贴图平铺 U"]
+    // uniform float u_Tex1_u
+    // <
+    //     init = "1.0"
+    //     color = "0"
+    //     artist = "1"
+    //     max = "10.0"
+    //     min = "0.0"
+    //     uistep = "0.01"
+    //     uigroup = "基本参数"
+    // >;
+
+    // ["贴图平铺 V"]
+    // uniform float u_Tex1_v
+    // <
+    //     init = "1.0"
+    //     color = "0"
+    //     artist = "1"
+    //     max = "10.0"
+    //     min = "0.0"
+    //     uistep = "0.01"
+    //     uigroup = "基本参数"
+    // >;
+
+    // ["贴图平移 U"]
+    // uniform float u_Tex1_speed_u
+    // <
+    //     init = "0.0"
+    //     color = "0"
+    //     artist = "1"
+    //     max = "5.0"
+    //     min = "0.0"
+    //     uistep = "0.01"
+    //     uigroup = "基本参数"
+    // >;
+
+    // ["贴图平移 V"]
+    // uniform float u_Tex1_speed_v
+    // <
+    //     init = "0.0"
+    //     color = "0"
+    //     artist = "1"
+    //     max = "5.0"
+    //     min = "0.0"
+    //     uistep = "0.01"
+    //     uigroup = "基本参数"
+    // >;
+
+    ["溶解参数(xy:UV缩放,zw:UV速度)"]
+    uniform float4 u_dissolve_param
+    <
+        init = "1, 1, 0, 0"
+        color = "0"
+        artist = "1"
+        uigroup = "溶解"
+    >;
+
+
+
+
+    ["虚化大小"]
+    uniform float u_fresnel_size
+    <
+        init = "2.0"
+        color = "0"
+        artist = "1"
+        max = "5.0"
+        min = "0.0"
+        uistep = "0.0001"
+        uigroup = "基本参数"
+    >;
+
+    ["虚体亮度"]
+    uniform float u_fresnel_brightness
+    <
+        init = "1.0"
+        color = "0"
+        artist = "1"
+        max = "20.0"
+        min = "0.0"
+        uistep = "0.001"
+        uigroup = "基本参数"
+    >;
+
+     ["溶解宽度"]
+    uniform float dissolve_width
+    <
+        init = "0.1"
+        color = "0"
+        artist = "1"
+        max = "1.0"
+        min = "0.001"
+        uistep = "0.001"
+        uigroup = "溶解"
+    >;
+
+     ["溶解虚化"]
+    uniform float dissolve_Feather
+    <
+        init = "0.1"
+        color = "0"
+        artist = "1"
+        max = "1.0"
+        min = "0.001"
+        uistep = "0.001"
+        uigroup = "溶解"
+    >;
+
+
+    ["溶解边缘颜色"]
+    uniform float4 dis_edge_color2
+    <
+        init = "1,1,1,1"
+        color = "1"
+        artist = "1"
+        uigroup = "溶解"
+    >;   
+    ["溶解边缘亮度"]
+    uniform float edge_shining
+    <
+        init = "1.0"
+        artist = "1"
+        max = "10.0"
+        min = "0.001"
+        uistep = "0.001"
+        uigroup = "溶解"
+    >; 
+
+
+    ["溶解因子1"]
+    uniform float dissolve_factor1
+    <
+        init = "-0.1"
+        color = "0"
+        artist = "1"
+        max = "1.2"
+        min = "-0.1"
+        uistep = "0.001"
+        uigroup = "溶解"
+    >;
+
+    ["溶解因子2"]
+    uniform float dissolve_factor2
+    <
+        init = "-0.1"
+        color = "0"
+        artist = "1"
+        max = "1.2"
+        min = "-0.1"
+        uistep = "0.001"
+        uigroup = "溶解"
+    >;
+
+
+    ["自发光"]
+    uniform float change_color_bright
+    <
+        init = "0.0"
+        color = "0"
+        artist = "1"
+        max = "1.0"
+        min = "0.0"
+        uistep = "0.001"
+        uigroup = "基本参数"
+    >;
+
+    ["染色1"]
+    uniform float4 u_Color1
+    <
+        init = "1,1,1,1"
+        artist = "1"
+        color = "1"
+        uigroup = "基本参数"
+    >;
+
+     ["染色强度1"]
+    uniform float u_Color1_intensity
+    <
+        init = "1.0"
+        artist = "1"
+        uigroup = "基本参数"
+    >;   
+
+    ["染色2"]
+    uniform float4 dis_edge_color1
+    <
+        init = "1,1,1,1"
+        color = "1"
+        artist = "1"
+        uigroup = "基本参数"
+    >; 
+
+    ["染色2，已取消使用"]
+    uniform float4 u_Color2
+    <
+        init = "1,1,1,1"
+        artist = "1"
+        color = "1"
+        uigroup = "基本参数"
+    >;
+
+     ["染色强度2"]
+    uniform float u_Color2_intensity
+    <
+        init = "1.0"
+        artist = "1"
+        uigroup = "基本参数"
+    >;   
+
+
+    ["雾颜色"]
+    uniform float4 u_fog_color: FOG_COLOR
+    <
+        init = "1,1,1,1"
+        color = "1"
+    >;
+    ["雾参数"]
+    uniform float4 u_fog_info: FOG_INFO
+    <
+        init = "0,0,0,0"
+    >;
+
+    ["膨胀距离"]
+    uniform float u_expand
+    <
+        init = "1"
+        artist = "1"
+        min = "0.001"
+        max = "5.0"
+        uistep = "0.001"
+        uigroup = "膨胀"
+    >;
+
+    ["溶解衰减速度"]
+    uniform float u_expand_fade
+    <
+        init = "1"
+        artist = "1"
+        min = "0.001"
+        max = "3.0"
+        uistep = "0.001"
+        uigroup = "膨胀"
+    >;
+    ["基础膨胀值"]
+    uniform float u_expand_base
+    <
+        init = "0.1"
+        artist = "1"
+        min = "0.001"
+        max = "0.5"
+        uigroup = "膨胀"
+    >;
+
+    // ["膨胀平移u"]
+    // uniform float u_expandU
+    // <
+    //     init = "1"
+    //     artist = "1"
+    //     min = "0.001"
+    //     max = "100.0"
+    //     uistep = "0.001"
+    // >;
+
+    ["Diffuse"]
+    uniform sampler Tex0:DIFFUSE
+    <
+        artist = "1"
+    >;
+
+    ["第二张贴图"]
+    uniform sampler Tex1
+    <
+        artist = "1"
+    >;
+
+    ["膨胀贴图"]
+    uniform sampler ExpandTex
+    <
+        artist = "1"
+    >;
+
+    ["溶解贴图"]
+    uniform sampler DissolveTex
+    <
+        artist = "1"
+    >;
+
+    ["渐变色贴图"]
+    uniform sampler GradientTex
+    <
+        artist = "1"
+    >;
+
+    ["单独alpha贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+        artist = "1"
+    >;
+
+    //varying highp float2 UV_raw;
+    varying highp float4 UV0; //xy 变换后uv， z fresnel_apha, w fog_factor
+    varying highp float4 UV1;
+    varying mediump float4 v_dissolve_fac; // x: expand_distance
+
+    vertex
+    {
+        highp float4 _pos = float4(a_position.x, a_position.y, a_position.zw);
+        highp float4 _posWorld = transform(_pos, u_world);
+        highp float3 _normalWorld = normalize(transform(a_normal.rgb, float3x3(u_world)));
+
+        mediump float4 trans_uv = transform(float4(a_texcoord0.xy, 1.0f, 0.0f), u_texTrans0);
+        mediump float2 UV0_ = trans_uv.xy;
+        macro(TEX_ENABLE) out (lowp float2 sec_uv)
+        {
+            branch("1")
+            {
+               // lowp float2 sec_uv_ 
+               //     = float2(u_Tex1_u *( u_Tex1_speed_u + a_texcoord0.x) , u_Tex1_v *(u_Tex1_speed_v + a_texcoord0.y)) ;//* u_frametime + a_texcoord0.xy * float2(u_Tex1_u, u_Tex1_v);
+                out(sec_uv, float2(0.0f));
+            }
+            branch("0"){
+                out(sec_uv, float2(0.0f));
+            }
+        };
+        macro(DISSOLVE_ENABLE) out(lowp float2 dissolve_uv)
+        {
+            branch("1")
+            {
+                //lowp float4 dissolve_uv_ = transform(float4(a_texcoord0.xy, 1.0f, 0.0f), u_texTrans1);
+                lowp float2 dissolve_uv_ 
+                    = float2(u_dissolve_param.x * a_texcoord0.x + u_frametime * u_dissolve_param.z, 
+                        u_dissolve_param.y * a_texcoord0.y + u_frametime * u_dissolve_param.w);
+                out(dissolve_uv, dissolve_uv_);
+            }
+            branch("0"){
+                out(dissolve_uv, float2(0.0f));
+            }
+        };
+
+        out(UV1, float4(sec_uv, dissolve_uv)); // secondUV + dissolveUV
+
+        macro(EXPAND_ENABLE) out(highp float4 posWorld, mediump float expand_distance)
+        {
+            branch("1")
+            {
+                lowp float4 expand_tex = samplelod(ExpandTex, UV0_.xy, 0.0f);
+                lowp float expand_fix = expand_tex.r;
+                // mediump float expand_distance_ = expand_tex.r * u_expand * sin(u_frametime * u_expand_speed);
+                mediump float expand_distance_ = expand_fix * (u_expand_base + u_expand);
+                out(posWorld, float4( _normalWorld * expand_distance_, 0.0f) + _posWorld);
+                out(expand_distance, expand_distance_);
+            }
+            branch("0")
+            {
+                out(posWorld, _posWorld);
+                out(expand_distance, 0.0f);
+            }
+        };
+
+        out(v_dissolve_fac, float4(expand_distance * u_expand_fade, 0.0f, 0.0f, 0.0f));
+
+        macro(FRESNEL_ENABLE) out(lowp float fresnel_alpha)
+        {
+            branch("1")
+            {
+                highp float4 light_dir = u_camera_position - posWorld; // 得到视线方向
+                highp float a = dot(normalize(light_dir.xyz), _normalWorld); //求夹角
+                out(fresnel_alpha, pow(abs(a), u_fresnel_size) * u_fresnel_brightness);
+            }
+            branch("0"){
+                out(fresnel_alpha, 1.0f);
+            }
+        };
+
+
+
+        highp float4 _Position = transform(posWorld, u_vp);
+
+        macro(NO_CLIP) out(highp float z)
+        {
+            branch("1")
+            {
+                out(z, min(_Position.z, 0.9999f*_Position.w)); //保证不会被天空盒剪裁掉
+            }
+            branch("0")
+            {
+                out(z, _Position.z);
+            }
+        };
+        vertex(float4(_Position.xy, z, _Position.w));
+
+        macro(FORCE_FOG_ENABLE) out(lowp float fog_factor)
+        {
+            branch("1") {
+                highp float4 posView = transform(a_position, u_wv);
+                mediump float linear_factor = saturate(smoothstep(u_fog_info.x, u_fog_info.y, posView.z));
+                out(fog_factor, linear_factor * u_fog_color.a);
+            }
+
+            branch("0") {
+                out(fog_factor, 0.0f);
+            }
+        };
+
+        
+        out(UV0, float4(UV0_, fresnel_alpha * a_color.r * AlphaMtl, fog_factor));
+        
+    }
+
+    pixel
+    {
+        lowp float4 u_uv1 = UV1;
+        lowp float4 expand_fac = v_dissolve_fac;    
+            
+        macro (TEX_ENABLE) out 
+            (mediump float4 color0, mediump float4 color1){
+           branch("1") {
+                mediump float4 diffuse_color = sample(Tex0, UV0.xy);
+                macro(SEPARATE_ALPHA_TEX) out(lowp float alpha)
+                {
+                    branch("1")
+                    {
+                        lowp float4 alphaColor = sample(sepAlphaTex, UV0.xy);
+                        out(alpha, alphaColor.a);
+                    }
+                    branch("0") { out(alpha, diffuse_color.a);}
+                };
+
+                mediump float4 color0_ = float4(diffuse_color.r * u_Color1.rgb, alpha);
+                mediump float4 color1_ = float4(float3(diffuse_color.g *  u_Color2_intensity), alpha);//u_Color2.rgb *
+                out(color0, color0_);
+                out(color1, color1_);
+           }
+           branch("0"){
+                out(color0, float4(u_Color1.rgb, 1.0f));
+                out(color1, float4(dis_edge_color1.rgb * u_Color2_intensity, 1.0f));
+           }
+        };
+        
+        macro(USELESS) 
+        {
+            branch("1")
+            {
+                lowp float4 expand_tex = samplelod(ExpandTex, UV0.xy, 0.0f);
+            }
+            branch("0")
+            {
+            }
+        };
+        //out(color0, float4(color0.rgb*u_Color1_intensity, color0.a))
+
+        macro(DISSOLVE_ENABLE) out(mediump float4 color2, lowp float dissolve_alpha_out)
+        {
+            branch("1"){
+                //lowp float fix_dissolve_factor = max(saturate(expand_fac.x), dissolve_factor);
+                mediump float4 dissolve_color = sample(DissolveTex, u_uv1.zw);
+                highp float dissolve_min1 = saturate(dissolve_factor1 - dissolve_width);
+                highp float dissolve_min2 = saturate(dissolve_factor2 - dissolve_width);
+                highp float dissolve_max1 = saturate(dissolve_factor1 + dissolve_width);
+                highp float dissolve_max2 = saturate(dissolve_factor2 + dissolve_width);
+
+                //mediump float dissolve_alpha = smoothstep(dissolve_min, fix_dissolve_factor, saturate(dissolve_color.r - expand_fac.x));
+                mediump float dissolve_alpha = smoothstep(dissolve_min2, saturate(dissolve_factor2), dissolve_color.g);//
+                //mediump float factor = smoothstep(dissolve_min, dissolve_max, saturate(dissolve_color.r - expand_fac.x));
+
+
+
+                mediump float factor = smoothstep(dissolve_min1, dissolve_max1, saturate(dissolve_color.r));
+                //mediump float blend_factor_x = (1.0f-factor);
+                mediump float blend_factor = clamp(10.0f-factor*10.0f, 0.0f,1.0f) ;//clamp(-10.0f * factor + 10.0f, 0.0f, 1.0f);
+
+                mediump float blend_in_factor = 1.0f-smoothstep(0.0f,1.0f,factor);
+                //mediump float blend_in_factor = step(0.9f,blend_in_factor_);
+
+
+                macro(DISSOLVE_GRADIENT_TEX) out (lowp float3 change_color){
+                    branch("1"){
+                        
+                        mediump float blend_Line_factor = smoothstep(0.001f,dissolve_Feather,blend_factor- blend_in_factor);
+
+                        lowp float4 change_color_ = sample(GradientTex, float2(1.0f, factor));
+
+                        lowp float4 change_color_1 = dis_edge_color2 * change_color_*blend_Line_factor* edge_shining + dis_edge_color1*color0.r*blend_in_factor;//dis_edge_color1*blend_in_factor
+
+                        //out(ColorRange ,blend_factor- blend_in_factor );
+
+                        out(change_color, change_color_1.rgb);
+                    }
+                    branch("0"){
+                        lowp float3 change_color_ = lerp(dis_edge_color1.rgb, dis_edge_color2.rgb* edge_shining, float3(factor));
+                        
+                        
+                        out(change_color, change_color_.rgb);
+                    }
+                };
+                
+                        
+                lowp float final_alpha = dissolve_alpha;
+
+                lowp float4 color00 = float4(color0.rgb*u_Color1_intensity, color0.a);
+
+                mediump float4 colorRemap = float4(lerp(color00.rgb, change_color.rgb  * color1.rgb, float3(blend_factor* dis_edge_color1.a)), final_alpha);
+
+                //mediump float4 colorRemap2 = float4(lerp(color0.rgb, colorRemap.rgb , float3(ColorRange)), final_alpha);
+
+
+                out(color2, float4(colorRemap));
+                out(dissolve_alpha_out, dissolve_color.r);
+            }
+            branch("0"){
+                lowp float4 color00 = float4(color0.rgb*u_Color1_intensity, color0.a);
+                out(color2, color00);
+                out(dissolve_alpha_out, 1.0f);
+            }
+        };
+        // lowp float3 o_color = lerp(color2.rgb*u_lightmap_color_min.rgb, color2.rgb, float3(UV0.z));
+        lowp float3 o_color = color2.rgb;
+        mediump float o_alpha = UV0.z * color2.a;
+
+        ["alpha test"]
+        macro(ALPHA_TEST_ENABLE)
+        {
+            branch("1") { alphatest("<")(o_alpha, alphaRef);}
+            branch("0") { }
+        };
+
+        macro(FORCE_FOG_ENABLE) out(lowp float3 out_color)
+        {
+            branch("1") {
+                lowp float fogFactor = UV0.w * u_fog_color.a;
+                out(out_color, o_color * (1.0f - fogFactor) + u_fog_color.xyz * fogFactor);
+            }
+            branch("0") {
+                out(out_color, o_color);
+            }
+        };
+
+        // function encode_hdr_color(out_color.rgb, u_tone_factor, u_adapt_factor) out(mediump float3 hdr_color);
+
+        pixel(float4(out_color.rgb, o_alpha));
+    }
+}

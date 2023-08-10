@@ -1,0 +1,357 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+	["FX_ENABLE"]
+	eitheror FX_ENABLE;
+	macro(FX_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "clamp"
+		addressv = "clamp"
+		lodbias = "-0.5"
+	>;
+	["brick贴图"]
+	uniform sampler BrickTex
+	<
+		artist = "1"
+		mag = "nearest"
+		mip = "nearest"
+		min = "nearest"
+		lodbias = "-0.5"
+		path = "common\\textures\\brick_nopack.png"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["_EmissColor"]
+	uniform mediump float4 _EmissColor
+	<
+		init = "(0.1372549,0.3686275,0.6901961,0.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+	["缩放:_Tilling"]
+	uniform mediump float _Tilling
+	<
+		artist = "1"    
+		init = "1.0"
+		// uistep = "0.001"
+		// max = "1.0"
+		// min = "0.0"
+	>;
+	["Y轴缩放:_TillingY"]
+	uniform mediump float _TillingY
+	<
+		artist = "1"    
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["X轴平移:_OffsetX"]
+	uniform mediump float _OffsetX
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "-1.0"
+	>;
+	["Y轴平移:_OffsetY"]
+	uniform mediump float _OffsetY
+	<
+		artist = "1"    
+		init = "-0.13"
+		uistep = "0.001"
+		max = "1.0"
+		min = "-1.0"
+	>;
+	["格子平铺数：_BrickTilling"]
+	uniform mediump float _BrickTilling
+	<
+		artist = "1"
+		init = "10.0"
+	>;
+	// ["格子化程度(高度):_HeightPoint"]
+	// uniform mediump float _HeightPoint
+	// <
+	// 	artist = "1"    
+	// 	init = "0.1"
+	// 	uistep = "0.001"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// >;
+	["ChangeAmount"]
+	uniform mediump float ChangeAmount
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["边缘渐隐Start:_FadeStart"]
+	uniform mediump float _FadeStart
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"
+		max = "2.0"
+		min = "-2.0"
+	>;
+	["边缘渐隐End:_FadeEnd"]
+	uniform mediump float _FadeEnd
+	<
+		artist = "1"    
+		init = "0.2"
+		uistep = "0.001"
+		max = "2.0"
+		min = "-2.0"
+	>;
+	["半透明度:_Alpha"]
+	uniform mediump float _Alpha
+	<
+		artist = "1"    
+		init = "0.25"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["Brick半透明度:_Alpha"]
+	uniform mediump float _BrickAlpha
+	<
+		artist = "1"    
+		init = "0.05"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["明度:_Luminance"]
+	uniform mediump float _Luminance
+	<
+		artist = "1"    
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["饱和度:_DeSaturate"]
+	uniform mediump float _DeSaturate
+	<
+		artist = "1"    
+		init = "0.7"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["过渡"]
+	uniform mediump float _SmoothFade
+	<
+		artist = "1"    
+		init = "0.13"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["亮边偏移"]
+	uniform float EdgeDistance
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.15"
+		uistep = "0.001"  
+		max = "1"
+		min = "-1"
+	>;
+	["亮边宽度"]
+	uniform float EdgeWidth
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.15"
+		uistep = "0.001"  
+		max = "3"
+		min = "0"
+	>;
+	["亮边平滑度"]
+	uniform float EdgeSmoothness
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "2.0"
+	>;
+	["亮边亮度"]
+	uniform float EdgeIntensity
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "2.5"
+	>;
+	["亮边颜色"]
+	uniform mediump float4 EdgeColor
+	<
+		uigroup = "大龙扩散特效"
+		init = "(0.0, 0.392, 0.623,1.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform highp float frame_time : FRAME_TIME;
+	uniform highp float4 viewport_size : VIEWPORT_SIZE;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying highp float4 v_screenpos;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+	    vertex(pos);
+	 //    macro(FX_ENABLE)
+	 //    {
+	 //    	branch("1")
+	 //    	{
+		// 		out(v_screenpos,pos);
+		// 	}
+		// 	branch("0")
+		// 	{
+
+		// 	}
+		// };
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+	}
+
+	pixel
+	{
+		mediump float2 tex_uv = UV0.xy / float2(0.664f,1.0f) / float2(_Tilling,_Tilling) + float2(_OffsetX,_OffsetY);
+		lowp float4 diffuse_color = sample(Tex0,tex_uv);
+
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, tex_uv);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_color.a);
+			}
+	    };
+
+	    mediump float screen_aspect = (viewport_size.x +  (1920.0f - clamp(viewport_size.x,1280.0f,1920.0f)) * 0.25f) / 1920.0f;
+
+	    mediump float uv_vertical = 1.0f - UV0.y;
+	    lowp float vertical_alpha = smoothstep(0.45f,1.0f,uv_vertical);
+	    lowp float horizontal_alpha = smoothstep(_FadeStart,_FadeEnd,1.0f - saturate(abs(tex_uv.x - 0.5f) * 2.0f));
+	    lowp float body_alpha = horizontal_alpha * vertical_alpha * _Alpha * alpha;
+	    lowp float combine_alpha = saturate(body_alpha);
+
+	   	lowp float3 mul_color = diffuse_color.rgb * body_alpha;
+	   	lowp float mul_alpha = dot(mul_color,float3(0.3f, 0.59f, 0.11f));
+		lowp float3 combined_color = lerp(mul_color,float3(mul_alpha),float3(_DeSaturate));
+
+	    macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(combine_alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		macro(FX_ENABLE) out(lowp float3 fx_color,lowp float fx_alpha)
+		{
+			branch("1")
+			{
+				lowp float4 brick_color = sample(BrickTex,UV0.xy * _BrickTilling);
+				lowp float brick_factor = (1.0f - brick_color.r);
+				mediump float _BrickStep = _BrickTilling * 10.0f;
+				mediump float changefactor = ChangeAmount * 1.2f;
+				mediump float floorline_ = (floor(changefactor * _BrickStep) / _BrickStep - UV0.x);
+				mediump float floorline = smoothstep(0.0f,_SmoothFade,floor(floorline_ * _BrickStep) / _BrickStep);
+				// lowp float patternfade_factor = saturate(floorline + floorline - brick_factor);
+				lowp float patternfade_factor = floorline + floorline - brick_factor;
+
+				mediump float edge_factor = smoothstep(1.0f,0.0f,abs(patternfade_factor - EdgeDistance) / EdgeWidth);
+				mediump float edge_mask = saturate(edge_factor * edge_factor);
+
+				// lowp float pattern_factor = saturate(1.0f - floorline);
+				// lowp float4 diffuse_color_scale = sample(Tex0,tex_uv * 0.98f);
+				// lowp float3 scale_color = lerp(combined_color,diffuse_color_scale.rgb,float3(pattern_factor));
+				lowp float fx_alpha_ = combine_alpha * saturate(patternfade_factor);
+				lowp float fx_combined_alpha = saturate(fx_alpha_ + combine_alpha * edge_mask * EdgeIntensity);
+				out(fx_color,combined_color + edge_mask * EdgeColor.rgb * EdgeIntensity);
+				out(fx_alpha,fx_combined_alpha);
+			}
+			branch("0")
+			{
+				out(fx_color,combined_color);
+				out(fx_alpha,combine_alpha);
+			}
+		};
+
+
+		pixel(float4(float3(fx_color), fx_alpha));
+	}
+}

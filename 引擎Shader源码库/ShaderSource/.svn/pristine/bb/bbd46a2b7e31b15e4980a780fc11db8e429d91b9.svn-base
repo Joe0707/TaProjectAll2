@@ -1,0 +1,235 @@
+["双面材质"]
+pipeline
+<
+	version = "1.0.0"
+	author = "mengqingyu"
+	company = "netease"
+	merge = "1"
+
+>
+{
+	["单贴图染色模式"]
+	eitheror SINGLE_MAP;
+	macro(SINGLE_MAP)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启溶解"]
+	eitheror DISSOLVE_ENABLE;
+	macro(DISSOLVE_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否柔边溶解"]
+	eitheror DISSOLVE_SOFT;
+	macro(DISSOLVE_SOFT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	attribute float4 a_position: POSITION;
+	attribute float2 a_texture0: TEXTURE0;
+	attribute float4 a_normal : NORMAL;
+
+	uniform highp float4x4 wv : WORLD_VIEW;
+	uniform highp float4x4 u_world_view_projection: WORLD_VIEW_PROJECTION;
+	
+	["正面贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		addressu = "repeat"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		map = "linear"
+		lodbias = "-0.5"
+	>;
+
+    ["反面贴图"]
+	uniform sampler Tex01
+	<
+		artist = "1"
+		addressu = "repeat"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		map = "linear"
+		lodbias = "-0.5"
+	>;
+
+	["正面颜色"]
+	uniform lowp float4 color01
+	<
+		uigroup = "染色"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["背面颜色"]
+	uniform lowp float4 color02
+	<
+		uigroup = "染色"
+		init = "(0.0, 0.0, 0.0, 1.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["溶解贴图"]
+	uniform sampler DisTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["溶解贴图密度"]
+	uniform float2 dissolve_density
+	<
+		uigroup = "溶解"
+		init = "(1.0, 1.0)"
+		artist = "1"
+	>;
+
+	["溶解程度"]
+    uniform lowp float dissolve_intensity
+    <
+        artist = "1"
+        max = "1.0"
+        min = "0.0"
+        init = "0.0"
+        uistep = "0.01"
+        uigroup = "溶解"
+    >;
+
+    ["柔边溶解宽度"]
+    uniform lowp float soft_intensity
+    <
+        artist = "1"
+        max = "1.0"
+        min = "0.0"
+        init = "0.0"
+        uistep = "0.01"
+        uigroup = "溶解"
+    >;
+
+	
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	//uniform lowp float4 ambient_color : AMBIENT;
+	
+	varying mediump float2 v_texture0: TEXTURE0;
+	varying mediump float3 v_view_normal;
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, u_world_view_projection);
+
+		float3x3 wvMat = float3x3(wv);
+		mediump float3 view_normal = normalize(transform(a_normal.xyz, wvMat));
+
+		vertex(pos);
+		out(v_texture0, a_texture0);
+		out(v_view_normal, view_normal);
+	}
+	
+	pixel
+	{
+		lowp float face = v_view_normal.z;
+		mediump float2 uv = v_texture0;
+		macro(SINGLE_MAP) out(lowp float4 diffuse) 
+		{
+			branch ("0") 
+			{
+				condition(face) out(lowp float4 diffuse1) 
+				{
+					branch ("%0% > 0.0") 
+					{
+						lowp float4 diffuse0 = sample(Tex01, uv);
+						out(diffuse1, diffuse0);
+					}
+					default 
+					{
+						lowp float4 diffuse0 = sample(Tex0, uv);
+						out(diffuse1, diffuse0);
+					}
+				};
+				out(diffuse, diffuse1);
+			}
+			branch ("1")
+			{
+				lowp float4 diffuse0 = sample(Tex0, uv);
+				condition(face) out(lowp float3 diffuse1rgb) 
+				{
+					branch ("%0% > 0.0") 
+					{
+						out(diffuse1rgb, diffuse0.rgb * color02.rgb);
+					}
+					default 
+					{
+						out(diffuse1rgb, diffuse0.rgb * color01.rgb);
+					}
+				};
+				out(diffuse, float4(diffuse1rgb, diffuse0.a));
+			}  
+		};
+		
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (float diffuseAlpha)
+		{
+			branch("1")
+			{
+				lowp float4 sepColor = sample(sepAlphaTex, v_texture0);
+				out(diffuseAlpha, sepColor.w);
+			}
+			branch("0") {out(diffuseAlpha, diffuse.w);}
+		};
+
+		macro(DISSOLVE_ENABLE) out(lowp float4 res) 
+		{
+			branch ("0") 
+			{
+				out(res, float4(diffuse.xyz, diffuseAlpha * AlphaMtl));
+			}
+			branch ("1") 
+			{
+				lowp float4 disColor = sample(DisTex, uv * dissolve_density);
+				macro(DISSOLVE_SOFT) out(lowp float disAlpha) 
+				{
+					branch ("0") 
+					{
+						lowp float dis = lerp(-0.004f, 1.004f, dissolve_intensity);
+						alphatest("<")(disColor.r, dis);
+						out(disAlpha, diffuseAlpha);
+					}
+					branch ("1") 
+					{
+						lowp float dis = lerp(-0.004f - soft_intensity, 1.004f, dissolve_intensity);
+						lowp float disAlpha0 = smoothstep(0.0f, soft_intensity, disColor.r - dis) * diffuseAlpha;
+						out(disAlpha, disAlpha0);
+					}
+				};
+				out(res, float4(diffuse.xyz, disAlpha * AlphaMtl));
+			}
+		};
+		
+		pixel(res);
+	}
+	
+}

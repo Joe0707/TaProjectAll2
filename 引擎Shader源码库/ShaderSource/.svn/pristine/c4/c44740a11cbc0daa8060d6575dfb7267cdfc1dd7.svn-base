@@ -1,0 +1,1813 @@
+﻿["F-PBR shader for DM62"]
+pipeline
+<
+	version = "1.0.8.7" 
+	author = "fanyu/liuyu" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	["低配模式"]
+	eitheror LOW_QUALITY_ENABLE;
+	macro(LOW_QUALITY_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	eitheror HDR_ENABLE;
+	macro(HDR_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	
+	// 宏
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["开启高光"]
+	eitheror PBR_SPECULAR_ENABLE;
+
+	["开启环境反射(ENVIR_ENABLE)"]
+	eitheror ENVIR_ENABLE;
+
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+
+	["开启边缘光(FRESNEL_ENABLE)"]
+	eitheror FRESNEL_ENABLE;
+	
+	["是否手动调参数(MANUL_ENABLE)"]
+	eitheror MANUL_ENABLE;
+
+	["是否打开光"]
+	eitheror LIGHT_ENABLE;
+	
+	["仅打开diffuse"]
+	eitheror NOT_DIFFUSE;
+	
+	["补光"]
+	eitheror DIR_AMBIENT_ENABLE;
+
+	["开启sss"]
+	eitheror SSS_ENABLE;
+
+	["开启各向异性"]
+	eitheror ANISO_ENABLE;	
+
+	["开启自发光"]
+	eitheror SELF_BLING;
+
+	["开启贴花"]
+	eitheror DECAL_ENABLE;
+
+	["检查diffuse"]
+	eitheror DIFFUSE_CHECK;
+
+	["接受点光"]
+	eitheror POINT_LIGHT_ENABLE;
+
+
+
+	// ["开启羽毛反射"]
+	// eitheror FUR_COLOR_ENABLE;
+
+	
+	macro(NOT_DIFFUSE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "0"
+	>;
+
+	macro(SHADOW_MAP_ENABLE_DEPTH_TEX)
+	<
+		default = "1"
+	>;
+	
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(ENVIR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(FRESNEL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(MANUL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	// macro(SHADOWMAP_TYPE)
+	// <
+	// 	default = "SOFT_SHADOWMAP"
+	// 	customizable = "0"
+	// >;
+
+	macro(DIR_AMBIENT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(SSS_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(ANISO_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(SELF_BLING)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(DECAL_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;	
+
+	macro(DIFFUSE_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(PBR_SPECULAR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(POINT_LIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(HDR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	// macro(FUR_COLOR_ENABLE)
+	// <
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	["金属度/sss/光滑度"]
+	uniform sampler SamplerRough
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["ramp贴图"]
+	uniform sampler SamplerRamp
+	<
+		artist = "1"
+		addressu = "clamp"
+		addressv = "clamp"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-10.0"
+	>;
+
+	
+	["环境贴图"]
+	uniform sampler SamplerEnvMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-10.0"
+	>;
+
+	["cubemap贴图"]
+	uniform sampler SamplerCubeMap
+	<
+		artist = "1"
+		addressu = "clamp"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		thumbnail = "0"
+	>;
+
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["各向异性贴图（RG方向，B区域）"]
+	uniform sampler SamplerAniso
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["贴花贴图"]
+	uniform sampler SamplerDecal
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	// ["扰动贴图"]
+	// uniform sampler SamplerNoise
+	// <
+	// 	mag = "POINT"
+	// 	mip = "POINT"
+	// 	min = "POINT"
+	// 	path = "common\\textures\\noise.bmp"
+	// >;
+
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "0"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+	
+	// —————————————————— PBR调整 ——————————————————
+	["手动金属度"]
+	uniform mediump float manul_metal
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+	
+	["手动光滑度"]
+	uniform mediump float manul_rough
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["金属度缩放"]
+	uniform mediump float metal_multi
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "2.0"
+	>;
+	["粗糙度缩放"]
+	uniform mediump float rough_multi
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "2.0"
+	>;
+	
+/*
+	["非金属最低灰阶(min_metal_gray)"]
+	uniform mediump float min_metal_gray
+	<
+		uigroup = "1 PBR"
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.003"
+	>;
+*/
+	
+	// —————————————————— 环境光PBR ——————————————————
+	["反射强度(envir_brightness)"]
+	uniform mediump float envir_brightness
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+	
+	
+	["反射边缘强度(envir_fresnel_brightness)"]
+	uniform mediump float envir_fresnel_brightness
+	<
+		uigroup = "1 环境光"
+		uistep = "0.001"
+		min = "-1.0" 
+		max = "2.0" 
+		init = "0.15"
+	>;
+	
+	["贴图行数(row_num)"]
+	uniform mediump float row_num
+	<
+		uigroup = "1 环境光"
+		min = "0.0" 
+		max = "10.0"
+		init = "4.0"
+	>;
+	
+
+
+
+	["旋转cubemap"]
+	uniform mediump float nx_offset
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-5.0"
+		max = "5.0"
+		uigroup = "1 环境光"
+	>;
+
+	["最大亮度值"]
+	uniform mediump float max_brightness
+	<
+		uigroup = "1 PBR"
+		artist = "0" 
+		init = "8.0"
+		min = "1.0"
+		max = "60.0"
+		uigroup = "1 环境光"
+	>;
+
+
+
+
+	// —————————————————— 动态光PBR ——————————————————
+	
+	["高光颜色(spec_color)"]
+	uniform mediump float4 light_spec_color
+	<
+		uigroup = "2 动态光"
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	
+
+	["反射强度(spec_intensity)"]
+	uniform mediump float spec_intensity
+	<
+		artist = "1" 
+		uigroup = "2 动态光"
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["GGX最小粗糙度(min_ggx_roughness)"]
+	uniform mediump float min_ggx_roughness
+	<
+		uigroup = "2 动态光"
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.00"
+	>;
+	
+	["GGX最小粗糙度(max_ggx_roughness)"]
+	uniform mediump float max_ggx_roughness
+	<
+		uigroup = "2 动态光"
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+
+
+
+	
+	// ——————————————————各向异性——————————————————
+	
+	["抖动偏移值(Anisotropic_offset)"]
+	uniform mediump float noise_offset
+	<
+		uigroup = "各向异性"
+		artist = "1" 
+		uistep = "0.001"
+		min = "-5.0" 
+		max = "5.0" 
+		init = "-0.2"
+	>;
+
+	["整体偏移值(Anisotropic_offset)"]
+	uniform mediump float normal_offset
+	<
+		uigroup = "各向异性"
+		artist = "1" 
+		uistep = "0.001"
+		min = "-5" 
+		max = "5" 
+		init = "-0.2"
+	>;
+	
+	["整体偏移值(Anisotropic_offset)"]
+	uniform mediump float normal_offset2
+	<
+		uigroup = "各向异性"
+		artist = "1" 
+		uistep = "0.001"
+		min = "-5" 
+		max = "5" 
+		init = "-0.2"
+	>;
+	
+	// ——————————————————自发光——————————————————
+	
+	["自发光强度"]
+	uniform mediump float emissive_intensity
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		uistep = "0.001"
+		min = "1.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	// ——————————————————DIFFUSE——————————————————
+
+	["漫反射强度"]
+	uniform mediump float diffuse_intensity
+	<
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		uistep = "0.001"
+		artist = "1"
+		uigroup = "0 漫反射"
+	>;
+
+	["环境光"]
+	uniform mediump float4 ambient_color
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		color = "1"
+		init = "(0.5,0.5,0.5,0.5)"
+	>;	
+
+	["AO强度"]
+	uniform lowp float ao_intensity
+	<
+		uigroup = "风格化"
+		min = "1.0" 
+		max = "10.0" 
+		init = "1.0"
+		artist ="1"
+		uistep = "0.001"
+	>;
+	["漫画化"]
+	uniform mediump float u_light_scale
+	<
+		init = "1.0"
+		max = "2.0"
+		min = "1.0"
+		uistep = "0.001"
+		artist = "1"
+		uigroup = "风格化"
+	>;
+
+	["ndl缩放"]
+	uniform lowp float ndl_multi
+	<
+		init = "0.68"
+		artist = "0"
+		uistep = "0.001"
+		max = "2.0"
+		min = "0.0"
+	>;	
+
+	["ndl pow"]
+	uniform lowp float ndl_pow
+	<
+		init = "1.05"
+		artist = "0"
+		uistep = "0.001"
+		max = "5.0"
+		min = "0.0"
+	>;		
+
+	["ndl偏移"]
+	uniform lowp float ndl_bias
+	<
+		init = "0.26"
+		artist = "0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "-1.0"
+	>;		
+
+	["角色高度"]
+	uniform mediump float char_height
+	<
+		artist = "1"
+		init = "20"
+		min = "0"
+		uigroup = "风格化"
+	>;
+
+
+	["下身调色"]
+	uniform mediump float4 down_color
+	<
+		init = "(1.0,1.0,1.0,1.0)"
+		artist = "1"
+		color = "1"
+		uigroup = "风格化"
+	>;
+
+	["暗部颜色"]
+	uniform mediump float4 dark_color
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		color = "1"
+		init = "(0.15,0.15,0.15,0.15)"
+	>;	
+	["暗部细节抹平"]
+	uniform mediump float u_spec_dark_pow
+	<
+		artist = "1"
+		init = "2.2"
+		min = "1.0"
+		max = "10.0"
+		uistep = "0.001"
+		uigroup = "风格化"
+	>;
+
+	// ——————————————————自投影——————————————————
+
+
+
+	["自投影浓度"]
+	uniform mediump float shadow_prop
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+		artist = "1"
+		uigroup = "自投影"
+	>;		
+
+
+
+	//————————————————补光——————————————————
+
+	["补光强度"]
+	uniform mediump float dir_ambient_intensity
+	<
+		init = "0.57"
+		max = "5.0"
+		min = "0.0"
+		uistep = "0.001"
+		artist = "1"
+		uigroup = "补光"
+	>;	
+
+	["补光颜色"]
+	uniform mediump float4 dir_ambient
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.2,0.384,0.78,1.0)"
+		uigroup = "补光"
+	>;	
+	
+	["补光位置x"]
+	uniform highp float l_pos_x
+	<
+		init = "55"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["补光位置y"]
+	uniform highp float l_pos_y
+	<
+		init = "26"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["补光位置z"]
+	uniform highp float l_pos_z
+	<
+		init = "16"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+
+	["补光开始"]
+	uniform lowp float da_start
+	<
+		init = "0.51"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;	
+
+	["补光结束"]
+	uniform lowp float da_end
+	<
+		init = "0.66"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+
+
+	// ====================0 基础=====================
+
+
+
+
+
+	["光源位置x"]
+	uniform highp float u_light_pos_x
+	<
+		init = "-100"
+		artist = "1"
+		uigroup = "光源位置x"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["光源位置y"]
+	uniform highp float u_light_pos_y
+	<
+		init = "52"
+		artist = "1"
+		uigroup = "光源位置y"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["光源位置z"]
+	uniform highp float u_light_pos_z
+	<
+		init = "-100"
+		artist = "1"
+		uigroup = "光源位置z"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+
+	["强制设置颜色（用于逻辑控制颜色）"]
+	uniform mediump float3 force_pixel_color
+	<
+		artist = "0"
+		init = "(0.0, 0.0, 0.0)"
+	>;	
+
+
+
+	// —————————————————— FRESNEL ——————————————————
+
+
+	["覆盖范围"]
+	uniform mediump float rim_power
+	<
+		uigroup = "3 rim"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"
+		max = "1.0"
+		min = "5.0"
+	>;
+	["强度"]
+	uniform mediump float rim_multi
+	<
+		uigroup = "3 rim"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"    
+		max = "5.0"
+		min = "0.0"
+	>;
+
+	["轮廓颜色"]
+	uniform mediump float4 rim_color
+	<
+		uigroup = "3 rim"
+		init = "(0.0, 0.0, 0.0, 0.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["内部颜色"]
+	uniform mediump float4 adjust_inner
+	<
+		uigroup = "3 rim"
+		init = "1"
+		artist = "1"
+		color ="1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	["内部透明度"]
+	uniform mediump float inner_alpha
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "1"
+		max = "1.0"
+		min = "-0.5"
+		artist = "1"
+	>;
+
+	["rim 开始"]
+	uniform mediump float u_rim_start
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["rim 结束"]
+	uniform mediump float u_rim_end
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "1"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+
+
+
+	// —————————————————— SSS ——————————————————
+	["SSS颜色"]
+	uniform mediump float4 sss_color
+	<
+		init = "(0.5,0.5,0.5,0.5)"
+		artist = "1"
+		color = "1"
+		uigroup = "sss"
+	>;	
+
+	["SSS强度"]
+	uniform mediump float sss_intensity
+	<
+		init = "1.0"
+		artist = "1"
+		max = "5.0"
+		min = "1.0"
+		uistep = "0.001"
+		uigroup = "sss"
+	>;	
+
+	["SSS结束"]
+	uniform mediump float sss_range_end
+	<
+		init = "0.51"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+		uigroup = "风格化"
+	>;	
+
+	["SSS开始"]
+	uniform mediump float sss_range_start
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+		uigroup = "风格化"
+	>;	
+
+	// —————————————————— SSS ——————————————————
+
+
+	["poisson uniform values"]
+	uniform lowp float4[8] poissonDisk
+	<
+		init = "(0.0, 0.0, -0.94201624, -0.39906216, 0.94558609, -0.76890725, -0.094184101, -0.92938870, 0.34495938, 0.29387760, -0.91588581, 0.45771432, -0.81544232, -0.87912464, -0.38277543, 0.27676845, 0.97484398, 0.75648379, 0.44323325, -0.97511554, 0.53742981, -0.47373420, -0.26496911, -0.41893023, 0.79197514, 0.19090188, -0.24188840, 0.99706507, -0.81409955, 0.91437590, 0.19984126, 0.78641367)"
+	>;
+	
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1; // 贴花的uv
+	varying mediump float v_char_height; 
+	varying mediump float4 PosWorld;	
+	varying mediump float4 pos_local;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+	varying lowp float3 GiLightColor;
+	varying highp float4 PosLightProj;
+	
+	varying mediump float4 v_light_proj_pos;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float4 shadow_blendall:SHADOW_BLEND_ALL;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform mediump float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	
+	uniform mediump float4 ZBufferParams: ZBUFFER_PARAMS;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	uniform mediump float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+
+	
+	// —————————————————— Sphere Gassian ——————————————————
+	function SG in (lowp float x, mediump float k) out (lowp float result)
+	{
+		mediump float a = k * 1.44269504f + 1.089234755f;
+		out (result, exp2(a * x - a));
+	};
+
+	// —————————————————— PBR函数 ——————————————————
+	// D
+	function CookTorranceContrib in (lowp float vdh, lowp float ndh, lowp float ndl, lowp float ndv, lowp float Roughness) out (mediump float brdf)
+	{
+	  // This is the contribution when using importance sampling with the GGX based
+	  // sample distribution. This means ct_contrib = ct_brdf / ggx_probability
+	  
+	  // Schlick with Smith-like choice of k
+	  // cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+	  // visibility is a Cook-Torrance geometry function divided by (n.l)*(n.v)
+	  
+	  float k = max(Roughness * Roughness * 0.5f, 1e-5f);
+	  out(brdf, vdh * ndl / (ndh * ( ndl*(1.0f-k) +  k ) * ( ndv*(1.0f-k) +  k )));
+	};
+
+	// GGX / Trowbridge-Reitz
+	// [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
+	function D_GGX in( float Roughness, float NoH ) out (lowp float D_GGX)
+	{
+		float m = Roughness * Roughness;
+		float m2 = m * m;
+		float d = ( NoH * m2 - NoH ) * NoH + 1.0f;	// 2 mad
+		out(D_GGX, m2 / ( d*d ));		// 2 mul, 1 rcp
+	};
+
+	// Anisotropic GGX
+	// [Burley 2012, "Physically-Based Shading at Disney"]
+	function D_GGXaniso in ( float RoughnessX, float RoughnessY, float NoH, float3 H, float3 X, float3 Y ) out(mediump float D_GGX)
+	{
+		float mx = RoughnessX * RoughnessX;
+		float my = RoughnessY * RoughnessY;
+		float XoH = dot( X, H );
+		float YoH = dot( Y, H );
+		float d = XoH*XoH / (mx*mx) + YoH*YoH / (my*my) + NoH*NoH;
+		out(D_GGX, 1.0f / ( mx*my * d*d ));
+	};
+		
+	// G
+	function SmithJointGGXVisibilityTerm in (lowp float a, lowp float NdotL, lowp float NdotV) out (lowp float V)
+	{
+		//lowp float a = roughness * roughness;
+		lowp float mina = 1f - a;
+		lowp float lambdaV = NdotL * (NdotV * mina + a);
+		lowp float lambdaL = NdotV * (NdotL * mina + a);
+		out(V, 1.0f / (lambdaV + lambdaL + 1e-5f));
+	};
+	
+	// G
+	// Tuned to match behavior of Vis_Smith
+	// [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
+	function Vis_Schlick in ( lowp float Roughness, lowp float NoV, lowp float NoL ) out (mediump float v)
+	{
+		float k = ( Roughness * Roughness ) * 0.5f;
+		float Vis_SchlickV = NoV * (1.0f - k) + k;
+		float Vis_SchlickL = NoL * (1.0f - k) + k;
+		out(v ,0.25f / ( Vis_SchlickV * Vis_SchlickL ));
+	};
+
+	function G_Schlick_Disney in (lowp float Roughness,lowp float NoV,lowp float NoL ) out(mediump float G)
+	{
+		float k = ( 0.5f + 0.5f*Roughness ) * ( 0.5f + 0.5f*Roughness );
+		float G_SchlickV = NoV * (1.0f - k) + k;
+		float G_SchlickL = NoL * (1.0f - k) + k;
+		out(G, 0.25f / ( G_SchlickV * G_SchlickL ));
+	};
+
+	// F
+	// [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
+	// [Lagarde 2012, "Spherical Gaussian approximation for Blinn-Phong, Phong and Fresnel"]
+	function F_Schlick in (mediump float3 SpecularColor, lowp float VoH) out (mediump float3 f_color)
+	{
+		lowp float t = 1.0f - VoH;
+		//float Fc = pow(1.0f - VoH, 5.0f); 
+		function SG(t, 5.0f) out(lowp float Fc);
+		out(f_color, SpecularColor + (float3(1.0f) - SpecularColor) * Fc);
+		
+
+	};
+
+
+	// IBL
+	function EnvBRDFApprox in (mediump float3 SpecularColor, lowp float Roughness, lowp float NoV, mediump float brightness) out (mediump float3 env_brdf)
+	{
+		lowp float4 c0 = float4( -1f, -0.0275f, -0.572f, 0.022f );
+		lowp float4 c1 = float4( 1.0f, 0.0425f, 1.04f, -0.04f );
+		mediump float4 r = Roughness * c0 + c1;
+		//lowp float rx = max(0.2f, r.x);
+		mediump float a004 = min( r.x * r.x, exp2(-9.28f * NoV )) * r.x + r.y;
+		mediump float2 AB = float2( -1.04f, 1.04f ) * a004 + r.zw;
+		out(env_brdf, SpecularColor * AB.x + float3(AB.y) * brightness);
+
+	};
+
+	// IBL采样（matcap方式）
+	function GetEnvirmentColor in (lowp float lod, mediump float row_num, mediump float d_row_num, lowp float2 normal_view_xy, sampler env_map) out(mediump float3 envir_color)
+	{
+		mediump float lod1 = lod;
+		
+		mediump float2 uv_1 = normal_view_xy * 0.5f + float2(0.5f);
+		
+		mediump float v_index_1 = floor(lod1 / row_num);
+		mediump float u_index_1 = floor(lod1 - v_index_1 * row_num);
+		
+		mediump float2 final_uv_1 = float2(uv_1.x + u_index_1, uv_1.y + v_index_1) * d_row_num;
+
+		lowp float4 envir1 = sample(env_map, final_uv_1.xy);
+		mediump float3 envir1_hdr = float3(0.3f) / max(float3(1.0f) - envir1.xyz, float3(0.02f)) - float3(0.3f);
+		out(envir_color, envir1_hdr * envir1_hdr);
+	};
+
+	// // IBL specular采样
+	// function GetEnvirmentColor_prefiltered in(sampler env_map, mediump float rough, highp float3 R, mediump float brightness) out(mediump float3 envir_color)
+	// {
+	// 	//mediump float MIP_ROUGHNESS = 0.14f;
+	// 	mediump float MIP_ROUGHNESS = 0.14f;
+	// 	highp float level = rough / MIP_ROUGHNESS;
+	// 	highp float fsign = max(sign(R.z), 0.0f);
+	// 	highp float fsign2 = fsign * 2.0f - 1.0f;
+	// 	mediump float2 uv0 = R.xy / ((R.z + fsign2) * fsign2);
+	// 	mediump float2 uv1 = uv0 * float2(0.25f, -0.25f) + float2(0.25f + 0.5f * fsign);
+		
+	// 	mediump float4 env_tex = samplelod(env_map, uv1, level);
+	// 	mediump float3 env_color = env_tex.rgb *  env_tex.a  *  8.0f;
+
+	// 	out(envir_color, env_color);
+	// };
+
+
+	// IBL specular采样
+	function GetEnvirmentColor_prefiltered in(
+		sampler env_map, mediump float rough, highp float3 R, mediump float brightness, lowp float max_brightness) out(mediump float3 envir_color)
+	{
+		//mediump float MIP_ROUGHNESS = 0.14f;
+		mediump float MIP_ROUGHNESS = 0.14f;
+		highp float level = rough / MIP_ROUGHNESS;
+		highp float fsign = max(sign(R.z), 0.0f);
+		highp float fsign2 = fsign * 2.0f - 1.0f;
+		mediump float2 uv0 = R.xy / ((R.z + fsign2) * fsign2);
+		mediump float2 uv1 = uv0 * float2(0.25f, -0.25f) + float2(0.25f + 0.5f * fsign);
+		
+		mediump float4 env_tex = samplelod(env_map, uv1, level);
+		mediump float3 env_color = env_tex.rgb  *  env_tex.a * max_brightness;
+
+		out(envir_color, env_color);
+	};
+
+
+	// IBL_panorama
+	function GetEnvirmentColor_panorama in(sampler env_map, mediump float rough, highp float3 R, lowp float max_brightness) out(mediump float3 envir_color)
+	{
+		//mediump float MIP_ROUGHNESS = 0.14f;
+		mediump float MIP_ROUGHNESS = 0.14f;
+		highp float level = rough / MIP_ROUGHNESS;
+		mediump float PI = 3.1415926535897932384626433832795f;
+		mediump float INV_PI = 0.31830988618379067153776752674503f;
+		mediump float INV_PIX2 = 0.15915494309189533576888376337251f;
+		
+		mediump float theta = atan2(R.z, R.x);
+		mediump float2 ref_uv = float2((theta + PI) * INV_PIX2, acos(R.y) * INV_PI);
+
+		mediump float4 env_tex = samplelod(env_map, ref_uv, level);
+		//mediump float3 env_color = env_tex.rgb * (env_tex.a * env_tex.a * 4.0f);
+		mediump float3 env_color = env_tex.rgb *  env_tex.a *  max_brightness;
+
+		out(envir_color, env_color);
+	};
+
+	
+	
+	function GetShadowColor in(mediump float3 light_dir,mediump float3 normalWorld, mediump float shadow_fac, mediump float3 in_shadow_color, mediump float3 no_shadow_color) out(mediump float3 shadow_color, mediump float dark_area)
+	{
+		mediump float normal_dot_light_raw = clamp(dot(normalWorld, -light_dir), 0.0f, 1.0f);
+		mediump float normal_dot_light = saturate(normal_dot_light_raw);
+		mediump float dark_area_ = min(normal_dot_light_raw, shadow_fac);
+		mediump float3 _shadow_color = lerp(in_shadow_color, no_shadow_color, float3(dark_area_));
+		out(shadow_color, _shadow_color);
+		out(dark_area, dark_area_);
+	};
+
+	    ["根据像素在灯光空间的位置，深度色和shadowalpha取得shadow因子"]
+    function calc_shadow_inner in(
+        highp samplershadow shadow_sampler, 
+        highp float4 light_proj_pos,    // 在光源投影空间的坐标
+        highp float4 shadow_info,       // 阴影信息
+        highp float4 shadow_blend_all
+    ) out(highp float shadow_factor) // 阴影因子
+    {
+        highp float bias = clamp( 0.005f * (1.0f - light_proj_pos.w) + 0.001f,  0.0f, 1.0f );
+        //highp float bias = (saturate(1.0f - light_proj_pos.w) + 0.1f) * shadow_blend_all.y;
+
+        highp float2 uv = light_proj_pos.xy;
+        highp float pos_z_bias = light_proj_pos.z - bias;
+
+        //???这里有潜在问题吧
+        macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(highp float pos_z)
+        {
+            branch("1")
+            {
+                out(pos_z, pos_z_bias);
+            }
+            branch("0")
+            {
+                out(pos_z, pos_z_bias);
+            }
+        };
+
+        highp float factor = sampleProj(shadow_sampler, float4(uv, pos_z, 1.0f));
+        //highp float factor_min = min(factor, light_proj_pos.w);
+        
+        highp float4 inLightVec = sign(float4(uv.x, 1.0f-uv.x, uv.y, 1.0f-uv.y));
+        // 只有inLightVec每一个分量都是1，dot的结果才会为4，inLight的值才会为1
+        highp float inLight = step(3.5f, dot(inLightVec, float4(1.0f, 1.0f, 1.0f, 1.0f)));
+
+        // 投影范围外的shadow_factor是1
+        out(shadow_factor, clamp(factor + (1.0f - inLight), 0.0f, 1.0f));
+    };
+
+    ["计算shadowmap的uv，depth和factor(VS中处理)"]
+    function calc_shadow_info_inner in(
+        highp float4 pos_world, // 世界空间的坐标
+        highp float3 normal_world, //世界空间的法线方向
+        highp float4x4 light_view_proj, //光源的view proj矩阵
+        highp float3 light_dir // 光源的方向(世界空间)
+    ) out(
+        highp float2 uv_out, // shadow map的uv
+        highp float depth_out, //在光源空间的深度
+        highp float factor_out // 阴影因子
+    )
+    {
+        ["计算在光源空间下的正规化空间"]
+        highp float4 light_space_pos = transform(pos_world, light_view_proj);
+        highp float3 light_space_norm = light_space_pos.xyz / float3(light_space_pos.w);
+        
+        // 算出了深度
+        out(depth_out, light_space_norm.z);
+        
+        ["GL下，纹理原点在左下角，否则在左上角"]
+        macro(SYSTEM_UV_ORIGIN_LEFT_BOTTOM) out(highp float2 bias)
+        {
+            // 在左下角
+            branch("1")
+            {
+                out(bias, float2(0.5f, 0.5f));
+            }
+            // 在左上角
+            branch("0")
+            {
+                out(bias, float2(0.5f, -0.5f));
+            }
+        };
+        
+        // 算出lightmap的uv值
+        out(uv_out, light_space_norm.xy * bias + float2(0.5f, 0.5f));
+        
+        // 算阴影因子
+        out(factor_out, saturate(dot(-normal_world, normalize(light_dir))));
+    };
+
+
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				//function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				// out(vec, pos1);
+				// out(nor, nor1);
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		
+		highp float4 position = vec;
+		highp float4 normal = nor;
+		
+
+		//mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+
+		// 计算顶点位置
+		highp float4 screen_pos = float4(transform(position, wvp));
+		vertex(screen_pos);
+		
+		highp float4 pos_world = transform(position, world);
+		
+		float3x3 worldMat = float3x3(world);
+		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		
+		out(UV0, float4(texcoord0.xy, 0.0f, 0.0f));
+
+		// 贴花UV
+		macro(DECAL_ENABLE){
+			branch("1"){
+				out(UV1, a_color.xy);
+			}
+			branch("0"){
+
+			}
+		};
+
+		
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		
+		out(v_NormalWorld, world_normal);
+
+		macro (XNORMAL_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+		
+				// 通过uv空间来判断是否是镜像模型，如果是镜像模型则反转法线
+				//mediump float test_sign = float(sign(step(length(tangent.xyz), 1.0f) - 0.5f));
+				//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+				//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+				highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+				mediump float3 binormal_world = cross(tangentWorld, world_normal) * tan_coef;
+
+				out(v_TangentWorld, normalize(tangentWorld));
+				out(v_BinormalWorld, normalize(binormal_world));
+			}
+			branch("0") {
+			}
+		};
+
+		macro(SHADOW_MAP_ENABLE)
+		{
+			branch("1")
+			{
+				mediump float4 shadow_light_attr_3 = ShadowLightAttr[3];
+				function calc_shadow_info_inner(
+                        pos_world,
+                        world_normal,
+                        lvp,
+                        shadow_light_attr_3.xyz)
+                    out(
+                        highp float2 uv_out,
+                        highp float  depth_out,
+                        highp float  factor_out
+                    );
+
+                out(v_light_proj_pos, float4(uv_out, depth_out, factor_out));
+			}
+			branch("0")
+			{
+
+			}				
+		};
+
+
+		// 角色高度
+		out(v_char_height, a_position.y/char_height);
+	}
+
+	pixel
+	{
+		lowp float3 vertex_normal_world = v_NormalWorld;
+		
+		// —————————————————— 法线 ——————————————————	
+		macro(XNORMAL_MAP_ENABLE) out(lowp float3 normalWorld, lowp float occlusion, lowp float3 binormalWorld, lowp float3 tangentWorld) {
+			branch("1") {
+				lowp float4 norm = sample(SamplerNormalMap, UV0.xy);
+				
+				lowp float2 normOff = norm.xy * 2.0f - float2(1.0f);
+				lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+				out(normalWorld, normalWorld_inner);
+				out(occlusion, norm.z);
+				out(binormalWorld, v_BinormalWorld);
+				out(tangentWorld, v_TangentWorld);
+			}	
+			branch("0") {
+				out(normalWorld, vertex_normal_world);
+				out(occlusion, 1.0f);
+				out(binormalWorld, float3(0.0f));
+				out(tangentWorld, float3(0.0f));
+			}
+		};
+
+
+		// —————————————————— 自投影(shadow_fac计算) ——————————————————	
+		macro(SHADOW_MAP_ENABLE) out (mediump float shadow_fac_)
+		{
+			branch("1") {
+				function calc_shadow_inner(SMAP, v_light_proj_pos, u_shadowmap_info, shadow_blendall)
+                    out(lowp float factor);
+                out(shadow_fac_, factor);
+			}
+			branch("0") {
+				out(shadow_fac_, 1.0f);
+			}
+		};
+
+
+		// ——————————————————★★★ 基础设置 ★★★——————————————————	
+		// 采样贴图
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		lowp float4 pbr_map = sample(SamplerRough, UV0.xy);	
+
+				
+		// 是否手动调金属度和粗糙度
+		macro(MANUL_ENABLE) out(lowp float metal, lowp float rough, lowp float sss_str) {
+					branch("1") {
+						out(metal, manul_metal * metal_multi);
+						out(rough, manul_rough * rough_multi);
+						out(sss_str, pbr_map.g);
+					}
+					branch("0") {	
+						out(metal, pbr_map.r * metal_multi);
+						out(rough, pbr_map.b * rough_multi);
+						out(sss_str, clamp(2.0f*pbr_map.g-1.0f, 0.0f, 1.0f));
+					}
+		};
+
+		// ——————————————————★★★ 光照设置 ★★★——————————————————
+		macro(POINT_LIGHT_ENABLE) out(mediump float3 gi_color, mediump float3 light_dir) {
+			branch ("1") {
+				// 点光颜色
+				lowp float4 light_color = ShadowLightAttr[1];
+				mediump float4 dir_vector = ShadowLightAttr[3];
+				lowp float light_range = dir_vector.w;
+				mediump float3 light_dir_ = PosWorld.xyz - dir_vector.xyz; 
+				out(light_dir, normalize(light_dir_)); 
+				lowp float dist = length(light_dir_);
+				lowp float point_light_fac = clamp((light_range - dist) / light_range, 0.0f, 1.0f);
+				out(gi_color, lerp(dark_color.rgb, light_color.rgb, float3(point_light_fac * point_light_fac)));
+				// out(gi_color, float3(1.0f, 1.0f, 1.0f));
+			}
+			branch ("0"){
+				//平行光颜色
+				lowp float4 light_color = ShadowLightAttr[1]; 
+				out(gi_color, light_color.xyz); 
+				// out(gi_color, float3(1.0f, 1.0f, 1.0f));
+
+				// 光源方向
+				mediump float4 light_dir_ = ShadowLightAttr[3];
+				out(light_dir, normalize(light_dir_.xyz));
+				//mediump float3 light_dir = u_light_scale * normalize(float3(u_light_pos_x, u_light_pos_y, u_light_pos_z));
+			}
+
+		};
+
+
+		// // 光源方向
+		macro(TRANS_ENABLE) out(float trans)
+		{
+			branch("0")
+			{
+				out(trans, 1.0f);
+			}
+			branch("1")
+			{
+				out(trans, -1.0f);
+			}
+		};
+		highp float3 f_light_dir = normalize(float3(light_dir.x, trans * light_dir.y, light_dir.z)) * u_light_scale;
+
+		// 视线方向
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+			
+		// 用于做出漫画明暗交界的效果（不影响高光计算）
+		mediump float3 light_dir_ndl = f_light_dir * u_light_scale;
+
+		// ——————————————————★★★ 常用参数 ★★★——————————————————
+
+		lowp float roughness = rough;
+				
+		lowp float non_metal = 1.0f - metal;
+
+		lowp float3 H = normalize(view_dir - f_light_dir);	
+
+		mediump float VdotH = clamp(dot(view_dir, H), 0.0f, 1.0f);
+
+		mediump float NdotH = max(0.0f, dot(normalWorld, H));
+
+		lowp float NdotV = clamp(dot(view_dir, normalWorld), 0.0f, 1.0f);
+
+		// NdotL
+		lowp float NdotL_raw = min(dot(normalWorld, -f_light_dir), shadow_fac_);
+
+
+		macro(LOW_QUALITY_ENABLE) out(lowp float NdotL) {
+			branch ("0") {
+				// warp function
+				lowp float NdotL_warp = NdotL_raw * 0.5f + 0.5f + ndl_bias;
+				function SG(NdotL_warp, ndl_pow + 0.5f * metal) out (lowp float NdotL_pow);
+				lowp float  NdotL_= ndl_multi * NdotL_pow;
+				//lowp float NdotL = clamp(NdotL_, 0.0f, 1.0f);
+				out(NdotL, clamp(NdotL_, 0.0f, 1.0f));
+			}
+			branch("1"){
+				out(NdotL, clamp(NdotL_raw, 0.0f, 1.0f));
+			}
+		};
+
+		mediump float NdotL_invert = clamp(NdotL, -1.0f, 0.0f);
+		
+
+		// diffuse用的NDL
+		// lowp float NdotL_d_raw = min(dot(normalWorld, -light_dir_ndl), shadow_fac_);
+		// mediump float NdotL_d_invert = clamp(NdotL_d_raw, -1.0f, 0.0f);
+		//lowp float NdotL_d = clamp(NdotL_d_raw, 0.0f, 1.0f);
+		//lowp float NdotL_d = NdotL;
+
+
+
+		// ——————————————————★★★ DIFFUSE ★★★—————————————————— 
+		mediump float3 diffuse_color = diffuse_map_color.xyz * diffuse_map_color.xyz * diffuse_intensity; 
+				
+		// 金属度计算过后的漫反射光强
+		mediump float3 non_metal_diffuse = non_metal * diffuse_color; 
+		//mediump float3 non_metal_diffuse = diffuse_color;
+
+		// 方向环境光 		
+		macro (DIR_AMBIENT_ENABLE) out (mediump float3 dir_ambient_color)
+		{
+			branch("1"){
+				mediump float3x3 inverse_view_mat = float3x3(inverse_view);
+				//mediump float dir_ambient_fac = clamp(-normalWorld.y, 0.0f, 1.0f);
+				mediump float3 ambient_dir = normalize(float3(l_pos_x, l_pos_y, l_pos_z) * inverse_view_mat);
+				lowp float dir_ambient_fac_ = clamp(dot(normalWorld, ambient_dir), 0.0f, 1.0f);
+				//lowp float dir_ambient_fac__ = smoothstep(da_start, da_end, dir_ambient_fac_);
+				lowp float3 dir_ambient_fac = lerp(diffuse_color, float3(dir_ambient_fac_), float3(0.7f));
+				//out(dir_ambient_color, dir_ambient.rgb * dir_ambient_fac * dir_ambient_intensity * (0.5f * non_metal + 0.5f));	
+				out(dir_ambient_color, dir_ambient.rgb * dir_ambient_fac * dir_ambient_intensity * (0.5f * non_metal + 0.5f));	
+			}
+			branch("0"){
+				out(dir_ambient_color, float3(0.0f));	
+
+			}
+		};
+
+		// AO
+		lowp float AO = occlusion;
+		lowp float gradient_fac = v_char_height;
+		lowp float AO_adjust = clamp(AO / NdotV, 0.0f, 1.0f);
+		lowp float3 AO_color =  AO * lerp(down_color.rgb, float3(1.0f,1.0f,1.0f), float3(gradient_fac));
+
+		// 计算lambert
+		//mediump float ndl_adjust = 0.5f * non_metal + 0.5f; 
+		//mediump float non_metal_NdotL = (NdotL + ndl_adjust)/(ndl_adjust + 1.0f);
+		mediump float non_metal_NdotL = NdotL;
+		// 采样ramp
+		//lowp float3 ramp_NdotL = sample(SamplerRamp, float2(non_metal_NdotL, 0.5f)).rgb;
+		mediump float3 mix_diffuse = lerp(non_metal_diffuse, non_metal_diffuse, float3(non_metal_NdotL));
+		//mediump float3 mix_diffuse = ramp_NdotL * non_metal_diffuse;
+
+		// 计算sss
+		macro (SSS_ENABLE) out (mediump float3 combine_sss_diffuse)
+		{
+			branch("1"){
+				
+				mediump float3 sss_color_fac =  sss_color.rgb * sss_str * sss_intensity;
+				//mediump float sss_area = smoothstep(sss_range_start, sss_range_end, (NdotL_invert + NdotL)/2.0f);
+				lowp float sss_area = smoothstep(0.51f, 0.0f, (NdotL_invert + NdotL)/2.0f);
+				out(combine_sss_diffuse, lerp(mix_diffuse, sss_color.rgb * sss_intensity, float3(sss_area * sss_str)));
+			}
+			branch("0"){
+				out(combine_sss_diffuse, mix_diffuse);
+			}
+		};
+
+		// 贴花
+		macro (DECAL_ENABLE) out (mediump float3 combine_decal_diffuse)
+		{
+			branch("1"){
+				mediump float4 decal_tex = sample(SamplerDecal, float2(UV1.x, -UV1.y));
+				mediump float3 mix_decal = lerp(combine_sss_diffuse.rgb, decal_tex.rgb, float3(decal_tex.rgb));  
+				out(combine_decal_diffuse, mix_decal);
+			}
+			branch("0"){
+				out(combine_decal_diffuse, combine_sss_diffuse);
+			}
+		}; 
+
+		macro(ENVIR_ENABLE) out(highp float3 R_rotated) {
+			branch ("1") {
+				lowp float cos_r = cos(nx_offset);
+				lowp float sin_r = sin(nx_offset);
+				highp float3 R = reflect(-view_dir, normalWorld);
+				highp float3 R_rotated_ = float3(R.x * cos_r + R.z * sin_r, R.y, R.z * cos_r - R.x * sin_r);
+				out(R_rotated, R_rotated_);
+			}
+			branch("0"){
+				out(R_rotated, float3(0.0f));
+			}
+		};
+
+		macro(ENVIR_ENABLE) out (mediump float3 ibl_diffuse){
+			branch("1"){
+
+				function GetEnvirmentColor_prefiltered (SamplerCubeMap, 0.96f, R_rotated, envir_fresnel_brightness, max_brightness) out(mediump float3 ibl_diffuse_);
+				//function GetEnvirmentColor_panorama (SamplerCubeMap, 0.96f, R_rotated, max_brightness) out (mediump float3 ibl_diffuse_);
+				out(ibl_diffuse, ibl_diffuse_);
+				 //out(ibl_diffuse, float3(1.0f));
+			}
+			branch("0"){
+				out(ibl_diffuse, float3(1.0f));
+			}
+		};
+
+
+
+		// Final Diffuse
+		mediump float3 final_diffuse = combine_decal_diffuse * non_metal_NdotL * gi_color * ibl_diffuse * envir_brightness + dir_ambient_color;	
+
+
+
+		// —————————————————— ★★★ SPECULAR ★★★—————————————————— 
+		mediump float3 spec_color = lerp(diffuse_color.xyz, float3(0.04f), float3(non_metal)); 
+				// F
+				macro(LOW_QUALITY_ENABLE) out(lowp float3 F) {
+					branch ("0") {
+						function F_Schlick(spec_color,VdotH) out (lowp float3 F_);
+						out(F, F_);
+					}
+					branch ("1"){
+						out(F, spec_color);
+					}
+				};
+
+		lowp float ggx_rough = lerp(min_ggx_roughness, max_ggx_roughness, rough);
+
+		function SG(non_metal_NdotL, u_spec_dark_pow) out (lowp float spec_dark_pow);
+
+		macro(PBR_SPECULAR_ENABLE) out(mediump float3 final_specular)
+		{
+			branch("1") {
+
+				// 各向异性
+				macro (ANISO_ENABLE) out (lowp float factor)
+				{
+					branch("1"){
+						// 采样一张各向异性方向贴图，RG表示方向，B表示各向异性区域（白色代表有各向异性）
+						lowp float4 aniso_dir = sample(SamplerAniso, UV0.xy);
+						lowp float aniso_x = aniso_dir.x;
+						lowp float aniso_y = aniso_dir.y;
+						lowp float4 aniso_factor = (aniso_dir - float4(0.5f)) * 2.0f;
+						lowp float3 fixed_tangend = normalize(-aniso_factor.x * tangentWorld + aniso_factor.y * binormalWorld);
+						lowp float3 anisotex_offset = normalWorld * (normal_offset + (aniso_dir.b - 0.5f) * noise_offset);
+						lowp float3 T = normalize(anisotex_offset + fixed_tangend);
+						lowp float aniso_str = step(sss_str, 0.25f);
+						lowp float HdotA = saturate(dot(T,view_dir));
+						// lowp float HdotA = clamp(dot(normalize(normalWorld + float3(aniso_x,aniso_y, 0.0f)), H), 0.0f, 1.0f);
+						lowp float aniso = sin(HdotA * 3.1415926f);
+						out(factor, lerp(NdotH, aniso, aniso_str));
+
+
+						// mediump float4 nor_tex = sample(NormalMap, uv0);
+						// highp float3 T = binor_world + transform(nor_world, anisoOffset + nor_tex.b);
+						// highp float ToA = saturate(dot(normalize(T), H));
+						// highp float fake_NoH = sin(ToA * PI);
+						// out(NoH1, fake_NoH * saturate(0.7f + NoL)); 
+					}
+					branch("0"){
+						out(factor, NdotH);
+					}
+				};
+
+				// D 
+				// lowp float alpha = ggx_rough * ggx_rough + 0.005f;
+				// mediump float denom = factor * factor * (alpha * alpha -1.0f) + 1.0f;
+				// mediump float D = (alpha/denom) * (alpha/denom) * 0.31830988618379067153776752674503f;  // DM48(U4 NDF)
+				function D_GGX(ggx_rough, factor) out(lowp float D);
+
+
+				// G
+				//function Vis_Schlick(ggx_rough, NdotV, NdotL) out (lowp float G);
+				function G_Schlick_Disney(ggx_rough, NdotV, NdotL) out (lowp float G);
+				
+				// G
+				//lowp float LdotH = saturate(dot(-light_dir, H));
+				//lowp float G = 1.0f/(4.0f * LdotH * LdotH * (ggx_rough + 0.5f));
+
+				// specular BRDF
+				//mediump float3 brdf =  D * spec_color * spec_intensity;
+				mediump float3 brdf =  D * F * G * spec_intensity ;
+
+				// // 羽毛反射染色
+				// macro(FUR_COLOR_ENABLE) out(lowp float3 fur_color) {
+				// 	branch ("1") {
+				// 		lowp float LdotV = saturate(dot(light_dir, view_dir));
+				// 		lowp float3 fur_fac_1 = lerp(float3(0.0f, 1.0f, 0.0f), float3(1.0f, 0.0f, 0.0f), float3(LdotV));
+				// 		lowp float3 fur_fac_2 = lerp(float3(1.0f, 0.0f, 0.0f), float3(0.0f, 0.0f, 1.0f), float3(NdotL));
+				// 		out(fur_color, fur_fac_1 + fur_fac_2);
+				// 	}
+				// 	branch("0"){
+				// 		out(fur_color, float3(1.0f, 1.0f, 1.0f));
+				// 	}
+				// };
+
+				// Final Specular
+				mediump float3 final_specular_ = brdf * spec_dark_pow;
+
+				out(final_specular, final_specular_);
+			}
+			branch("0") {
+				out(final_specular, float3(0.0f));
+			}
+		};
+
+
+						
+
+		// ——————————————————★★★ IBL ★★★—————————————————— 
+		macro(ENVIR_ENABLE) out(mediump float3 final_envir)
+		{
+			branch("1") {
+				// mediump float d_row_num = 1.0f / row_num;
+				// mediump float float_lod = ggx_rough * (float(row_num * row_num) - 1.0f);
+				// mediump float lod = floor(float_lod);	
+				// lowp float3 normal_view = normalWorld * float3x3(view_mat);
+						
+				//function GetEnvirmentColor (lod, row_num, d_row_num, normal_view.xy + float2(sample_radius, 0f), SamplerEnvMap) out(mediump float3 envir);
+
+				function GetEnvirmentColor_prefiltered (SamplerCubeMap, roughness, R_rotated, envir_fresnel_brightness, max_brightness) out (mediump float3 envir);
+				//function GetEnvirmentColor_panorama (SamplerCubeMap, roughness, R_rotated, max_brightness) out (mediump float3 envir);
+
+				function EnvBRDFApprox(spec_color, ggx_rough, NdotV, envir_fresnel_brightness) out (mediump float3 env_brdf);
+							
+				out(final_envir, non_metal_NdotL * envir_brightness * env_brdf * envir * spec_dark_pow);
+
+
+			}
+			branch("0") {
+				out(final_envir, float3(0.0f));
+			}
+		};
+
+
+
+		// ——————————————————★★★ 自发光 & 半透 ★★★—————————————————— 
+		lowp float arufa = diffuse_map_color.a; 
+		macro(SELF_BLING) out (mediump float3 final_emissive, lowp float diffuse_alpha){
+			branch("1"){
+				// 50%-100%灰度的透明通道出来给自发光
+				condition(arufa) out (lowp float _alpha, lowp float emissive_tex){
+					branch("%0% < 0.5"){
+						out(_alpha, arufa * 2.0f);
+						out(emissive_tex, 0.0f);
+					}
+					default{
+						out(_alpha, 1.0f);
+						out(emissive_tex, (arufa - 0.5f) * 2.0f);
+					}
+				};
+				
+				//mediump float3 final_emissive_ = combine_sss_diffuse;
+				mediump float3 final_emissive_ = emissive_tex * emissive_intensity * combine_sss_diffuse.rgb;
+
+				out(final_emissive, final_emissive_);
+				out(diffuse_alpha, _alpha);
+			}
+			branch("0"){
+				out(final_emissive, float3(0.0f));
+				out(diffuse_alpha, diffuse_map_color.a);
+			}
+		};
+
+
+		/////////////////////////////////////////////////////////////////
+		// ——————————————————★★★ 最终光照计算 ★★★——————————————————
+		/////////////////////////////////////////////////////////////////
+
+
+		// 把不开启的光照部分的强度补偿到其他部分
+		
+		// macro (ENVIR_ENABLE) out (lowp float ibl_conserve, lowp float diffuse_conserve_1){
+		// 	branch("1"){
+		// 		out(ibl_conserve, 1.0f);
+		// 		out(diffuse_conserve_1, 1.0f);
+		// 	}
+		// 	branch("0"){
+		// 		lowp float converse_1 = non_metal * envir_brightness / 2.0f;
+		// 		out(ibl_conserve, 1.1f + converse_1);
+		// 		out(diffuse_conserve_1, 1.0f + converse_1 * non_metal);
+		// 	}
+		// };
+		// macro (PBR_SPECULAR_ENABLE) out (lowp float spec_conserve, lowp float diffuse_conserve){
+		// 	branch("1"){
+		// 		out(spec_conserve, 1.0f);
+		// 		out(diffuse_conserve, 1.0f);
+		// 	}
+		// 	branch("0"){
+		// 		lowp float converse_2 = spec_intensity / 2.0f;
+		// 		out(spec_conserve, 1.0f + converse_2 * metal);
+		// 		out(diffuse_conserve, 1.0f + converse_2 * non_metal);
+		// 	}
+		// };
+
+
+
+		// pbr的最终计算结果 = (漫反射 + 动态光反射 + 环境反射）* 主光颜色 * AO  （IBL也要受主光颜色影响，这样不会出现与主光色调不一致的情况）
+		//mediump float3 pbr_light_color =  (final_diffuse * diffuse_conserve + final_specular * ibl_conserve + final_envir * spec_conserve) * AO_color * gi_color;
+		mediump float3 pbr_light_color =  (final_diffuse + final_specular  + final_envir ) * AO_color * gi_color;
+		// 最终光照 = pbr计算结果 + 自发光
+		mediump float3 final_light_color = pbr_light_color + final_emissive;
+
+		// —————————————————— 边缘光 ———————————————————
+		macro(FRESNEL_ENABLE) out (mediump float3 fresnel_combine, lowp float alpha_fresnel){
+			branch("1"){
+				lowp float rim_ = 1.0f - NdotV;
+				function SG(rim_, rim_power) out (lowp float rim_factor);
+				mediump float3 rim = smoothstep(u_rim_start, u_rim_end, rim_factor) * rim_color.xyz * rim_multi;
+				mediump float3 final_rim_color = final_light_color * adjust_inner.rgb + rim.xyz;
+				out(fresnel_combine, final_rim_color);
+				out(alpha_fresnel, (rim_ + inner_alpha) * ceil(NdotV));
+			}
+			branch("0"){
+				out(fresnel_combine, final_light_color);
+				out(alpha_fresnel, 1.0f);
+			}
+		};
+
+		// 受击闪白
+		mediump float3 force_color = fresnel_combine + force_pixel_color;
+
+		// —————————————————— diffuse check ———————————————————
+		macro(DIFFUSE_CHECK) out(mediump float3 result_diff_raw){
+			branch("1"){
+				out(result_diff_raw, diffuse_color * AO);
+			}
+			branch("0"){
+				out(result_diff_raw, force_color);
+			}
+		};
+
+		// // —————————————————— Gamma ——————————————————		
+		// mediump float3 gamma_correct = sqrt(result_diff_raw);
+		// mediump float4 result = float4(gamma_correct.xyz, diffuse_map_color.a * AlphaMtl);
+		// //mediump float4 result = float4(float3(AO), 1.0f);
+
+		// function linear_2_gamma_3(result_diff_raw) out(mediump float3 gamma_color);
+
+		// —————————————————— HDR Encode & Gamma ——————————————————
+		macro(HDR_ENABLE) out(lowp float4 encode_color)
+		{
+			branch("1")
+			{
+				mediump float lum = max(max(result_diff_raw.r, 0.0001f), max(result_diff_raw.g, result_diff_raw.b));
+				lowp float3 color = result_diff_raw.xyz / lum;
+				out(encode_color, float4(color, lum / (lum + 1.0f)));
+			}
+			branch("0")
+			{
+				// function linear_2_gamma_3(result_diff_raw) out(mediump float3 gamma_color);
+				// out(encode_color, float4(gamma_color, alpha_fresnel * diffuse_alpha * AlphaMtl));
+				out(encode_color, float4(result_diff_raw, alpha_fresnel * diffuse_alpha * AlphaMtl));
+			}	
+		};			
+
+		 pixel(encode_color);
+		 //pixel(float4(encode_color, alpha_fresnel * diffuse_alpha * AlphaMtl));
+		//pixel(float4(float3(normalWorld), 1.0f));
+	}
+}
+

@@ -1,0 +1,384 @@
+["turbulence model"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+>
+{	
+	// 宏
+		["使用遮罩贴图"]
+		eitheror MASK_ENABLE;
+		macro(MASK_ENABLE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+
+		["使用溶解效果"]
+		eitheror DISSOLVE_ENABLE;
+		macro(DISSOLVE_ENABLE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+
+		["使用柔边溶解"]
+		eitheror SOFTEDGE_ENABLE;
+		macro(SOFTEDGE_ENABLE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+
+
+		["使用溶解发光"]
+		eitheror GLOSSEDGE_ENABLE;
+		macro(GLOSSEDGE_ENABLE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+
+		["开启第二张扰动"]
+		eitheror SECOND_TEX_ENABLE;
+		macro(SECOND_TEX_ENABLE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+
+		["使用全新的溶解贴图"]
+		eitheror SEPERATED_DISSOLVE;
+		macro(SEPERATED_DISSOLVE)
+		<
+			default = "0"
+			customizable = "1"
+		>;
+	// attribute
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点？
+	>;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+
+	["漫反射贴图"]
+	uniform sampler diffuse: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+
+	>;
+
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+
+	["遮罩贴图"]
+	uniform sampler u_tex_mask
+	<
+		artist = "1"
+		min = "linear"
+		mag = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+
+	["偏移贴图1"]
+	uniform sampler turbulence1
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+	>;
+	["偏移贴图2"]
+	uniform sampler turbulence2
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+	>;
+	["溶解贴图"]
+	uniform sampler dissolvemap
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+	>;
+	["vx_vy_scale1"]
+	uniform float3 vx_vy_scale1
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 1.0)"
+	>;
+	["vx_vy_scale2"]
+	uniform float3 vx_vy_scale2
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 1.0)"
+	>;
+
+	["漫反射平铺"]
+	uniform float2 diffuse_uv
+	<
+		artist = "1"
+		init = "(1.0,1.0)"
+	>;
+
+	["溶解贴图（新）平铺"]
+	uniform float2 dissolve_uv
+	<
+		artist = "1"
+		init = "(1.0,1.0)"
+	>;
+
+	["变色"]
+	uniform float4 Alpha
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["振幅1"]
+	uniform float amplitude1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+	>;
+
+	["振幅2"]
+	uniform float amplitude2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+	>;
+
+
+	// 溶解效果
+		["溶解程度"]
+		uniform lowp float u_dissolve_intensity
+		<
+			artist = "1"
+			max = "1.0"
+			min = "0.0"
+			init = "0.0"
+			uistep = "0.01"
+			uigroup = "溶解"
+		>;
+
+		["溶解宽度"]
+		uniform lowp float u_dissolve_edge
+		<
+			artist = "1"
+			max = "1.0"
+			min = "0.0"
+			init = "0.2"
+			uistep = "0.01"
+			uigroup = "溶解"
+		>;
+
+		["溶解边界颜色"]
+		uniform lowp float4 u_dissolve_color
+		<
+			color = "1"
+			artist = "1"
+			init = "(1.0, 1.0, 1.0, 1.0)"
+			uigroup = "溶解"
+		>;
+
+		["溶解边界宽度"]
+		uniform lowp float u_gloss_edge
+		<
+			artist = "1"
+			max = "1.0"
+			min = "0.0"
+			init = "0.2"
+			uistep = "0.01"
+			uigroup = "溶解"
+		>;
+
+		["溶解边界强度"]
+		uniform lowp float u_gloss_strength
+		<
+			artist = "1"
+			max = "5.0"
+			min = "1.0"
+			init = "1.0"
+			uistep = "1"
+			uigroup = "溶解"
+		>;
+
+		["流动光颜色"]
+		uniform lowp float4 u_emissive_color
+		<
+			color = "1"
+			artist = "1"
+			init = "(1.0, 1.0, 1.0, 0.5)"
+			uigroup = "流动光"
+		>;
+
+	uniform mediump float time: FRAME_TIME;
+	// varying
+	varying mediump float4 v_texture0;
+	varying mediump float2 v_texture1;
+	varying mediump float2 v_texture2;
+	varying highp float2 v_uv0;
+	varying lowp float4 Color;
+
+	vertex
+	{
+		highp float4 position = a_position;
+
+		["wvp变换"]
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 0.0f) * texTrans0);
+		out(v_texture1, a_texture0.xy * vx_vy_scale1.z + vx_vy_scale1.xy * time);
+
+		macro(SECOND_TEX_ENABLE) {
+			branch ("1") {
+				out(v_texture2, a_texture0.xy * vx_vy_scale2.z + vx_vy_scale2.xy * time);
+			}
+			branch("0") {
+			}
+		};
+		out(Color, a_diffuse);
+
+		macro(MASK_ENABLE) {
+			branch ("1") {
+				out(v_uv0, a_texture0.xy);
+			}
+			branch("0") {
+
+			}
+		};
+
+	}
+
+	pixel
+	{	
+		lowp float4 tex1 = sample(turbulence1, v_texture1.xy) - float4(0.5f);
+		
+		macro(SECOND_TEX_ENABLE) out(lowp float4 tex2) {
+			branch ("1") {
+				out(tex2, (sample(turbulence2, v_texture2.xy) - float4(0.5f)) * amplitude2);
+			}
+			branch ("0") {
+				out(tex2, float4(0.0f));
+			}
+		};
+
+		mediump float2 newUV = v_texture0.xy * diffuse_uv + tex1.xy * float2(amplitude1) + tex2.xy;
+		lowp float4 texColor0 = sample(diffuse, newUV);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 color_out){
+            branch("1"){
+            	lowp float4 sep_color = sample(sepAlphaTex, newUV.xy);
+                out(color_out, float4(texColor0.xyz, sep_color.w));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+        lowp float4 _result = color_out * Color *  Alpha * 2.0f;
+        lowp float4 result = float4(_result.xyz, _result.w * AlphaMtl);
+		
+		// mediump float4 emissive_color = float4(texColor0.xyz, alpha) * Color * tFactor * Alpha * 2.0f;
+
+
+		macro(MASK_ENABLE) out(lowp float mask_color) {
+			branch ("1") {
+				out(mask_color, sample(u_tex_mask, v_uv0).r);
+			}
+			branch ("0") {
+				out(mask_color, 1.0f);
+			}
+		};
+
+		// 支持硬边溶解、柔边溶解、溶解边缘发光
+		macro(DISSOLVE_ENABLE) out(lowp float3 mix_color, lowp float mix_alpha) {
+			branch("1")
+			{
+				// float2 dissolve_tilting = u_shader_attributes.xy; 
+				// lowp float3 dissolve_color = texColor0.rgb;
+				macro(SEPERATED_DISSOLVE) out(lowp float dissolve_mask) {
+					branch ("0") {
+						out(dissolve_mask, texColor0.r);
+					}
+					branch ("1") {
+						lowp float4 dissolvemap_color = sample(dissolvemap, v_texture0.xy * dissolve_uv);
+						out(dissolve_mask,dissolvemap_color.r);
+					}
+				};
+
+				macro(SOFTEDGE_ENABLE) out(lowp float dissolve_fator) {
+					branch ("0") {
+						out(dissolve_fator,step(u_dissolve_intensity,dissolve_mask));
+					}
+					branch ("1") {
+                        lowp float fixed_dissolve_edge = max(0.01f, u_dissolve_edge);
+						out(dissolve_fator,smoothstep(u_dissolve_intensity,saturate(u_dissolve_intensity + fixed_dissolve_edge),dissolve_mask));
+					}
+				};
+
+				macro(GLOSSEDGE_ENABLE) out(lowp float3 mixed_gloss_edge_color,lowp float mixed_gloss_edge_alpha) {
+					branch ("1") {
+						mediump float gloss_edge_factor = 1.0f - smoothstep(u_dissolve_intensity - u_gloss_edge, u_dissolve_intensity + u_gloss_edge, dissolve_mask);
+						out(mixed_gloss_edge_color, lerp(result.rgb, u_dissolve_color.rgb, float3(saturate(u_gloss_strength * gloss_edge_factor))));
+						out(mixed_gloss_edge_alpha, (result.a + gloss_edge_factor) * mask_color * dissolve_fator);
+					}
+					branch ("0") {
+						out(mixed_gloss_edge_color,result.rgb);
+						out(mixed_gloss_edge_alpha, result.a * mask_color * dissolve_fator);
+					}
+				};
+				out(mix_color, mixed_gloss_edge_color.rgb);
+				out(mix_alpha, mixed_gloss_edge_alpha);
+			}
+			branch("0") {
+				out(mix_color, result.rgb);
+				out(mix_alpha, result.a * mask_color );
+			}
+		};
+		
+		// pixel(float4(texColor0.xyz, alpha) * Color * tFactor * Alpha * 2.0f);
+		pixel(float4(mix_color, mix_alpha));
+	}
+}

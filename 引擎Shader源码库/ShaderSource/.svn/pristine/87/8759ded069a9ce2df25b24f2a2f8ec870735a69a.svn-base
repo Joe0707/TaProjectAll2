@@ -1,0 +1,155 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+	["雾效"]
+	eitheror SCENE_FOG;
+	macro(SCENE_FOG)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform lowp float HeightFogDensity: HEIGHT_FOG_DENSITY; 
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying lowp float fog_distance;
+	varying lowp float fog_height_factor;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+	    vertex(pos);
+
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+
+
+		// 在vertex中计算高度雾
+		macro(SCENE_FOG) {
+			branch ("1") {
+				mediump float4 pos_world = transform(a_position, world);
+				mediump float height = pos_world.y;
+
+				function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor1);
+
+				mediump float distance = pos.z;
+				out(fog_distance , distance);
+				out(fog_height_factor, 1.0f - fog_height_factor1);
+			}
+			branch ("0") {
+			}
+		};
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_map_color.a);
+			}
+	    };
+
+	    macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		 macro(SCENE_FOG) out(mediump float3 final_result) {
+			branch ("1") {
+
+				// 在pixel中计算线性雾（地表顶点较少防止过渡畸变）
+				function get_fog_mix(u_fog_info.x, u_fog_info.y, fog_distance) out(mediump float fog_linear_factor);
+				// mediump float fog_linear_factor = fog_linear_factor11 ;
+				mediump float fog_factor = u_fog_color.a * max(fog_height_factor, fog_linear_factor);
+				out(final_result, lerp(diffuse_map_color.rgb, u_fog_color.rgb, float3(fog_factor)));
+
+				// out(final_result, float3(fog_factor));
+			}
+			branch("0")
+			{
+				out(final_result, diffuse_map_color.rgb);
+			}
+		};
+
+
+		pixel(float4(final_result.xyz, alpha * AlphaMtl));
+	}
+}

@@ -1,0 +1,255 @@
+["refraction shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	rendertarget = "Distortion"
+>
+{	
+	
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "0"
+		export = "1"
+	>;
+	["使用边缘削弱"]
+	eitheror FALLOFF_ENABLE;
+	macro(FALLOFF_ENABLE)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+	uniform highp float4 u_clipplane1
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float4 u_clipplane2
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float soft_edge_width
+    <
+    	init = "10.0"
+    >;
+	varying highp float4 v_pos_world;
+
+	// attribute
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点？
+	>;
+	attribute float4 a_normal: NORMAL;
+	attribute float4 a_texture0: TEXTURE0;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["漫反射贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		loadbias = "-0.5"
+
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+        artist = "1"
+    >;
+
+	["边缘过渡"]
+	uniform float edgealphaParams
+	<
+		artist = "1"
+		min = "0.8"
+		max = "1.5"
+		uistep = "0.05"
+		init = "2.0"
+	>;
+	["速度"]
+	uniform float u_speed
+	<
+		artist = "1"
+		min = "0.8"
+		max = "1.5"
+		uistep = "0.05"
+		init = "0.5"
+	>;
+
+	["强度"]
+	uniform float power
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.05"
+		init = "0.5"
+	>;
+
+	["垂直方向削弱Start"]
+	uniform float vertical_falloffstart
+	<
+		artist = "1"
+		min = "0.0"
+		max = "2.0"
+		uistep = "0.05"
+		init = "0.0"
+	>;
+	["垂直方向削弱End"]
+	uniform float vertical_falloffend
+	<
+		artist = "1"
+		min = "0.0"
+		max = "2.0"
+		uistep = "0.05"
+		init = "0.02"
+	>;
+	["水平方向削弱Start"]
+	uniform float horizon_falloffstart
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.05"
+		init = "0.0"
+	>;
+	["水平方向削弱End"]
+	uniform float horizon_falloffend
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.05"
+		init = "0.02"
+	>;
+	["显示削弱mask"]
+	uniform float falloff_show
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.05"
+		init = "0.0"
+	>;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	// varying
+	varying mediump float2 v_texture0;
+	varying mediump float3 v_normal;
+	varying highp float4 v_screenuv;
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 pos_local, highp float4 nor_local)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(pos_local, pos1);
+				out(nor_local, nor1);
+			}
+			branch("0") 
+			{
+				out(pos_local, a_position);
+				out(nor_local, a_normal);
+			}
+		};
+		highp float4 position = pos_local;
+		highp float4 normal = nor_local;
+		["wvp变换"]
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+
+		out(v_texture0, a_texture0.xy);
+		out(v_normal, normalize(transform(normal.xyz, float3x3(wvp)).xyz));
+		out(v_screenuv,pos);
+
+		macro(CLIPPLANE_ENABLE)
+		{
+			branch("1")
+			{
+				highp float4 pos_world = transform(position, world);
+				out(v_pos_world, pos_world);
+			}
+			branch("0")
+			{}
+		};
+	}
+
+	pixel
+	{	
+		mediump float len = length(v_normal.xy);
+		mediump float frenel = pow(len, edgealphaParams);
+
+		lowp float4 diffuse_color0 = sample(Tex0, v_texture0.xy + float2(u_speed, 0.0f)* FrameTime);
+		lowp float4 diffuse_color1 = sample(Tex0, v_texture0.xy + float2(-u_speed * 0.6f, u_speed * 0.3f)* FrameTime);
+		lowp float4 diffuse_color_blend = (diffuse_color0 * diffuse_color1) * 2.0f;
+
+		lowp float4 _diffuse_color = float4(0.5f) + (diffuse_color_blend - float4(0.5f)) * power; 
+
+		// 裁剪平面
+        macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+        {
+            branch("1")
+            {
+                highp float2 p1_1 = u_clipplane1.xy;
+                highp float2 p2_1 = u_clipplane1.zw;
+                function bcross(p1_1, p2_1, v_pos_world.xz, soft_edge_width) out(highp float t_value1);
+                highp float2 p1_2 = u_clipplane2.xy;
+                highp float2 p2_2 = u_clipplane2.zw;
+                function bcross(p1_2, p2_2, v_pos_world.xz, soft_edge_width) out(highp float t_value2);
+
+				out(clipAlpha, t_value1 * t_value2);
+            }
+            branch("0")
+            {
+                out(clipAlpha, 1.0f);
+            }
+        };
+        lowp float3 diffuse_color = lerp(float3(0.5f), _diffuse_color.xyz, float3(clipAlpha));
+
+        mediump float2 screenuv_ = (v_screenuv.xy / v_screenuv.w + float2(1.0f)) * 0.5f;
+
+        macro(FALLOFF_ENABLE) out(lowp float3 falloff_color)
+        {
+        	branch("1")
+        	{
+        		mediump float falloff_v = smoothstep(vertical_falloffstart,vertical_falloffend,(1.0f - abs(screenuv_.y - 0.5f) * 2.0f));
+				mediump float falloff_h = smoothstep(horizon_falloffstart,horizon_falloffend,(1.0f - abs(screenuv_.x - 0.5f) * 2.0f));
+				mediump float falloff = min(falloff_h,falloff_v);
+				// lowp float3 falloff_color_ = lerp(diffuse_color * falloff,float3(falloff),float3(falloff_show));
+				lowp float3 falloff_color_ = lerp(float3(0.5f),diffuse_color,float3(falloff));
+				out(falloff_color,falloff_color_);
+				// out(falloff_color,float3(falloff));
+        	}
+        	branch("0")
+        	{
+        		out(falloff_color,diffuse_color);
+        	}
+		};
+		pixel(float4(falloff_color,  frenel * AlphaMtl));
+	}
+}

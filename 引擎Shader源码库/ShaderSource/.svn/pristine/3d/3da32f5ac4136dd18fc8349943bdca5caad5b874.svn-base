@@ -1,0 +1,78 @@
+["motion_blur"]
+pipeline
+<
+	author = "wyy"
+	company = "netease"
+	category = "postprocess"
+>
+
+{
+	attribute float4 a_position:POSITION;
+	attribute float4 a_texture0:TEXTURE0;
+	varying mediump float2 TexCoord0:TEXTURE0;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+	>;
+	uniform sampler Tex1
+	<
+		export = "0"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+
+	>;
+	uniform float _BloomIntensity: OTHER2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.5"
+	>;
+
+	uniform float _Dirtiness: OTHER3
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "3.0"
+	>;
+
+	uniform mediump float4 _BloomColor
+	<
+		init = "0.0, 0.0, 0.0, 0.0"
+		artist = "1"
+	>;
+
+	uniform sampler	DirtinessTexture:OTHER3
+	<
+		artist = "1"
+		path = "common\\pipeline\\lensdirtiness_01.png"
+	>;
+
+	vertex
+	{
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+
+	pixel
+	{
+		
+	    float4 bloomSample = sample(Tex1, TexCoord0);
+
+	    //bloomSample.xyz = float3(bloomSample.xyz * 0.1f);
+	    float3 bloom_sample = bloomSample.xyz * _BloomIntensity;// float3(0.1f, 0.1f, 0.1f);
+	    float4 dirtynessSample = sample(DirtinessTexture, TexCoord0);
+	    float4 sceneColor = sample(Tex0, TexCoord0);
+	    float4 gl_FragColor = float4( 1.0f , 1.0f , 1.0f , 1.0f );
+	    float3 final_rgb = sceneColor.xyz + bloom_sample.xyz * dirtynessSample.xyz * _Dirtiness + bloom_sample.rgb * _BloomColor.rgb;
+		pixel(float4(final_rgb.x, final_rgb.y, final_rgb.z, gl_FragColor.w));
+	}
+}

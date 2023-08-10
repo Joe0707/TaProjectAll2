@@ -1,0 +1,164 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang/xuzhuoliang/fanyu" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+  
+	["是否溶解"]
+	eitheror DISSOLVE_EFFECT;
+	macro(DISSOLVE_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["溶解贴图"]
+	uniform sampler DissolveTex
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\dissolve.png"
+	>;
+
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	// uniform highp float4x4 view : VIEW;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	
+	["溶解程度"]
+	uniform lowp float ChangeAmount
+	<
+		init = "0.0"
+		artist = "1"
+	>;
+
+	["溶解颜色"]
+	uniform lowp float4 DissolveColor
+	<
+		init = "(1.0, 0.3, 0.3, 0.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		
+		highp float4 pos = transform(position, wvp);
+		
+		vertex(pos);
+		out(UV0, float4(texcoord0.xy, 0.0f, 0.0f));
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		// alpha
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(alpha - alphaRef, 0.0f); 
+		  	}
+			branch("0") {
+		 	}
+		}; 
+
+		macro(DISSOLVE_EFFECT) out(lowp float4 dissolve_color)
+		{
+			branch("1") {
+				lowp float4 diss_samp = sample(DissolveTex, UV0.xy);
+				lowp float ClipAmount = diss_samp.x - ChangeAmount;
+				alphatest("<")(ClipAmount, 0.0f);
+				lowp float3 dest = DissolveColor.rgb * ClipAmount * 2.0f / 0.1f;
+				lowp float num1 = step(0.1f, ClipAmount);
+				lowp float3 dissolve_color_ = num1 * diffuse_map_color.xyz + (1.0f - num1) * dest;
+				out(dissolve_color, float4(dissolve_color_, diffuse_map_color.a));
+			}
+			branch("0") {
+				out(dissolve_color, float4(diffuse_map_color.xyz, alpha));
+			}
+		};
+
+		pixel(dissolve_color);		
+	}
+}

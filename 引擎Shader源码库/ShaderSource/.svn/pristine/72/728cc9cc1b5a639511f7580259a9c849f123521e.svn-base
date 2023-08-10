@@ -1,0 +1,373 @@
+["common"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+    merge = "0"
+>
+{
+// 宏
+    ["颜色修改"]
+    eitheror Enable_PARTICLE_COLOR;
+    macro(Enable_PARTICLE_COLOR)
+    <
+        customizable = "1"
+    >;
+
+    ["边缘光效果"]
+    eitheror FRESNEL_ENABLE;
+    macro(FRESNEL_ENABLE)
+    <
+        customizable = "1"
+    >;
+
+    ["溶解"]
+    eitheror DISSOLVE_EFFECT;
+    macro(DISSOLVE_EFFECT)
+    <
+        customizable = "1"
+    >;
+
+    // 贴图
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["Blur贴图"]
+    uniform sampler BlurTex
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        lodbias = "-0.5"
+    >;
+    ["BlurAlpha贴图"]
+    uniform sampler BlurAlphaTex
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        lodbias = "-0.5"
+    >;
+
+    ["TillingX"]
+    uniform float tillingx
+    <
+        artist = "1"
+        init = "1"
+    >;
+    ["TillingY"]
+    uniform float tillingy
+    <
+        artist = "1"
+        init = "1"
+    >;
+    ["SpeedX"]
+    uniform float speedx
+    <
+        artist = "1"
+        init = "0"
+    >;
+    ["SpeedY"]
+    uniform float speedy
+    <
+        artist = "1"
+        init = "0"
+    >;
+
+	["自发光强度"]
+	uniform mediump float change_color_bright
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "5.0" 
+		init = "1.0"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+    ////////////////////////////////
+    // fresnel
+    ["fresnel颜色"]
+    uniform float4 fresnel_color
+    <
+        color = "1"
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+
+    ["fresnel亮度"]
+    uniform float fresnel_brightness
+    <
+        artist = "1"
+        min = "0"
+        max = "3"
+        init = "0"
+    >;
+
+    ["fresnel大小"]
+    uniform float fresnel_size
+    <
+        artist = "1"
+        min = "1"
+        max = "10"
+        init = "3"
+    >;
+    ////////////////////////////////
+    ["BlurTillingX"]
+    uniform float blur_tillingx
+    <
+        artist = "1"
+        init = "1"
+    >;
+    ["BlurTillingY"]
+    uniform float blur_tillingy
+    <
+        artist = "1"
+        init = "1"
+    >;
+    ["BlurSpeedX"]
+    uniform float blur_speedx
+    <
+        artist = "1"
+        init = "0"
+    >;
+    ["BlurSpeedY"]
+    uniform float blur_speedy
+    <
+        artist = "1"
+        init = "0"
+    >;
+    ////////////////////////////////
+    ["溶解"]
+    uniform sampler DissolveTex
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        path = "fx\\texture\\effect\\dissolve.png"
+    >;
+
+    ["溶解Amount"]
+    uniform float DissAmount
+    <
+        artist = "1"
+        min = "0.0"
+        max = "20.0"
+        init = "0.0"
+    >;
+
+    ["溶解颜色"]
+    uniform float4 DissolveColor
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0, 0.3, 0.3, 1.0)"
+    >;
+
+    ["颜色修改"]
+    uniform mediump float4 particle_color
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0,1.0,1.0,1.0)"
+    >;
+
+    ["颜色修改强度"]
+    uniform mediump float particle_color_value
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+
+    ["FadeStart"]
+    uniform mediump float FadeStart
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+    ["FadeEnd"]
+    uniform mediump float FadeEnd
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+    ["BlurStart"]
+    uniform mediump float BlurStart
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+    ["BlurEnd"]
+    uniform mediump float BlurEnd
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+
+    ["BlurShow"]
+    uniform mediump float BlurShow
+    <
+        artist = "1"
+        min = "0.0"
+        max = "1.0"
+        init = "0.0"
+    >;
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	// attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+    uniform highp float4x4 wv: WORLD_VIEW;
+    uniform mediump float FrameTime: FRAME_TIME;
+    uniform lowp float alphaRef : ALPHA_REF;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+    uniform highp float4x4 texTrans1 : TEXTURE_TRANS1;
+	
+	uniform highp float4x4 proj : PROJECTION;
+	uniform float AlphaMtl : ALPHA_MTL
+    <
+        init = "1.0"
+    >;
+
+// varying变量
+	varying mediump float4 UV0;
+    varying lowp float3 NormalView;
+	varying lowp float4 VectorDiffuse;
+    varying highp float4 v_screenpos;
+
+	vertex
+	{
+
+        highp float4 position = a_position;
+        highp float4 normal = a_normal;
+
+        highp float4 worldpos = transform(position,world);
+		highp float4 pos = transform(position, wvp);
+        vertex(pos);
+		
+        out (VectorDiffuse, diffuse);
+
+        macro(FRESNEL_ENABLE)
+        {
+            branch("1") {
+                float3x3 worldViewMat = float3x3(wv);
+                lowp float3 nor_value = normalize(transform(normal.xyz, worldViewMat));
+                out(NormalView, nor_value);
+            }
+            branch("0") {
+            }
+        };
+    // diffuse
+		mediump float4 uv0 = float4(texcoord0.xy,0.0f,0.0f);
+		out(UV0, uv0);
+        out(v_screenpos,position);
+	}
+
+	pixel
+	{
+        mediump float2 uvxyz = UV0.xy * float2(tillingx,tillingy) + FrameTime * float2(speedx,speedy);
+        mediump float2 bluruv = UV0.xy * float2(blur_tillingx,blur_tillingy) + FrameTime * float2(blur_speedx,blur_speedy);
+		lowp float4 diffuse_map_color_ = sample(Tex0, uvxyz);
+        lowp float4 blur_tex_color_ = sample(BlurTex,bluruv);
+        lowp float4 blur_tex_alpha = sample(BlurAlphaTex,bluruv);
+        lowp float4 blur_tex_color = float4(blur_tex_color_.xyz,blur_tex_alpha.x);
+
+        lowp float alphafade = smoothstep(FadeStart,FadeEnd,v_screenpos.z);
+        lowp float blurfade = 1.0f - smoothstep(BlurStart,BlurEnd,v_screenpos.z);
+
+        lowp float4 diffuse_map_color = lerp(diffuse_map_color_,blur_tex_color,float4(blurfade));
+        // lowp float4 diffuse_map_color = blur_tex_color_;
+
+        macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+        {
+        branch("1") {
+            lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+            out(alpha, separateColor.w);
+        }
+        branch("0") {
+            out(alpha, diffuse_map_color.a);
+        }
+        };
+        macro(ALPHA_TEST_ENABLE)
+        {
+            branch("1") {
+                alphatest("<")(alpha - alphaRef, 0.0f);
+            }
+            branch("0") {
+            }
+        };
+
+        mediump float3 final_lightmap_color = diffuse_map_color.xyz * change_color_bright;
+
+        macro(FRESNEL_ENABLE) out(lowp float3 color1)
+        {
+            branch("1") {
+                lowp float3 inputNormView = NormalView;
+                lowp float fresnel = 1.0f - abs(dot(inputNormView, float3(0.0f, 0.0f, -1.0f)));
+                out(color1, final_lightmap_color + fresnel_color.xyz * pow(fresnel, fresnel_size) * fresnel_brightness);
+            }
+            branch("0") {
+                out(color1, final_lightmap_color);
+            }
+        };
+
+        macro(DISSOLVE_EFFECT) out(lowp float3 color2)
+        {
+            branch("1") {
+                lowp float4 diss_samp = sample(DissolveTex, UV0.xy);
+                lowp float ClipAmount = diss_samp.x - DissAmount;
+                alphatest("<")(ClipAmount, 0.0f);
+                lowp float3 dest = color1 * DissolveColor.xyz * ClipAmount * 2.0f / 0.1f;
+                // 0-0.1 :  color1 >0.1. dest
+                lowp float num1 = step(0.1f, ClipAmount);
+                out(color2, num1 * color1 + (1.0f - num1) * dest);
+            }
+            branch("0") {
+                out(color2, color1);
+            }
+        };
+
+        macro(Enable_PARTICLE_COLOR) out(mediump float3 color3)
+        {
+            branch("1") {
+                out(color3, particle_color.xyz * particle_color_value + color2);
+            }
+            branch("0") {
+                out(color3, color2);
+            }
+        };
+        lowp float final_alpha = alpha * AlphaMtl * VectorDiffuse.a * alphafade;
+        lowp float3 color_debug = lerp(color3.xyz,float3(blurfade),float3(BlurShow));
+        lowp float alpha_debug = lerp(final_alpha,1.0f,BlurShow);
+		pixel(float4(color_debug, alpha_debug));
+        // pixel(float4(float3(alphafade),alphafade));
+	}
+}

@@ -1,0 +1,147 @@
+["outline shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "wyy"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	["纹理"]
+	uniform sampler Tex0 
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	
+    >;
+
+	
+	["描边粗细"]
+    uniform float outline_wide
+    <
+    	artist = "1"
+    	init = "2"
+    	max = "5"
+    	min = "1"
+    	uistep = "1"
+    >;
+	
+	 ["描边色彩"]
+    uniform float4 outline_color1
+    <
+    	artist = "1"
+    	init = "(1.0,0.0,0.0,1.0)"
+    	color = "1"
+    >;
+	 ["描边色彩2"]
+	 uniform float4 outline_color2
+    <
+    	artist = "1"
+    	init = "(0.0,1.0,0.0,1.0)"
+    	color = "1"
+    >;
+	
+	["混合颜色因子"]
+	 uniform float blend_k
+    <
+    	artist = "1"
+    	init = "0.5"
+    >;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+	
+	
+	uniform mediump float4 rtSize:RT_SIZE;
+	varying mediump float4 v_TexCoord1;
+	varying mediump float4 v_TexCoord2;
+	varying mediump float2 UV0;
+	
+	["计算采样点"]
+	function get_points in (
+	float4 rtSize, 
+	float2 texcoord0_xy, 
+	float wide
+	) out (float4 v_texcoord1, float4 v_texcoord2) // 计算
+	{
+		float2 v1 = texcoord0_xy + float2(rtSize.z  * wide, 0.0f);
+		float2 v2 = texcoord0_xy - float2(rtSize.z * wide, 0.0f);
+		float2 v3 = texcoord0_xy + float2(0.0f, rtSize.w * wide) ;
+		float2 v4 = texcoord0_xy - float2(0.0f, rtSize.w * wide);
+		out(v_texcoord1, float4(v1, v2));
+		out(v_texcoord2, float4(v3, v4));
+		
+	};
+	
+	function uniform_value in (
+	float in_value
+	)out (float out_value)
+	{
+		float k = step(in_value, 0.0f);
+		out(out_value, k * 1.0f + (1.0f - k) * in_value);
+	};
+	
+
+	
+	vertex{
+		highp float4 position = a_position;
+		vertex(position);	
+		
+		function get_points(rtSize, texcoord0.xy, outline_wide)
+		out(float4 v1, float4 v2);
+		out(v_TexCoord1, v1);
+		out(v_TexCoord2, v2);	
+		out(UV0, texcoord0.xy);
+	}
+	
+	pixel{	
+		function uniform_value(sample(Tex0, v_TexCoord1.xy).w) out(highp float w1);
+		function uniform_value(sample(Tex0, v_TexCoord1.zw).w) out(highp float w2);
+		function uniform_value(sample(Tex0, v_TexCoord2.xy).w) out(highp float w3);
+		function uniform_value(sample(Tex0, v_TexCoord2.zw).w) out(highp float w4);
+
+		
+		highp float4 tex_color = sample(Tex0, UV0.xy);//采样的颜色
+		//float w = tex_color.w;
+		function uniform_value(tex_color.w) out(highp float w);
+		
+		
+		
+		float du = 0.00001f;
+		float alpha_diff = float(abs(w1 - w) + abs(w2 - w) +  abs(w3 - w) + abs(w4 - w));
+		float k1 = step(du, alpha_diff); //判断是否是边缘
+		
+		float k2 = step(du, float(abs(w1 - w) + abs(w3 - w)));//判断左边和下边的像素的w值是否相同
+		float k3 = 1.0f - step(du, abs(w2 - w)); //判断右边的像素的w是否相同，如果不同则不染色，相同为1
+		
+		//交叠的边缘像素w都是小于1的
+		float value = step(0.0f, w1-1.0f) + step(0.0f, w2 - 1.0f) + step(0.0f, w3 - 1.0f) + step(0.0f, w4 - 1.0f);
+		float out_line = step(1.0f, value); //是否是交叠的边缘
+		
+		float color_k = step(w, 0.33f); //描边样式0和描边样式1
+		float4 outline_color = color_k * outline_color2 + (1.0f - color_k) * outline_color1;
+		float4 blend_color = outline_color * blend_k + tex_color * (1.0f - blend_k);//和当前像素颜色混合
+		float4 color1 = (1.0f - k2 * k3) * tex_color + k2 * k3 *blend_color ;// 模型交叠颜色   
+		float4 color2 = (1.0f - k1) * tex_color + k1 * blend_color;//非模型交叠颜色
+		float4 color = (1.0f - out_line) * color1 + out_line * color2;
+		//使用内描边
+		float k4 = step(1.0f, w);
+		float test_k = k4;		
+		float4 final_color = (1.0f - test_k)* color + test_k* tex_color;
+		//float4 test = float4(0.0f, k1, 0.0f, 1.0f);
+		float4 c = test_k* outline_color + (1.0f - test_k) * tex_color;
+
+		
+		//float4 test = float4(k1, 0.0f, 0.0f, 1.0f);
+		pixel(float4(final_color.xyz, 1.0f));
+		//pixel(test);
+
+	}
+
+}
+	
+

@@ -1,0 +1,37 @@
+["fog of war blur"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	technique = "TShader"
+	zenable = "0"
+	zwritable = "0"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float2 TexCoord0;
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		lowp float4 color = sample(Tex0, TexCoord0.xy);
+		pixel(color);
+	}
+}

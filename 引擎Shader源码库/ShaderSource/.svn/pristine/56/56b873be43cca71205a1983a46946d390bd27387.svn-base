@@ -1,0 +1,59 @@
+["motion_blur"]
+pipeline
+<
+	author = "wyy"
+	company = "netease"
+	category = "postprocess"
+>
+
+{
+	attribute float4 a_position:POSITION;
+	attribute float4 a_texture0:TEXTURE0;
+	varying mediump float2 TexCoord0:TEXTURE0;
+	varying mediump float4 TexCoord1;
+	varying mediump float4 TexCoord2;
+	varying mediump float4 TexCoord3;
+	varying mediump float4 TexCoord4;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+	>;
+
+	uniform mediump float4 _Offset
+	<
+		init = "0.0, 0.0, 0.0, 0.0"
+		artist = "1"
+	>;
+
+	vertex
+	{
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+		out(TexCoord1, a_texture0.xyxy + _Offset.xyxy * float4( 1.0f , 1.0f , -1.0f , -1.0f ));
+    	out(TexCoord2, a_texture0.xyxy + _Offset.xyxy * float4( 1.0f , 1.0f , -1.0f , -1.0f ) * 2.0f);
+    	out(TexCoord3, a_texture0.xyxy + _Offset.xyxy * float4( 1.0f , 1.0f , -1.0f , -1.0f ) * 3.0f);
+    	out(TexCoord4, a_texture0.xyxy + _Offset.xyxy * float4( 1.0f , 1.0f , -1.0f , -1.0f ) * 4.0f);
+	}
+
+	pixel
+	{
+
+	    float4 c1 = 0.225f  * sample(Tex0, TexCoord0);
+	    float4 c2 = 0.150f  * sample(Tex0, TexCoord1.xy);
+	    float4 c3 = 0.150f  * sample(Tex0, TexCoord1.zw);
+	    float4 c4 = 0.110f  * sample(Tex0, TexCoord2.xy);
+	    float4 c5 = 0.110f  * sample(Tex0, TexCoord2.zw);
+	    float4 c6 = 0.075f  * sample(Tex0, TexCoord3.xy);
+	    float4 c7 = 0.075f  * sample(Tex0, TexCoord3.zw);
+	    float4 c8 = 0.0525f * sample(Tex0, TexCoord4.xy);
+	   	float4 c9 = 0.0525f * sample(Tex0, TexCoord4.zw);
+    	float4 gl_FragColor = c1 + c2 + c3 + c4 + c5 + c6 + c7 + c8 + c9 ;
+		pixel(float4(gl_FragColor.x, gl_FragColor.y, gl_FragColor.z, gl_FragColor.w));
+	}
+}

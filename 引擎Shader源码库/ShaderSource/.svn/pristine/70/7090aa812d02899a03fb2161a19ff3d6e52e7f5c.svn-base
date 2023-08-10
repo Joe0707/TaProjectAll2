@@ -1,0 +1,34 @@
+["cocos"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_MVPMatrix;
+  uniform sampler CC_Texture0
+    <name = "CC_Texture0">;
+  uniform sampler CC_Texture1
+    <name = "CC_Texture1">;
+  uniform float4 u_color;
+
+  varying mediump float2 v_texCoord;
+
+  eitheror USE_SEPARATE_ALPHA;
+
+  vertex main
+  {
+    vertex(position * CC_MVPMatrix);
+    out(v_texCoord, texCoord0);
+  }
+  pixel main
+  {
+    lowp float4 samp = sample(CC_Texture0, v_texCoord);
+    pixel(samp * u_color);
+  }
+}

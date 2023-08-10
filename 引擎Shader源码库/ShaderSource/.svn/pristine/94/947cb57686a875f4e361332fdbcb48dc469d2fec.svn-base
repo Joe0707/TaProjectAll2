@@ -1,0 +1,68 @@
+["Dark Corner"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+	technique = "DarkCorner"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	varying mediump float2 v_texture0: TEXTURE0;
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	uniform sampler	TexCorner:OTHER0
+	<
+		artist = "1"
+		path = "common\\pipeline\\dark_corner.dds"
+	>;
+	["压暗程度"]
+	uniform mediump float DarkIntensity: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "3"
+	>; 
+	
+	["开始位置"]
+	uniform lowp float DarkBegin: OTHER1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>; 
+	
+	["DarkAlpha"]
+	uniform float DarkAlpha: OTHER2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "1.0"
+	>; 
+	
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(v_texture0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		float4 org_clr = sample(Tex0, v_texture0);
+		float4 mask_clr = sample(TexCorner, v_texture0);
+		pixel(transform(org_clr, pow(abs(sin(saturate(mask_clr.a + DarkBegin) * 1.570796f)), DarkIntensity)* DarkAlpha ));
+	}
+	
+}

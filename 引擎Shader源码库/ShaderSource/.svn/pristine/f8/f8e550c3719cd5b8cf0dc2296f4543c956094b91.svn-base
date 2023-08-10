@@ -1,0 +1,675 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0"
+	author = "zhangliang/xuzhuoliang/fanyu"
+	category = "common"
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+
+	["是否溶解"]
+	eitheror DISSOLVE_EFFECT;
+	macro(DISSOLVE_EFFECT)
+	<
+		default = "0"
+		customizable = "0"
+	>;
+
+	["是否灵魂状态"]
+	eitheror GHOST_EFFECT;
+	macro(GHOST_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否冰冻"]
+	eitheror FROZENE_EFFECT;
+	macro(FROZENE_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+
+	["是否燃烧"]
+	eitheror FIRE_EFFECT;
+	macro(FIRE_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否金身"]
+	eitheror GOLD_EFFECT;
+	macro(GOLD_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+
+	["是否叠加为ADD模式"]
+	eitheror ADD_MODE;
+	macro(ADD_MODE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否石化"]
+	eitheror PETRIFY_EFFECT;
+	macro(PETRIFY_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+// 贴图
+
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["画符贴图"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	// ["光照贴图"]
+	// uniform sampler LightTex
+	// <
+	// 	artist = "1"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	path = "fx\\texture\\effect\\lighttex.png"
+	// >;
+
+	["冰冻贴图"]
+	uniform sampler IceTex
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\ice_buff_1.png"
+	>;
+
+	["燃烧贴图"]
+	uniform sampler FireTex
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\fire_buff.png"
+	>;
+
+	["金身贴图"]
+	uniform sampler GoldTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "fx\\texture\\noise\\noise_yd_26.tga"
+	>;
+
+	["灵体贴图"]
+	uniform sampler GhostTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "fx\\texture\\noise\\noise_yd_26.tga"
+	>;
+
+	["溶解贴图"]
+	uniform sampler DissolveTex
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\dissolve.png"
+	>;
+
+	["石化贴图"]
+	uniform sampler PetrifyTex
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\petrify_buff.png"
+	>;
+
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	// uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+
+
+
+	["叠加色"]
+	uniform mediump float3 change_color
+	<
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;
+
+	["溶解程度"]
+	uniform lowp float DissAmount
+	<
+		init = "0.0"
+	>;
+	["uvtiling"]
+	uniform lowp float uvtiling
+	<
+		uistep = "0.001"
+		init = "1"
+		max = "5.0"
+		min = "1.0"
+		artist = "1"
+	>;
+
+	["范围开始"]
+	uniform mediump float nov_sm1
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.31"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["范围结束"]
+	uniform mediump float nov_sm2
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "1.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["中央厚度"]
+	uniform mediump float sm_min
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.4"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["金身-中央厚度"]
+	uniform mediump float sm_min_gold
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.42"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["灵魂边缘强度"]
+	uniform mediump float ghost_rim_sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.8"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+
+	["光效强度"]
+	uniform mediump float sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "2.35"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["UV动画速度"]
+	uniform mediump float sm_vuspeed
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.53"
+		max = "1.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+
+	["U缩放"]
+	uniform float sm_uvtiling_u
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "0.1"
+		uistep = "0.0001"
+		max = "2.0"
+		min ="0.0"
+	>;
+	["U偏移"]
+	uniform float sm_uvoffset_u
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "1.0"
+		uistep = "0.0001"
+		max = "1.0"
+		min ="-1.0"
+	>;
+	["V缩放"]
+	uniform float sm_uvtiling_v
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "0.1"
+		uistep = "0.0001"
+		max = "2.0"
+		min ="0.0"
+	>;
+
+	["金身颜色"]
+	uniform mediump float4 gold_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 0.756, 0.121, 1.0"
+		artist = "1"
+	>;
+	["灵魂颜色"]
+	uniform mediump float4 ghost_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "0.847, 0.847, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	["灵魂贴图强度"]
+	uniform mediump float ghost_sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["颜色"]
+	uniform mediump float4 sm_color_ad
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 1.0, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	["纹理平铺数"]
+	uniform float per_uvtilling
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "3.0"
+	>;
+
+	// ["石化阴影深度"]
+	// uniform float per_lerp
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "1.0"
+	// >;
+
+	// ["石化边缘宽度"]
+	// uniform float height_sm2
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "0.1"
+	// >;
+
+	["石化程度"]
+	uniform float ChangeAmount
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		init = "0.1"
+	>;
+
+
+	["抖动速度"]
+	uniform float shake_speed
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "5"
+		min = "0"
+		init = "0.1"
+	>;
+
+	["抖动强度"]
+	uniform float shake_intensity
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "5"
+		min = "0"
+		init = "0.1"
+	>;
+
+	["抖动高度"]
+	uniform float shake_height
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "20"
+		min = "0"
+		init = "0.4"
+	>;
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float ghostlerp;
+	varying mediump float icelerp;
+	varying mediump float firelerp;
+	varying mediump float goldlerp;
+	varying mediump float2 petrify_uv;
+	varying mediump float petrify_shadow;
+	varying mediump float height_sm;
+	varying mediump float v_vertical_fac;
+	varying mediump float v_gold_gradient;
+	varying mediump float2 v_gold_uv;
+	varying mediump float2 v_ghost_uv;
+	//varying lowp float v_height_fac;
+
+	vertex
+	{
+		highp float4 position = a_position;
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+
+		// 灵体状态（可以跑但是未确认效果，先别用）
+		macro(GHOST_EFFECT) {
+			branch ("1") {
+				highp float3 normal_view = normalize(transform(a_normal.rgb,float3x3(wv)));
+				mediump float ghostlerp_ = smoothstep(nov_sm1,nov_sm2,1.0f + normal_view.b);
+				out(ghostlerp,saturate(ghostlerp_ + sm_min));
+
+				// 控制頂點運動
+				// 顶点位置越高扰动越弱，根据世界空间坐标做扰动偏移
+				mediump float horizon_fac = pos_world.x + pos_world.z; // 水平因子
+				//lowp float shake_height = 20.0f; // 标准高度
+				mediump float vertical_fac = clamp((position.y - shake_height) * 0.1f, 0.0f, 1.0f); // 垂直因子 // 明天把高度抖动也写下
+				//highp float4 pos_ghost_ = pos + float4(abs(sin((frame_time + horizon_fac)* shake_speed)) * normal_view * shake_intensity * vertical_fac);
+				//highp float4 pos_ghost_ = pos *1.0f;
+				//mediump float alpha_shake = clamp(0.5f*(sin(frame_time + horizon_fac * 0.2f ))+0.7f, 0.0f, 1.0f) * vertical_fac;
+				//out(pos_ghost, pos_ghost_);
+				out(v_vertical_fac, vertical_fac);
+
+				highp float ghost_uv_y = position.y + frame_time * sm_vuspeed;
+				lowp float2 ghost_view = float2(normal_view.x * sm_uvtiling_u + sm_uvoffset_u, ghost_uv_y * sm_uvtiling_v);
+				out(v_ghost_uv, ghost_view);
+			}
+			branch ("0") {
+			}
+		};
+
+		vertex(pos);
+
+		macro(FROZENE_EFFECT) {
+			branch ("1") {
+				highp float3 normal_view = normalize(transform(a_normal.rgb,float3x3(wv)));
+				mediump float icelerp_ = smoothstep(nov_sm1,nov_sm2,1.0f + normal_view.b);
+				out(icelerp,saturate(icelerp_ + sm_min));
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(FIRE_EFFECT) {
+			branch ("1") {
+				highp float3 normal_view = normalize(transform(a_normal.rgb,float3x3(wv)));
+				out(UV1,normal_view.rg * float2(0.5f, -0.5f) + float2(-0.5f, -0.5f));
+				mediump float firelerp_ = smoothstep(nov_sm1,nov_sm2,1.0f + normal_view.b);
+				out(firelerp,saturate(firelerp_ + sm_min));
+
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(GOLD_EFFECT) {
+			branch ("1") {
+				highp float3 normal_view = normalize(transform(a_normal.rgb,float3x3(wv)));
+				//out(UV1, normal_view.rg * float2(0.5f, -0.5f) + float2(-0.5f, -0.5f));
+				mediump float firelerp_ = smoothstep(nov_sm1,nov_sm2,1.0f + normal_view.b);
+				out(goldlerp,saturate(firelerp_ + sm_min_gold));
+
+				//highp float4 pos_view = normalize(transform(position, wv));
+				highp float gold_uv_y = position.y + frame_time * sm_vuspeed;
+				lowp float2 gold_view = float2(normal_view.x * sm_uvtiling_u + sm_uvoffset_u, gold_uv_y * sm_uvtiling_v);
+				out(v_gold_uv, gold_view);
+
+				mediump float gradient_fac = clamp((position.y - shake_height) * 0.1f, 0.0f, 1.0f); // 垂直因子
+				out(v_gold_gradient, gradient_fac);
+
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(PETRIFY_EFFECT) {
+			branch ("1") {
+				highp float3 normal_world = normalize(transform(a_normal.rgb,float3x3(world)));
+				out(petrify_shadow,max(0.0f,normal_world.y));
+				out(petrify_uv,texcoord0.xy * per_uvtilling);
+				// 模型高度一般为30
+				out(height_sm,step(30.0f*ChangeAmount,a_position.y));
+			}
+			branch ("0") {
+			}
+		};
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color_tmp = sample(Tex0,UV0.xy);
+		lowp float4 huafu_map_color = sample(Tex1, UV0.xy);
+
+		lowp float huafu_a = huafu_map_color.r;
+		lowp float r = min(diffuse_map_color_tmp.r * (1.0f - huafu_a) + huafu_map_color.r * huafu_a, 1.0f);
+		lowp float g = min(diffuse_map_color_tmp.g * (1.0f - huafu_a) + huafu_map_color.g * huafu_a, 1.0f);
+		lowp float b = min(diffuse_map_color_tmp.b * (1.0f - huafu_a) + huafu_map_color.b * huafu_a, 1.0f);
+		lowp float4 diffuse_map_color = float4(r, g, b, diffuse_map_color_tmp.a);
+		//lowp float4 diffuse_map_color = diffuse_map_color_tmp;
+
+
+		//lowp float height_fac = v_height_fac;
+		// alpha
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+
+		// 灵魂状态
+		macro(GHOST_EFFECT) out(lowp float4 combine_ghost) {
+			branch ("0") {
+				out(combine_ghost, float4(diffuse_map_color.rgb, alpha));
+			}
+			branch ("1") {
+				lowp float height_alpha = v_vertical_fac;
+				lowp float3 ghost_flash = sample(GhostTex,v_ghost_uv.xy).rgb;
+				lowp float3 ghost_color = ghost_color_add.rgb * ghost_rim_sm_multi;
+
+				// lowp float3 ghost_color = lerp(1.15f * sm_color_ad.rgb, float3(oneminus(height_alpha)), float3(0.5f)); // hardcode
+				//lowp float3 ghost_color = 1.15f * sm_color_ad.rgb; // hardcode
+				lowp float3 combine_ghost_ = lerp(diffuse_map_color.rgb, ghost_color + ghost_sm_multi * ghost_flash,float3(ghostlerp));
+				out(combine_ghost, float4(combine_ghost_, height_alpha));
+			}
+		};
+
+		// 冰冻状态（无采样贴图）
+		macro(FROZENE_EFFECT) out(lowp float4 combine_frozen) {
+			branch ("0") {
+				out(combine_frozen,combine_ghost);
+			}
+			branch ("1") {
+				lowp float3 ice_color = 1.15f * float3(0.21875f, 0.7882f, 1.0f); // hardcode
+				lowp float3 combine_frozen_ = lerp(max(float3(0.2f), combine_ghost.rgb), ice_color,float3(icelerp));
+				out(combine_frozen, float4(combine_frozen_, combine_ghost.a));
+			}
+		};
+
+		// 燃烧状态（采样了一张火焰贴图）
+		macro(FIRE_EFFECT) out(lowp float4 combine_fire) {
+			branch ("1") {
+				lowp float3 fire_color = sample(FireTex,UV1.xy).rgb * sm_multi;
+				lowp float3 combine_fire_ = lerp(combine_frozen.rgb , fire_color, float3(firelerp)); // 人会变暗
+				out(combine_fire, float4(combine_fire_, combine_frozen.a));
+			}
+			branch ("0"){
+				out(combine_fire, combine_frozen);
+			}
+		};
+
+		// 金身
+		macro(GOLD_EFFECT) out(lowp float4 combine_gold) {
+			branch ("1") {
+				//lowp float2 gold_flash = v_gold_uv;
+				// lowp float3 gold_color = sample(GoldTex,UV1.xy).rgb * sm_multi;
+				lowp float3 gold_flash = sample(GoldTex,v_gold_uv.xy).rgb;
+				lowp float3 gold_color = gold_color_add.rgb * sm_multi;
+				lowp float goldlerp_1 = goldlerp;
+				macro(ADD_MODE) out(lowp float3 combine_gold_) {
+					branch ("1") {
+						lowp float3 combine_gold_1 = lerp(combine_fire.rgb, gold_color+gold_flash, float3(goldlerp_1));
+						out(combine_gold_, combine_gold_1);
+					}
+					branch("0"){
+						lowp float3 combine_gold_1 = lerp(combine_fire.rgb, gold_color*gold_flash, float3(goldlerp_1));
+						out(combine_gold_, combine_gold_1);
+					}
+				};
+				lowp float3 result_gold = combine_gold_ + oneminus(gold_flash)*gold_color_add.rgb;
+				lowp float height_alpha_gold = v_gold_gradient;
+				out(combine_gold, float4(combine_gold_, height_alpha_gold * combine_fire.a));
+
+			}
+			branch("0"){
+				out(combine_gold, combine_fire);
+			}
+		};
+
+		// 石化状态（采样了一张黑白贴图）
+		macro(PETRIFY_EFFECT) out(lowp float4 combine_petrfy) {
+			branch ("1") {
+				lowp float3 petrify_color = sample(PetrifyTex,petrify_uv).rgb * lerp(petrify_shadow,1.0f,0.6f);
+				lowp float3 petrified_color = float3(0.299f * diffuse_map_color.x + 0.587f * diffuse_map_color.y + 0.114f * diffuse_map_color.z);
+				lowp float3 combine_petrfy_= lerp(petrify_color,petrified_color,float3(0.3f));
+				lowp float3 combine_petrfy_1 = lerp(combine_petrfy_,combine_gold.rgb,float3(height_sm));
+				out(combine_petrfy, float4(combine_petrfy_1, combine_gold.a));
+			}
+			branch ("0") {
+				out(combine_petrfy,combine_gold);
+			}
+		};
+
+
+
+
+		macro(DISSOLVE_EFFECT) out(lowp float4 combine_dissolve)
+		{
+			branch("1") {
+				lowp float4 diss_samp = sample(DissolveTex, UV0.xy);
+				lowp float ClipAmount = diss_samp.x - DissAmount;
+				alphatest("<")(ClipAmount, 0.0f);
+				mediump float3 dissolve_color = float3(1.0f, 0.3f, 0.3f);
+				lowp float3 dest = dissolve_color * ClipAmount * 2.0f / 0.1f;
+				lowp float num1 = step(0.1f, ClipAmount);
+				lowp float3 combine_dissolve_ = num1 * change_color * combine_petrfy.xyz + (1.0f - num1) * dest;
+				out(combine_dissolve, float4(combine_dissolve_, combine_petrfy.a));
+			}
+			branch("0") {
+				out(combine_dissolve, float4(change_color * combine_petrfy.xyz, combine_petrfy.a));
+			}
+		};
+
+		lowp float final_alpha = combine_dissolve.a * AlphaMtl;
+		pixel(float4(combine_dissolve.rgb , final_alpha));
+	}
+}

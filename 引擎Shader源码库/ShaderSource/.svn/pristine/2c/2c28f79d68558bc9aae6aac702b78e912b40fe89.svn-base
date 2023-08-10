@@ -1,0 +1,323 @@
+["common"]
+pipeline
+<
+    version = "1.0.0" 
+    author = "xinyue" 
+    category = "common" 
+    company = "netease"
+    merge = "0"
+>
+{
+// 宏
+    ["颜色修改"]
+    eitheror Enable_PARTICLE_COLOR;
+    macro(Enable_PARTICLE_COLOR)
+    <
+        customizable = "1"
+    >;
+
+    ["边缘光效果"]
+    eitheror FRESNEL_ENABLE;
+    macro(FRESNEL_ENABLE)
+    <
+        customizable = "1"
+    >;
+
+    ["溶解"]
+    eitheror DISSOLVE_EFFECT;
+    macro(DISSOLVE_EFFECT)
+    <
+        customizable = "1"
+    >;
+
+// 贴图
+    ["diffuse贴图"]
+    uniform sampler Tex0 : DIFFUSE
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        lodbias = "-0.5"
+    >;
+    
+    ["自发光强度"]
+    uniform mediump float change_color_bright
+    <
+        artist = "1" 
+        min = "0.0" 
+        max = "5.0" 
+        init = "1.0"
+    >;
+
+    uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+    <
+    >;
+
+    ////////////////////////////////
+    // fresnel
+    ["fresnel颜色"]
+    uniform float4 fresnel_color
+    <
+        color = "1"
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+
+    ["fresnel亮度"]
+    uniform float fresnel_brightness
+    <
+        artist = "1"
+        min = "0"
+        max = "3"
+        init = "0"
+    >;
+
+    ["fresnel大小"]
+    uniform float fresnel_size
+    <
+        artist = "1"
+        min = "1"
+        max = "10"
+        init = "3"
+    >;
+    ////////////////////////////////
+
+    ////////////////////////////////
+    ["溶解"]
+    uniform sampler DissolveTex
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        path = "fx\\texture\\effect\\dissolve.png"
+    >;
+
+    ["溶解Amount"]
+    uniform float DissAmount
+    <
+        artist = "1"
+        min = "0.0"
+        max = "20.0"
+        init = "0.0"
+    >;
+
+    ["溶解颜色"]
+    uniform float4 DissolveColor
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0, 0.3, 0.3, 1.0)"
+    >;
+
+    ["颜色修改"]
+    uniform mediump float4 particle_color
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0,1.0,1.0,1.0)"
+    >;
+
+    ["颜色修改强度"]
+    uniform mediump float particle_color_value
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+// attribute变量
+    attribute float4 texcoord0 : TEXTURE0;
+    attribute float4 texcoord1 : TEXTURE1;
+    attribute float4 diffuse : DIFFUSE;
+    attribute float4 a_position : POSITION;
+    attribute float4 a_normal : NORMAL;
+
+// uniform变量
+    uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+    uniform highp float4x4 world : WORLD;
+    uniform highp float4x4 wv: WORLD_VIEW;
+
+    uniform lowp float alphaRef : ALPHA_REF;
+    
+    uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+    
+    uniform highp float4x4 proj : PROJECTION;
+    uniform float AlphaMtl : ALPHA_MTL
+    <
+        init = "1.0"
+    >;
+    ["内圆的直径"]
+    //距离原点的直径长度
+    uniform lowp float InnerDiam 
+    <
+        init = "52.0"
+        artist = "1"
+    >;
+    ["两圆的宽度"]
+    //两个圆的半径差
+    uniform lowp float RingWide 
+    <
+        init = "17.5"
+        artist = "1"
+    >;
+    ["两圆之间距离"]
+    uniform lowp float RingDis
+    <
+         init = "0.0"
+         artist = "1"
+    >;
+    ["模型长度"]
+    //模型缩放，先把模型调节到直径大小，调到二分之一大小就只显示四分之一个圆
+    uniform lowp float ModelSize
+    <
+        init = "53.0"
+        artist = "1"
+    >;
+     ["模型宽度"]
+    uniform lowp float WideSize 
+    <
+        init = "17.5"
+        artist = "1"
+    >;
+    ["坐标原点"]
+    //位置
+    uniform lowp float4 OriPoint 
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+        artist = "1"
+
+    >;
+   
+    //varying变量
+    varying mediump float4 UV0;
+    varying lowp float3 NormalView;
+    varying lowp float4 VectorDiffuse;
+    
+    varying highp float POSY;
+    vertex
+    {
+
+        highp float4 position = a_position;
+        highp float px = position.x;
+        highp float4 normal = a_normal;
+        
+        highp float height_ratio = InnerDiam/ModelSize;
+        highp float width_ratio = RingWide/WideSize;
+        highp float half_model = ModelSize * 0.5f;
+       // highp float pz = 
+        highp float real_raduis = abs(half_model * height_ratio + position.z*width_ratio);
+        
+     
+        highp float posx = px * real_raduis * 2.0f /ModelSize;
+        highp float pdis = abs(posx - half_model * real_raduis * 2.0f/ModelSize);
+        highp float tsqare = pow(real_raduis,2.0f) -  pow(pdis,2.0f);
+        highp float t = sqrt(tsqare);
+        highp float ppx = posx - abs(position.z * width_ratio);
+       
+        highp float4 newPos = float4(ppx, position.y, t, position.w) + OriPoint;
+        highp float4 pos = transform(newPos, wvp);
+        vertex(pos);
+        out(POSY,newPos.z);
+
+        mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+        
+        out (VectorDiffuse, diffuse);
+
+        macro(FRESNEL_ENABLE)
+        {
+            branch("1") {
+                float3x3 worldViewMat = float3x3(wv);
+                lowp float3 nor_value = normalize(transform(normal.xyz, worldViewMat));
+                out(NormalView, nor_value);
+            }
+            branch("0") {
+            }
+        };
+    // diffuse
+        mediump float4 uv0 = float4(uvxyz.xyz, 0.0f);
+        out(UV0, uv0);
+    }
+
+    pixel
+    {
+        lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+        macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+        {
+        branch("1") {
+            lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+            out(alpha, separateColor.w);
+        }
+        branch("0") {
+            out(alpha, diffuse_map_color.a);
+        }
+        };
+        macro(ALPHA_TEST_ENABLE)
+        {
+            branch("1") {
+                alphatest("<")(alpha - alphaRef, 0.0f);
+            }
+            branch("0") {
+            }
+        };
+
+        mediump float3 final_lightmap_color = diffuse_map_color.xyz * change_color_bright;
+
+        macro(FRESNEL_ENABLE) out(lowp float3 color1)
+        {
+            branch("1") {
+                lowp float3 inputNormView = NormalView;
+                lowp float fresnel = 1.0f - abs(dot(inputNormView, float3(0.0f, 0.0f, -1.0f)));
+                out(color1, final_lightmap_color + fresnel_color.xyz * pow(fresnel, fresnel_size) * fresnel_brightness);
+            }
+            branch("0") {
+                out(color1, final_lightmap_color);
+            }
+        };
+
+        macro(DISSOLVE_EFFECT) out(lowp float3 color2)
+        {
+            branch("1") {
+                lowp float4 diss_samp = sample(DissolveTex, UV0.xy);
+                lowp float ClipAmount = diss_samp.x - DissAmount;
+                alphatest("<")(ClipAmount, 0.0f);
+                lowp float3 dest = color1 * DissolveColor.xyz * ClipAmount * 2.0f / 0.1f;
+                // 0-0.1 :  color1 >0.1. dest
+                lowp float num1 = step(0.1f, ClipAmount);
+                out(color2, num1 * color1 + (1.0f - num1) * dest);
+            }
+            branch("0") {
+                out(color2, color1);
+            }
+        };
+
+        macro(Enable_PARTICLE_COLOR) out(mediump float3 color3)
+        {
+            branch("1") {
+                out(color3, particle_color.xyz * particle_color_value + color2);
+            }
+            branch("0") {
+                out(color3, color2);
+            }
+        };
+
+        //lowp float4 rescolor = sample(Tex0, UV0.xy);
+        condition(POSY, RingDis) out(lowp float4 resColor)
+        {
+            branch("%0% < %1%") {
+           
+                lowp float4 myColor = float4(color3.xyz, 0.0f);
+                out (resColor, myColor);
+                //out (resColor,  float4(0,0,0,0));
+            }
+            default {
+                lowp float4 myColor = float4(color3.xyz,  alpha * AlphaMtl * VectorDiffuse.a);
+                out(resColor, myColor);
+                //out (resColor, 1.0f);
+           }
+        };
+        pixel (resColor);
+    }
+}

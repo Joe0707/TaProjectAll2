@@ -1,0 +1,448 @@
+﻿["shader for fx in zhanshi"]
+pipeline
+<
+	version = "1.1.2" 
+	author = "fanyu/liuyu/xuzhuoliang" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+
+	["开启边缘光(FRESNEL_ENABLE)"]
+	eitheror FRESNEL_ENABLE;
+	
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(FRESNEL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// —————————————————— 环境光PBR ——————————————————
+	["反射强度(envir_brightness)"]
+	uniform mediump float envir_brightness
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+
+	// ——————————————————DIFFUSE——————————————————
+
+	["AO强度"]
+	uniform mediump float ao_intensity
+	<
+		uigroup = "风格化"
+		min = "1.0" 
+		max = "10.0" 
+		init = "1.0"
+		artist ="1"
+		uistep = "0.001"
+	>;
+
+	["角色高度"]
+	uniform mediump float char_height
+	<
+		artist = "1"
+		init = "20"
+		min = "0"
+		uigroup = "风格化"
+	>;
+
+	// ————————————————环境光————————————————
+	["环境光背光面颜色"]
+	uniform lowp float4 env_shadow_factor
+	<
+		artist = "0" 
+		color = "1"
+		init = "(0.667,0.545,0.761,1.0)"
+		uigroup = "环境光"
+	>;
+
+	["AO深色区域调整参数"]
+	uniform lowp float AO_slider
+	<
+		artist = "1" 
+		uistep = "1"
+		max = "1"
+		min = "0.4"
+		init = "1"
+		uigroup = "环境光"
+	>;
+
+	// —————————————————— FRESNEL ——————————————————
+
+
+	["覆盖范围"]
+	uniform lowp float rim_power
+	<
+		uigroup = "3 rim"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"
+		max = "1.0"
+		min = "-1.0"
+	>;
+	
+	["强度"]
+	uniform mediump float rim_multi
+	<
+		uigroup = "3 rim"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"    
+		max = "5.0"
+		min = "0.0"
+	>;
+
+	["轮廓颜色"]
+	uniform lowp float4 rim_color
+	<
+		uigroup = "3 rim"
+		init = "(0.0, 0.0, 0.0, 0.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["内部颜色"]
+	uniform lowp float4 adjust_inner
+	<
+		uigroup = "3 rim"
+		init = "1"
+		artist = "1"
+		color ="1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	["内部透明度"]
+	uniform lowp float inner_alpha
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "1"
+		max = "1.0"
+		min = "-0.5"
+		artist = "1"
+	>;
+
+	["rim 开始"]
+	uniform lowp float u_rim_start
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["rim 结束"]
+	uniform lowp float u_rim_end
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "1"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["poisson uniform values"]
+	uniform lowp float4[8] poissonDisk
+	<
+		init = "(0.0, 0.0, -0.94201624, -0.39906216, 0.94558609, -0.76890725, -0.094184101, -0.92938870, 0.34495938, 0.29387760, -0.91588581, 0.45771432, -0.81544232, -0.87912464, -0.38277543, 0.27676845, 0.97484398, 0.75648379, 0.44323325, -0.97511554, 0.53742981, -0.47373420, -0.26496911, -0.41893023, 0.79197514, 0.19090188, -0.24188840, 0.99706507, -0.81409955, 0.91437590, 0.19984126, 0.78641367)"
+	>;
+	
+	uniform lowp float u_tonemapping_factor
+	<
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+		artist = "1"
+	>;
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1; // 贴花的uv
+	// varying mediump float v_char_height; 
+	varying mediump float4 PosWorld;	
+	varying mediump float4 pos_local;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform mediump float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	
+	uniform mediump float4 ZBufferParams: ZBUFFER_PARAMS;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+    uniform mediump float4x4 envSHR
+    <
+        init = "(0.034482, -0.012261, -0.084893, -0.059473, -0.012261, -0.034482, 0.050653, 0.049730, -0.084893, 0.050653, 0.163796, 0.134177, -0.059473, 0.049730, 0.134177, 0.232006)"
+    >;
+    uniform mediump float4x4 envSHG
+    <
+        init = "(0.021185, -0.008407, -0.054125, -0.043060, -0.008407, -0.021185, 0.054404, 0.080244, -0.054125, 0.054404, 0.122501, 0.120679, -0.043060, 0.080244, 0.120679, 0.275157)"
+    >;
+    uniform mediump float4x4 envSHB
+    <
+        init = "(-0.001481, -0.004859, -0.023554, -0.026278, -0.004859, 0.001481, 0.068232, 0.166090, -0.023554, 0.068232, 0.068985, 0.116195, -0.026278, 0.166090, 0.116195, 0.354098)"
+    >;
+
+	uniform lowp float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+	
+	function calc_env_sh
+	in (mediump float4x4 envSHR,
+		mediump float4x4 envSHG,
+		mediump float4x4 envSHB,
+		mediump float3 normal)
+	out(mediump float3 color_out)
+	{
+		mediump float4 n = float4(normal.xyz, 1.0f);
+		mediump float3 env_diffuse_color = float3(
+				dot(n, transform(n, envSHR)),
+				dot(n, transform(n, envSHG)),
+				dot(n, transform(n, envSHB)));
+
+		out(color_out, env_diffuse_color);
+	};
+
+	// —————————————————— Sphere Gassian ——————————————————
+	function SG in (lowp float x, mediump float k) out (lowp float result)
+	{
+		mediump float a = k * 1.44269504f + 1.089234755f;
+		out (result, exp2(a * x - a));
+	};
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				//function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				// out(vec, pos1);
+				// out(nor, nor1);
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		
+		highp float4 position = vec;
+		highp float4 normal = nor;
+
+		// 计算顶点位置
+		highp float4 screen_pos = float4(transform(position, wvp));
+		vertex(screen_pos);
+		
+		highp float4 pos_world = transform(position, world);
+		
+		float3x3 worldMat = float3x3(world);
+		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		
+		out(UV0, float4(texcoord0.xy, 0.0f, 0.0f));
+		
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		
+		out(v_NormalWorld, world_normal);
+
+		macro (XNORMAL_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+				highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+				mediump float3 binormal_world = cross(tangentWorld, world_normal) * tan_coef;
+
+				out(v_TangentWorld, normalize(tangentWorld));
+				out(v_BinormalWorld, normalize(binormal_world));
+			}
+			branch("0") {
+			}
+		};
+	}
+
+	pixel
+	{
+		lowp float3 vertex_normal_world = v_NormalWorld;
+		macro(XNORMAL_MAP_ENABLE) out(lowp float3 normalWorld, lowp float occlusion) {
+			branch("1") {
+				lowp float4 norm = sample(SamplerNormalMap, UV0.xy);				
+				lowp float2 normOff = norm.xy * 2.0f - float2(1.0f);
+				lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+				out(normalWorld, normalWorld_inner);
+				out(occlusion, norm.z);
+			}	
+			branch("0") {
+				out(normalWorld, vertex_normal_world);
+				out(occlusion, 1.0f);
+			}
+		};
+
+		// ——————————————————★★★ 基础设置 ★★★——————————————————	
+		// 采样贴图
+		lowp float4 diffuse_map_color_ = sample(Tex0, UV0.xy);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 diffuse_map_color)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(diffuse_map_color, float4(diffuse_map_color_.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(diffuse_map_color, diffuse_map_color_);
+			}
+		};
+
+		lowp float gi_toned = 1.0f;
+
+		lowp float4 light_color = ShadowLightAttr[1]; 
+		mediump float3 gi_color = light_color.xyz;
+
+		// 视线方向
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+			
+		// 用于做出漫画明暗交界的效果（不影响高光计算）
+		lowp float3 light_dir_ndl = normalize(float3(0.346f, -0.373f, -0.863f));
+
+		// ——————————————————★★★ 常用参数 ★★★——————————————————
+
+		lowp float non_metal = 1.0f;
+		lowp float NdotV = clamp(dot(view_dir, normalWorld), 0.0f, 1.0f);
+		// NdotL
+		lowp float NdotL_org = dot(normalWorld, -light_dir_ndl);
+
+		// ——————————————————★★★ DIFFUSE ★★★—————————————————— 
+        mediump float3 non_metal_diffuse = diffuse_map_color.xyz * diffuse_map_color.xyz; 
+
+		lowp float _AO_adjust = lerp(1.0f, occlusion ,NdotV);
+		lowp float3 AO_color = float3(lerp(_AO_adjust, occlusion,2.0f * saturate(0.5f - occlusion) * AO_slider));
+		
+		// 计算lambert
+		mediump float non_metal_NdotL = saturate(NdotL_org);
+
+		// SH
+		function calc_env_sh( envSHR, envSHG, envSHB, normalWorld) out (mediump float3 ibl_diffuse);
+
+
+		// 环境光调整色计算
+		lowp float3 env_factor_color = lerp(env_shadow_factor.rgb ,float3(1.0f), float3(non_metal_NdotL));
+
+		// Final Diffuse
+		// 环境光不再额外做衰减
+		mediump float3 final_diffuse = non_metal_diffuse * (non_metal_NdotL * gi_color + env_factor_color * ibl_diffuse * envir_brightness);
+		
+		// ——————————————————★★★ 自发光 & 半透 ★★★—————————————————— 
+		lowp float arufa = diffuse_map_color.a; 
+		lowp float diffuse_alpha = 1.0f; //取消半透明功能
+
+		/////////////////////////////////////////////////////////////////
+		// ——————————————————★★★ 最终光照计算 ★★★——————————————————
+		/////////////////////////////////////////////////////////////////
+        mediump float3 final_light_color = final_diffuse ;
+
+		// —————————————————— 边缘光 ———————————————————
+		macro(FRESNEL_ENABLE) out (mediump float3 fresnel_combine, lowp float alpha_fresnel){
+			branch("1"){
+				lowp float rim_ = 1.0f - NdotV;
+				function SG(rim_, rim_power) out (lowp float rim_factor);
+				mediump float3 rim = smoothstep(u_rim_start, u_rim_end, rim_factor) * rim_color.xyz * rim_multi;
+				mediump float3 final_rim_color = final_light_color * adjust_inner.rgb + rim.xyz;
+				out(fresnel_combine, final_rim_color);
+				out(alpha_fresnel, (rim_ + inner_alpha) * ceil(NdotV));
+			}
+			branch("0"){
+				out(fresnel_combine, final_light_color);
+				out(alpha_fresnel, 1.0f);
+			}
+		};
+		lowp float4 encode_color_1_0 = float4(fresnel_combine/(fresnel_combine+ float3(0.187f)) * 1.035f,alpha_fresnel * diffuse_alpha * AlphaMtl);
+		pixel(encode_color_1_0);
+	}
+}
+

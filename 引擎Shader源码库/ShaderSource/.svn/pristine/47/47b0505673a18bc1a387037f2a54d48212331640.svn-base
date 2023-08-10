@@ -1,0 +1,268 @@
+["皮毛后处理，基于character_chief修改"]
+pipeline
+{
+	macro(GPU_SKIN_ENABLE)
+	<
+		default = "0"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	macro(SKIN_VEC_PER_BONE)
+	<
+		default = "SKIN_VEC_PER_BONE_QUAT"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	macro(LIGHT_ATTR_ITEM_NUM)
+	<
+		default = "LIGHT_ATTR_ITEM_NUM_2"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_normal: NORMAL;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+	
+	varying mediump float4 v_texture0: TEXTURE0;
+	["NormalViewUV"]
+	varying highp float3 v_texture1: TEXTURE1;
+	varying mediump float3 v_lighting: LIGHTING;
+	
+	uniform highp float4x4 u_view_projection: VIEW_PROJECTION;
+	uniform highp float4x4 u_view: VIEW;
+	uniform highp float4x4 u_world: WORLD;
+	uniform highp float4x4 u_projection: PROJECTION;
+	
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0
+	<
+		init = "1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0"
+	>;
+	uniform lowp float u_alpha_ref: ALPHA_REF;
+	
+	uniform lowp float4 u_fog_color: FOG_COLOR
+	<
+		color = "1"
+	>;
+	
+	uniform float4 u_fog_info: FOG_INFO;
+	
+	["blendValue"]
+	uniform lowp float blendValue: ALPHA_MTL
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+	
+	["自发光"]
+	uniform lowp float change_color_bright: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+	
+	["染色1"]
+	uniform lowp float4 tint_color1: OTHER1
+	<
+		artist = "1"
+		color = "1"
+		init = "0.94,0.33,0.25,1"
+	>;
+	
+	["染色2"]
+	uniform lowp float4 tint_color2: OTHER2
+	<
+		artist = "1"
+		color = "1"
+		init = "0.33,0.94,0.25,1"
+	>;
+	
+	uniform mediump float change_color_bright_add: OTHER3;
+	
+	["灯光缩放"]
+	uniform mediump float light_color_inten: OTHER4
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+	
+	uniform highp float4[LIGHT_ATTR_ITEM_NUM] u_point_light_attr: POINT_LIGHT_ATTR;
+	
+	uniform lowp float4 u_ambient: AMBIENT
+	<
+		artist = "1"
+		init = "0.0, 0.0, 0.0, 0.0"
+		color = "1"
+	>;
+	
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	["颜色贴图"]
+	uniform sampler Tex0: OTHER0;
+	
+	["亮度贴图"]
+	uniform sampler LightMap: OTHER1;
+	
+	["光照叠加"]
+	uniform sampler LightMapADD: OTHER2;
+	
+	["Mask贴图"]
+	uniform sampler MaskMap: OTHER3;
+	
+	["毛发mask图"]
+	uniform sampler TexFur: OTHER4;
+	
+	uniform sampler	TexFurNoise: OTHER5
+	<
+		artist = "1"
+		path = "shader\\texture\\noise.png"
+		min = "LINEAR"
+		mag = "LINEAR"
+		mip = "LINEAR"
+	>;
+	
+	["c++用"]
+	uniform float fur_layer: OTHER5
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "5.0"
+	>;
+	
+	uniform float fur_displacement: OTHER6
+	<
+		init = "-0.5"
+	>;
+	
+	["毛长"]
+	uniform float fur_length: OTHER7
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+	
+	uniform float fur_factor: OTHER8
+	<
+		init = "1.0"
+	>;
+
+	["毛密度"]
+	uniform float fur_density: OTHER9
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "5.0"
+	>;
+
+	["fresnel"]
+	uniform float fresnel: OTHER10
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>;
+	
+	uniform float shadow_fac: OTHER11
+	<
+		init = "0.08"
+	>;
+	
+	vertex
+	{
+		float tmp = fur_layer;
+		
+		//["计算最终的position"]
+		//vertex(transform(a_position, u_world_view_projection));
+		
+		float3 normal_out_vec3 = float3(a_normal);
+
+		["计算world空间的法线"]
+		float3 normal_world = normalize(transform(normal_out_vec3, float3x3(u_world)));
+		
+		["计算view空间的法线"]
+		float3 normal_view = normalize(transform(normal_world, float3x3(u_view)));
+		
+		["法线位移, 正对相机的多些，侧面减一些"]
+		float view_fac = (normal_view.z + 1.0f) * (1.0f- fresnel) + fresnel;
+		float4 pos_local = float4(float3(a_position)+ transform(normal_out_vec3, fur_length * fur_factor * view_fac), 1.0f);	
+		
+		["计算world position"]
+		float4 pos_world = transform(pos_local, u_world);
+		
+		["重力位移"]
+		float3 gravity = float3(0.0f, -fur_length, 0.0f);
+		float displacementFactor = pow(fur_factor, 3.0f);
+		float3 posWorldWithGravity = pos_world.xyz + transform(gravity, fur_displacement * displacementFactor);
+		
+		vertex(transform(float4(posWorldWithGravity, 1.0f), u_view_projection));
+		
+		["计算光照"]
+		function point_light_lit(u_point_light_attr[0], u_point_light_attr[1], posWorldWithGravity, normal_world) out(float3 lit);
+		
+		out(v_lighting, max(lit + float3(u_ambient), float3(0.0f)));
+		
+		["计算uv动画"]
+		out(v_texture0, transform(float4(a_texture0.xy, 1.0f, 0.0f), u_texture_trans0));
+
+		float2 normal_view_uv = normal_view.xy * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+		
+		out(v_texture1, float3(normal_view_uv, normal_view.z));
+	}
+	
+	pixel
+	{
+		float2 uv0 = v_texture0.xy;
+		lowp float4 diffuse = sample(Tex0, uv0);
+		float3 diffuse_color = float3(diffuse.xyz);
+		lowp float4 mask_color = sample(MaskMap, uv0);
+		float mask_b = mask_color.z;
+		float mask_g = mask_color.y;
+		float mask_r = mask_color.x;
+		
+		float3 gray = float3(0.299f, 0.587f, 0.114f);
+		
+		mediump float illum1 = dot(diffuse_color, gray) * 3.0f;
+		["油漆桶1"]
+		float3 tint1 = transform(tint_color1.xyz, mask_r * illum1);
+		["第一次染色"]
+		float3 tinted1st = lerp(diffuse_color, tint1, float3(mask_r));
+		
+		mediump float illum2 = dot(tinted1st, gray) * 3.0f;
+		["油漆桶2"]
+		float3 tint2 = transform(tint_color2.xyz, mask_g * illum2);
+		["第二次染色"]
+		float3 tinted2nd = lerp(tinted1st, tint2, float3(mask_g));
+		
+		float3 light_color = float3(transform(sample(LightMap, v_texture1.xy), light_color_inten)) + v_lighting;
+		float3 rim_color = float3(transform(sample(LightMapADD, v_texture1.xy), change_color_bright));
+		
+		highp float rim_mask = oneminus(mask_b);
+		float3 resultColor = tinted2nd * (light_color + float3(change_color_bright_add)) + transform(rim_color, rim_mask);
+		
+		["毛发后处理"]
+		float4 furData = sample(TexFurNoise, transform(uv0, fur_density));
+		float4 furMaskColor = sample(TexFur, uv0);
+		float furMask = furMaskColor.b;
+		float shadow = lerp(1.0f - shadow_fac, 1.0f + shadow_fac, fur_factor);
+		
+		float3 furColor = transform(resultColor, shadow);
+		float furVisibility = oneminus(fur_factor) * step(fur_factor, furData.r);
+		
+		pixel(float4(furColor, furVisibility * furMask));
+	}
+}

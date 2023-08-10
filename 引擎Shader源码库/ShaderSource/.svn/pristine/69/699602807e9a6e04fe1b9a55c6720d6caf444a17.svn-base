@@ -1,0 +1,30 @@
+pipeline
+<
+	author = "zhangliang" 
+	category = "postprocess"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	varying mediump float2 v_coor;
+	
+	vertex vs_main
+	{
+		out(v_coor, a_texture0.xy);
+		vertex(a_position);
+	}
+	
+	pixel ps_main
+	{
+		lowp float4 encode_color = sample(Tex0, v_coor);
+		// mediump float lum = encode_color.a / (1.0f - encode_color.a);
+		mediump float lum = 1.0f;
+		pixel(float4(encode_color.xyz * lum, 1.0f));
+	}
+}

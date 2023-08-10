@@ -1,0 +1,37 @@
+["to_backbuffer shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "wyy"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	["纹理"]
+	uniform sampler Tex0 
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	
+    >;
+	attribute float4 a_position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+	varying mediump float2 UV0;
+	
+	vertex{
+		highp float4 position = a_position;
+		vertex(position);		
+		out(UV0, texcoord0.xy);
+	}
+	pixel{					
+		highp float4 color = sample(Tex0, UV0.xy);
+		pixel(color);
+	}
+
+}
+	
+

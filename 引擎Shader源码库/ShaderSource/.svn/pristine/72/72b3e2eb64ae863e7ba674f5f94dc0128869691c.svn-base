@@ -1,0 +1,63 @@
+["云的材质"]
+pipeline
+<
+	version = "1.0.0"
+	author = "liuyu"
+	category = "sky"
+	company = "netease"
+	zenable = "true"
+	zwritable = "false"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float2 a_texture0: TEXTURE0;
+	
+	uniform highp float4x4 u_world_view_projection: WORLD_VIEW_PROJECTION;
+	
+	["diffuse0"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		addressu = "repeat"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		map = "linear"
+		lodbias = "-0.5"
+	>;
+	
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	uniform lowp float4 ambient_color : AMBIENT;
+	
+	varying mediump float2 v_texture0: TEXTURE0;
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, u_world_view_projection);
+		vertex(pos);
+		out(v_texture0, a_texture0);
+	}
+	
+	pixel
+	{
+		lowp float4 diffuse = sample(Tex0, v_texture0);
+		macro(DIFFUSE_ALPHA_SEPARATE) out (float diffuseAlpha)
+		{
+			branch("1")
+			{
+				lowp float4 sepColor = sample(sepAlphaTex, v_texture0);
+				out(diffuseAlpha, sepColor.w);
+			}
+			branch("0") {out(diffuseAlpha, diffuse.w);}
+		};
+		
+		lowp float4 res = float4(diffuse.xyz * ambient_color.xyz, diffuseAlpha);
+		
+		pixel(res);
+	}
+	
+}

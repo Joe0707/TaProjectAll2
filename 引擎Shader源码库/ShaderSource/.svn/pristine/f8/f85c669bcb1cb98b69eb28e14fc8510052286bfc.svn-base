@@ -1,0 +1,34 @@
+["屏幕效果"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "screen_filter"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+
+  varying mediump float2 TexCoord0;
+  uniform sampler tex0
+  <
+    export = "0"
+  >;
+  uniform lowp float screen_color
+  <
+    init = "0.5"
+    export = "0"
+  >;
+  
+  vertex
+  {
+		vertex(position);
+    out(TexCoord0, texcoord0.xy);
+  }
+
+  pixel
+  {
+    lowp float4 color = sample(tex0, TexCoord0);
+    pixel(float4(color.xyz * screen_color, 1.0f));
+  }
+}

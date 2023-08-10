@@ -1,0 +1,77 @@
+["comm sys"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0 : TEXTURE0;
+	
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	
+	 uniform highp float4x4 SprTrans
+	 <
+	  init = "(1.0,0.0,0.0,0.0),(0.0,1.0,0.0,0.0),(0.0,0.0,0.0,0.0),(0.0,0.0,0.0,0.0)"
+	 >;
+	 
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;		
+	
+  uniform float4 Alpha
+  <
+    color = "1"
+    artist = "1"
+    init = "0.99f, 0.92f, 0.89f, 1.0f"
+  >;
+  
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	  
+	
+	varying float2 v_uv;
+	
+	vertex
+	{
+		vertex(transform(position, wvp));
+		mediump float4 texc = float4(texcoord0.xy, 1.0f, 0.0f);
+		mediump float2 uv = (texc * SprTrans).xy;
+		out(v_uv, uv);
+	}
+	
+	pixel
+	{
+		lowp float4 diffuse_sample_color = sample(Tex0, v_uv);
+	
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float pa)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, v_uv);
+			out(pa, separateColor.w);
+		  }
+		  branch("0") {
+			out(pa, diffuse_sample_color.a);
+		  }
+		};
+		
+		lowp float4 texColor1 = diffuse_sample_color * (Alpha * 2.0f);
+		pixel(float4(texColor1.xyz, pa * Alpha.a * 2.0f * AlphaMtl));
+	}
+	
+}

@@ -1,0 +1,446 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+
+	["开启边缘光(FRESNEL_ENABLE)"]
+	eitheror FRESNEL_ENABLE;
+	macro(FRESNEL_ENABLE)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+
+	["遮罩纹理(MASK_ENABLE)"]
+	eitheror MASK_ENABLE;
+	macro(MASK_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["流光纹理(EMISS_ENABLE)"]
+	eitheror EMISS_ENABLE;
+	macro(EMISS_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+	
+
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["光照贴图"]
+	uniform sampler LightTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\lighttex.png"
+	>;
+	["遮罩纹理"]
+	uniform sampler _MaskTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["流光纹理"]
+	uniform sampler _EmissTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	
+	["光照贴图亮度"]
+	uniform float LightScale
+	<
+		uigroup = "1 基础光照"
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "2.2"
+		uistep = "0.1"
+	>;	
+
+	["覆盖范围"]
+	uniform mediump float rim_power
+	<
+		uigroup = "3 轮廓光"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"
+		max = "1.0"
+		min = "5.0"
+	>;
+	["轮廓光颜色强度"]
+	uniform mediump float rim_multi
+	<
+		uigroup = "3 轮廓光"
+		init = "2.26"
+		uistep = "0.001"
+		artist = "1"    
+		max = "5.0"
+		min = "1.0"
+	>;
+
+	["轮廓颜色"]
+	uniform mediump float4 rim_color
+	<
+		uigroup = "3 轮廓光"
+		init = "(0.0, 0.514, 1.0, 1.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["内部颜色"]
+	uniform mediump float4 adjust_inner
+	<
+		uigroup = "3 轮廓光"
+		init = "(0.5,0.514,0.733,1.0)"
+		artist = "1"
+		color ="1"
+	>;	
+	["内部透明度"]
+	uniform mediump float inner_alpha
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "1"
+		max = "1.0"
+		min = "-0.5"
+		artist = "1"
+	>;
+	["rim 开始"]
+	uniform mediump float u_rim_start
+	<
+		uigroup = "3 轮廓光"
+		uistep = "0.001"
+		init = "0.26"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["rim 结束"]
+	uniform mediump float u_rim_end
+	<
+		uigroup = "3 轮廓光"
+		uistep = "0.001"
+		init = "1.15"
+		max = "1.5"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["叠加色"]
+	uniform mediump float3 change_color
+	<
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;
+	["流光贴图使用世界UV"]
+	uniform mediump float _EmissUseWorldUV
+	<
+		uigroup = "4 流光"
+		uistep = "0.001"
+		init = "1.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["流光Tilling"]
+	uniform mediump float2 _EmissTilling
+	<
+		uigroup = "4 流光"
+		init = "(7.0,7.0)"
+		artist = "1"
+	>;
+	["流光rim开始"]
+	uniform mediump float _EmissRimMin
+	<
+		uigroup = "4 流光"
+		uistep = "0.001"
+		init = "0.0"
+		max = "2.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["流光rim结束"]
+	uniform mediump float _EmissRimMax
+	<
+		uigroup = "4 流光"
+		uistep = "0.001"
+		init = "0.7"
+		max = "2.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["流光颜色"]
+	uniform mediump float4 _EmissColor
+	<
+		uigroup = "4 流光"
+		init = "(0.03137255,0.6392157,1,0)"
+		artist = "1"
+		color ="1"
+	>;	
+	["流光强度"]
+	uniform mediump float _EmissIntensity
+	<
+		uigroup = "4 流光"
+		init = "20.0"
+		artist = "1"
+	>;
+
+	["遮罩贴图使用世界UV"]
+	uniform mediump float _MaskUseWorldUV
+	<
+		uigroup = "5 遮罩"
+		uistep = "0.001"
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["遮罩移速"]
+	uniform mediump float2 _MaskSpeed
+	<
+		uigroup = "5 遮罩"
+		init = "(0.05,-0.2)"
+		artist = "1"
+	>;
+	["遮罩Tilling"]
+	uniform mediump float2 _MaskTilling
+	<
+		uigroup = "5 遮罩"
+		init = "(1.0,1.0)"
+		artist = "1"
+	>;
+	["rim是否受mask影响"]
+	uniform mediump float _RimUseMask
+	<
+		uigroup = "5 遮罩"
+		init = "0.0"
+		artist = "1"
+		max = "1.0"
+		min = "0.0"
+	>;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	uniform highp float frame_time : FRAME_TIME;
+	// varying变量
+	varying mediump float2 UV0;
+	varying lowp float4    vertex_color1;
+	varying mediump float4 PosWorld;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		highp float4 position = vec;	
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		// macro(FRESNEL_ENABLE) out(mediump float3 fresnel_combine)
+		// {
+		// 	branch("1"){
+		// 		float3x3 worldMat = float3x3(world);
+		// 		lowp float3 world_normal = float3(normalize(transform(nor.xyz, worldMat)));
+		// 		out(NormalWorld, world_normal);
+		// 	}
+		// 	branch("0"){
+				
+		// 	}
+		// };
+		float3x3 worldMat = float3x3(world);
+		lowp float3 world_normal = float3(normalize(transform(nor.xyz, worldMat)));
+		out(v_NormalWorld, world_normal);
+		macro (XNORMAL_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+		
+				// 通过uv空间来判断是否是镜像模型，如果是镜像模型则反转法线
+				//mediump float test_sign = float(sign(step(length(tangent.xyz), 1.0f) - 0.5f));
+				//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+				//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+				highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+				mediump float3 binormal_world = cross(tangentWorld, world_normal) * tan_coef;
+
+				out(v_TangentWorld, normalize(tangentWorld));
+				out(v_BinormalWorld, normalize(binormal_world));
+			}
+			branch("0") {
+			}
+		};
+    }
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+		lowp float3 vertex_normal_world = normalize(v_NormalWorld);
+
+		macro(XNORMAL_MAP_ENABLE) out(lowp float3 normalWorld, lowp float occlusion) {
+			branch("1") {
+				lowp float4 norm = sample(SamplerNormalMap, UV0.xy);
+				
+				lowp float2 normOff = norm.xy * 2.0f - float2(1.0f);
+				// lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+				lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+				out(normalWorld, normalWorld_inner);
+				out(occlusion, norm.z);
+			}	
+			branch("0") {
+				out(normalWorld, vertex_normal_world);
+				out(occlusion, 1.0f);
+			}
+		};
+
+		mediump float2 world_uv = PosWorld.xy * 0.025f;
+
+		macro(MASK_ENABLE) out(mediump float mask_value ){
+			branch("1"){
+				mediump float2 mask_uv = lerp(UV0.xy,world_uv, float2(_MaskUseWorldUV));
+				mediump float2 panner_mask_uv = frame_time * _MaskSpeed + mask_uv * _MaskTilling;
+				lowp float mask_value_ = sample(_MaskTex, panner_mask_uv).r;
+				out(mask_value,mask_value_);
+			}
+			branch("0"){
+				out(mask_value,1.0f);
+			}
+		};
+	
+		macro(FRESNEL_ENABLE) out(mediump float3 fresnel_combine,lowp float alpha_fresnel,lowp float NoV){
+			branch("1"){
+				lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+				lowp float NdotV = saturate(dot(view_dir, normalWorld));
+				lowp float rim_ = 1.0f - lerp(NdotV,diffuse_map_color.r,0.2f);
+				mediump float rim = smoothstep(u_rim_start, u_rim_end, rim_);
+				lowp float rim_mask = lerp(1.0f, mask_value, _RimUseMask);
+				mediump float3 final_rim_color = lerp(change_color * diffuse_map_color.xyz * adjust_inner.rgb * 2.0f,rim_color.xyz * rim_multi,float3(rim));
+				lowp float alpha_fresnel_ = saturate(rim * rim_mask + inner_alpha) * ceil(NdotV);
+				out(fresnel_combine, final_rim_color);
+				out(alpha_fresnel,alpha_fresnel_);
+				out(NoV,NdotV);
+			}
+			branch("0"){
+				out(fresnel_combine, change_color * diffuse_map_color.xyz);
+				out(alpha_fresnel, 1.0f);
+				out(NoV,1.0f);
+			}
+		};
+		macro(EMISS_ENABLE) out(mediump float3 emiss_color,lowp float alpha_emiss){
+			branch("1"){
+				mediump float2 emiss_uv = lerp(UV0.xy,world_uv, float2(_EmissUseWorldUV));
+				lowp float emiss_rim_factor = smoothstep(_EmissRimMin,_EmissRimMax,1.0f - NoV);
+			
+				lowp float emiss_value = sample(_EmissTex,emiss_uv * _EmissTilling).r;
+				lowp float emiss_factor = emiss_value * _EmissIntensity * emiss_rim_factor * mask_value;
+
+				mediump float3 emiss_color_ = emiss_factor * _EmissColor.xyz;
+				out(emiss_color,emiss_color_);
+				out(alpha_emiss,emiss_factor);
+			}
+			branch("0"){
+				out(emiss_color,float3(0.0f));
+				out(alpha_emiss,0.0f);
+			}
+		};
+
+		mediump float3 combined_color = fresnel_combine + emiss_color;
+		lowp float combined_alpha = saturate(alpha_emiss + alpha_fresnel);
+
+		pixel(float4(combined_color , combined_alpha * alpha * AlphaMtl));
+	}
+}

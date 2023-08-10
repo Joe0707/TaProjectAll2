@@ -1,0 +1,50 @@
+pipeline
+<
+	author = "zhang ying peng" 
+	category = "postprocess"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	uniform mediump float color_pow
+	<>;
+	
+	uniform mediump float color_radius
+	<
+		init = "0.001"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	varying mediump float2 TexCoord;
+	// varying mediump float2 TexCoord0;
+	// varying mediump float2 TexCoord1;
+	// varying mediump float2 TexCoord2;
+	// varying mediump float2 TexCoord3;
+	
+	vertex vs_main
+	{
+		out(TexCoord, a_texture0.xy);
+		// out(TexCoord0, float2(a_texture0.x + color_radius, a_texture0.y));
+		// out(TexCoord1, float2(a_texture0.x - color_radius, a_texture0.y));
+		// out(TexCoord2, float2(a_texture0.x, a_texture0.y + color_radius));
+		// out(TexCoord3, float2(a_texture0.x, a_texture0.y - color_radius));
+		vertex(a_position);
+	}
+	
+	pixel ps_main
+	{
+		// lowp float4 tex_color0 = sample(Tex0, TexCoord0);
+		// lowp float4 tex_color1 = sample(Tex0, TexCoord1);
+		// lowp float4 tex_color2 = sample(Tex0, TexCoord2);
+		// lowp float4 tex_color3 = sample(Tex0, TexCoord3);
+		
+		// lowp float3 result = (tex_color0.xyz + tex_color1.xyz + tex_color2.xyz + tex_color3.xyz) * 0.25f;
+		lowp float4 result = sample(Tex0, TexCoord);
+		pixel(result);
+	}
+}

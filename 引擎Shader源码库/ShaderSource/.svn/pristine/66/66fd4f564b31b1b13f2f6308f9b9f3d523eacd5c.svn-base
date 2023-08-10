@@ -1,0 +1,45 @@
+pipeline
+<
+	author = "zhangliang"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	uniform sampler Tex1
+	<
+		export = "0"
+	>;
+	
+	uniform lowp float hdr_factor;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	varying mediump float2 v_coor;
+	
+	vertex vs_main
+	{
+		out(v_coor, a_texture0.xy);
+		vertex(a_position);
+	}
+	
+	pixel ps_main
+	{
+		mediump float4 glow = sample(Tex0, v_coor.xy);
+		mediump float4 encode_color = sample(Tex1, v_coor.xy);
+		
+		// Tone mapping
+		mediump float lum = encode_color.a / (1.0f - encode_color.a);
+		// mediump float lum = 4.0f;
+		mediump float3 hdr_color = encode_color.xyz * lum;
+		mediump float3 tone_color = hdr_color / (float3(1.0f) + hdr_color);
+		
+		lowp float3 result = encode_color.rgb * 2.0f + glow.rgb;
+		// lowp float3 result = glow.xyz;
+
+		pixel(float4(result.xyz, 1.0f));
+	}
+}

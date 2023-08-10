@@ -1,0 +1,92 @@
+["fow minimap"]
+pipeline
+<
+    author = "liuyu"
+    version = "1.0.0"
+    techinque = "TShader"
+>
+{
+    attribute float4 position: POSITION;
+    attribute float4 texcoord0: TEXTURE0;
+    uniform highp float4x4 CC_PMatrix: WORLD_VIEW_PROJECTION;
+
+    uniform sampler CC_Texture0
+    <
+        name = "CC_Texture0"
+    >;
+
+    uniform sampler CC_Texture1
+    <
+        name = "CC_Texture1"
+    >;
+
+    uniform sampler u_tex_view2
+    <
+        name = "u_tex_view2"
+    >;
+
+
+    eitheror USE_SEPARATE_ALPHA;
+
+    uniform highp float4 fowparam;// x:fow的uv缩放，y：fightside，z：迷雾浓度
+    varying highp float2 v_texture0:TEXTURE0;
+    varying highp float2 fow_uv;
+
+    function Luminance in (lowp float3 LinearColor) out (lowp float illum)
+    {
+        out(illum, dot(LinearColor, float3(0.3f, 0.59f, 0.11f)));
+    };
+
+    function rotate in (lowp float2 uv, mediump float rot) out (lowp float2 new_uv){
+        lowp float2 _uv = uv - float2(0.5f, 0.5f);
+        lowp float2 _uv1 = float2(_uv.x * cos(rot) - _uv.y * sin(rot), _uv.y * cos(rot) + _uv.x * sin(rot));
+        out(new_uv, _uv1 + float2(0.5f, 0.5f));
+    };
+
+    vertex main
+    {
+        // 旋转策略
+        // 1 双阵营的（旋转180,延斜线镜像)
+        vertex(transform(position, CC_PMatrix));
+        // 根据阵营旋转
+        function rotate(texcoord0.xy, fowparam.y) out (lowp float2 rot_tex0);
+        lowp float2 _rot_texcoord0 = rot_tex0.xy - float2(0.5f);
+        lowp float2 _side_uv = float2(_rot_texcoord0.x * fowparam.z + _rot_texcoord0.y * fowparam.w, _rot_texcoord0.x * fowparam.w - fowparam.x * _rot_texcoord0.y * fowparam.z);
+        lowp float2 side_uv = _side_uv + float2(0.5f);
+        // 由于迷雾贴图的原因，需要多旋转90度
+        function rotate(side_uv.xy, 3.1415926f / 2.0f) out (lowp float2 rot_texcoord0);
+        lowp float2 fix_rot_uv = rot_texcoord0.yx;
+        // uv 缩放
+        lowp float2 _fow_uv = float2(1.005f) * fix_rot_uv.xy + float2(0.0025f);
+
+        out(fow_uv, _fow_uv);
+        out(v_texture0, side_uv.xy);
+    }
+
+    pixel main
+    {
+        // 由于视野阻挡会比物件小，所以这里要做特殊处理
+        // 通过c0的颜色值判断是否为物件
+        lowp float4 c0 = sample(CC_Texture0, v_texture0);
+        function Luminance(c0.xyz) out (lowp float illum);
+        // black = 1表示阻挡，0表示非阻挡
+        lowp float _black = step(illum, 0.15f);
+        lowp float black = _black * 0.9f;
+        lowp float _fow_color = sample(u_tex_view2, fow_uv).z;
+        lowp float fow_color = max(_fow_color, black);
+
+        macro(USE_SEPARATE_ALPHA) out(lowp float _alpha)
+        {
+            branch("1")
+            {
+                lowp float sep_alpha= sample(CC_Texture1, v_texture0.xy).r;
+                out(_alpha, sep_alpha);
+            }
+            branch("0") {
+                out(_alpha, c0.w);
+            }
+        };
+        lowp float4 res = float4(float3(1.0f - fow_color * 0.4f) * c0.xyz, _alpha);
+        pixel(res);
+    }
+}

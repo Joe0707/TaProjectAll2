@@ -1,0 +1,525 @@
+["场景 PBR Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhang ying peng" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["编辑器"]
+	macro(EDITOR)
+	<
+		default = "0"
+	>;
+
+	["雾效"]
+	macro(FOG_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "1"
+	>;
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "1"
+	>;
+	["开启倒影"]
+	eitheror MIRROR_ENABLE;
+	macro(MIRROR_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+	uniform sampler TexReflection
+	<
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+	
+	["lightmap亮度"]
+	uniform mediump float lightmap_brightness
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	// ——————————————————自投影——————————————————
+	["阴影透明度"]
+	uniform lowp float shadow_alpha
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影颜色"]
+	uniform lowp float4 shadow_color
+	<
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+	["阴影颜色浓度"]
+	uniform lowp float shadow_density
+	<
+		init = "0.1"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影bias"]
+	uniform mediump float shadowmap_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["阴影采样bias"]
+	uniform mediump float shadowmap_uv_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["镜面反射颜色"]
+	uniform mediump float4 MirrorColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	["镜子强度"]
+	uniform float reflect_mirror_percent
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "5.0" 
+		uigroup = "镜面反射"
+	>;
+	["镜子视觉偏移量"]
+	uniform float reflect_mirror_bias
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "0.5" 
+		uigroup = "镜面反射"
+	>;
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_texcoord0 : TEXTURE0;
+	attribute float4 a_texcoord1 : TEXTURE1;
+	   attribute float3 a_normal : NORMAL;
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float4 v_fog_factor_info;
+	varying mediump float4 v_light_proj_pos;
+	varying mediump float4 v_screen_pos;
+	varying mediump float3 v_NormalWorld;
+	varying mediump float4 PosWorld;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float lm_scale : LIGHTMAP_TINT_FACTOR;	
+	uniform mediump float FrameTime: FRAME_TIME;	
+
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+	>;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,0.0)"
+	>;
+	uniform mediump float4 u_fog_info : FOG_INFO; 
+
+// function
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, max(0.0f,smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = max(0.0f, fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	vertex
+	{
+		highp float4 position = a_position;
+
+		// 世界空间坐标
+		macro(EDITOR) out(mediump float4 pos_world){
+			branch("1")
+			{
+				out(pos_world, transform(position, world));
+			}
+			branch("0"){
+				macro(INSTANCE_TYPE) out(mediump float4 _pos_world)
+				{
+		            branch("INSTANCE_TYPE_PRS")
+		            {
+		                float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                float4 world_pos = transform(position, instWorldMat);
+
+		            	macro(TRANS_ENABLE) out(float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+		            
+		            branch("INSTANCE_TYPE_PRS_LM")
+		            {
+		                mediump float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                mediump float4 world_pos = transform(position, instWorldMat);
+		                
+		            	macro(TRANS_ENABLE) out(mediump float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+
+		            branch("INSTANCE_TYPE_NONE")
+		            {
+		            	// 未合批的在引擎中已经转了world了
+		            	out(_pos_world, transform(position, world));
+		            }
+				};
+				out(pos_world,  _pos_world);
+			}
+		};
+		out(PosWorld, float4(pos_world));
+		highp float4 final_position = transform(pos_world, viewProj);
+		out(v_screen_pos,final_position);
+		vertex(final_position);
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float4 uv1 = float4(a_texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+				out(UV1, uv1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		macro(TRANS_ENABLE) out(mediump float height) {
+			branch ("1") {
+				out(height, -pos_world.y);
+			}
+			branch ("0") {
+				out(height, pos_world.y);
+			}
+		};
+
+		macro(FOG_ENABLE) out(mediump float fog_height_factor1, mediump float fog_distance_) {
+			branch ("1") {
+				
+				macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance1)
+				{
+					branch("1")
+					{
+						["GL渲染系统下"]
+						// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+						out(fog_distance1, final_position.w * ((final_position.z/final_position.w) *0.5f + 0.5f));
+					}
+					branch("0")
+					{
+						["Dx和Metal渲染系统下"]
+						out(fog_distance1, final_position.z);
+					}
+				};
+				function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor_);
+				out(fog_height_factor1, fog_height_factor_);
+				out(fog_distance_, fog_distance1);
+			}
+			branch ("0") {
+				out(fog_height_factor1, 0.0f);
+				out(fog_distance_, 0.0f);
+			}
+		};
+		out(UV0, float4(a_texcoord0.xy, fog_distance_, 1.0f - fog_height_factor1));
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+		out(v_NormalWorld, world_normal);
+		macro(LEVEL_MIDDLE)
+		{
+			branch("1")
+			{
+				macro(SHADOW_MAP_ENABLE)
+				{
+					branch("1")
+					{				
+						mediump float4 shadow_light_attr_3 = ShadowLightAttr[3];
+						function calc_shadow_info(
+							pos_world,
+							world_normal,
+							lvp,
+							shadow_light_attr_3.xyz)
+						out(
+							highp float2 uv_out,
+							highp float  depth_out,
+							highp float  factor_out
+						);
+						out(v_light_proj_pos, float4(uv_out, depth_out, factor_out));
+					}
+					branch("0")
+					{
+					}
+				};
+			}
+			branch("0")
+			{
+			}
+		};
+	}
+
+	pixel
+	{
+		mediump float fog_distance = UV0.z;
+		mediump float fog_height_factor = UV0.w;
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		mediump float3 normalWorld = normalize(v_NormalWorld);
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		
+        macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+        {
+            branch("1") {
+            	lowp float4 _lightmap_color = sample(TexLightmap, UV1.xy);
+                // 不再对lightmap染色
+                // lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+                lowp float3 light_map_color_gamma = _lightmap_color.xyz * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz);
+            }
+            branch("0") {
+                out(lightmap_color, float3(1.0f));
+            }
+        };
+
+        highp float3 pscreen = v_screen_pos.xyz/v_screen_pos.w;
+		float2 screen_uv_temp = pscreen.xy * 0.5f + float2(0.5f);
+		["镜子计算"]
+		macro(SYSTEM_UV_ORIGIN_LEFT_BOTTOM) out(highp float2 mirror_uv)
+		{
+			branch("1")
+			{
+				out(mirror_uv, float2(screen_uv_temp.x, screen_uv_temp.y));
+			}
+			branch("0")
+			{
+				out(mirror_uv, float2(screen_uv_temp.x, 1.0f - screen_uv_temp.y));
+			}
+		};
+
+		["镜子计算"]
+		macro(MIRROR_ENABLE) out(mediump float3 mirror_color)
+		{
+			branch("0")
+			{
+				out(mirror_color, float3(0.0f));
+			}
+			branch("1")
+			{	
+				mediump float NoV = dot(view_dir, normalWorld);
+				mediump float NdotV = saturate(NoV);
+				lowp float4 mirrorcolor = sample(TexReflection, mirror_uv + float2(NdotV * reflect_mirror_bias));
+				lowp float3 _reflect_color = (mirrorcolor.rgb * reflect_mirror_percent) * MirrorColor.rgb;
+				out(mirror_color, float3(_reflect_color));
+			}
+		};
+
+		// —————————————————— 自投影(shadow_fac计算) ——————————————————	
+		macro(LEVEL_MIDDLE) out(mediump float shadow_fac_) 
+		{
+			branch ("1") 
+			{
+				macro(SHADOW_MAP_ENABLE) out (mediump float shadow_fac_0)
+				{
+					branch("1") {         
+						mediump float4 v_light_proj_pos_ = v_light_proj_pos;
+						macro(LEVEL_HIGH) out(mediump float fac0) 
+						{
+							branch ("1") 
+							{
+								function calc_shadowmap_factor_sampling5(SMAP, v_light_proj_pos_, u_shadowmap_info, shadow_bias_factor * shadowmap_bias, shadowmap_uv_bias)
+						        out(lowp float factor);
+						        out(fac0, factor);
+							}
+							branch ("0") 
+							{
+								function calc_shadowmap_factor(SMAP, v_light_proj_pos_, u_shadowmap_info, shadow_bias_factor * shadowmap_bias)
+						        out(lowp float factor);
+						        out(fac0, factor);
+							}
+						};
+						out(shadow_fac_0, fac0);
+					}
+					branch("0") {
+						out(shadow_fac_0, 1.0f);
+					}
+				};
+				out(shadow_fac_, shadow_fac_0);
+			}
+			branch("0")
+			{
+				out(shadow_fac_, 1.0f);
+			}
+		};
+
+		mediump float3 color_diffuse_lightmap = diffuse_map_color.rgb * lightmap_color.xyz + mirror_color;
+		function get_fog_mix(u_fog_info.x,u_fog_info.y, fog_distance) out(mediump float fog_shadow);
+		lowp float shadow_fog = lerp(shadow_fac_,1.0f,fog_shadow);
+		lowp float shadow_lerp = lerp(shadow_alpha, 1.0f, shadow_fog);
+		lowp float3 shadow_color_lerp = lerp(color_diffuse_lightmap.rgb, shadow_color.rgb, float3(shadow_density));
+		lowp float3 shadow_blend_ = lerp(shadow_color_lerp * shadow_lerp, color_diffuse_lightmap.rgb, float3(shadow_fog));
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+		
+		macro(FOG_ENABLE) out(mediump float3 final_color_with_fog) {
+			branch ("1") {
+				// function get_fog_mix(u_fog_info.x + fog_fix, u_fog_info.y + fog_fix, fog_distance) out(mediump float fog_linear_factor);
+				function get_fog_mix(u_fog_info.x, u_fog_info.y, fog_distance) out(mediump float fog_linear_factor);
+				out(final_color_with_fog, lerp(shadow_blend_, u_fog_color.rgb, float3(u_fog_color.a * max(fog_height_factor,fog_linear_factor))));
+        	}
+			branch ("0") {
+				out(final_color_with_fog, shadow_blend_);
+			}
+		};
+
+		pixel(float4(float3(final_color_with_fog), alpha * AlphaMtl));
+	}
+}

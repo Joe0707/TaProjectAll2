@@ -1,0 +1,161 @@
+pipeline
+<
+	technique = "DownSample"
+>
+{
+
+	uniform float4 ScreenSize: VIEWPORT_SIZE;
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_t0: TEXTURE0;
+	varying highp float4 v_t0;
+	varying highp float4 v_t1;
+	varying highp float4 v_t2;
+	varying highp float4 v_t3;
+	varying highp float4 v_t4;
+	uniform mediump float4 u_rt: RT_SIZE;
+	//uniform lowp float u_adapt_factor:ADAPT_FACTOR;
+
+	uniform sampler Tex0
+	<
+		export = "0"
+		mag = "LINEAR"
+		min = "LINEAR"
+		mip = "POINT"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	uniform sampler Tex1
+	<
+		export = "0"
+		mag = "LINEAR"
+		min = "LINEAR"
+		mip = "POINT"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+
+	["下采样距离"]
+	uniform float down_scale
+	<
+		//artist = "1"
+		min = "0.0"
+		max = "6.0"
+		uistep = "0.1"
+		init = "1.0"
+	>;
+
+	["Bloom阈值"]
+	uniform float BloomThreshold
+	<
+		artist = "1"
+		min = "-1.0"
+		max = "4.0"
+		uistep = "0.01"
+		init = "1.0"
+	>;
+
+	["Bloom强度"]
+	uniform float BloomIntensity
+	<
+		artist = "1"
+		min = "0.0"
+		max = "8.0"
+		uistep = "0.1"
+		init = "1.0"
+	>;
+
+	["曝光"]
+	uniform float ArtistAdaptFactor
+	<
+		artist = "1"
+		min = "0.0"
+		max = "4.0"
+		uistep = "0.01"
+		init = "1.0"
+	>;
+
+	vertex vs_main
+	{
+		macro(EDITOR) out (float4 position){
+			branch ("1"){
+				out(position, a_position + float4(-u_rt.z, u_rt.w, 0.0f, 0.0f));
+			}
+			branch("0"){
+				out(position, a_position);
+			}
+		};
+		vertex(position);
+		float2 inc = ScreenSize.zw * down_scale;
+		out(v_t0, a_t0);
+		out(v_t1, float4(a_t0.xy + inc * float2(-0.7f, -0.7f), a_t0.xy + inc * float2(-0.7f,  0.7f)));
+		out(v_t2, float4(a_t0.xy + inc * float2( 0.7f, -0.7f), a_t0.xy + inc * float2( 0.7f,  0.7f)));
+		out(v_t3, float4(a_t0.xy + inc * float2(0.0f, -1.0f), a_t0.xy + inc * float2(0.0f,  1.0f)));
+		out(v_t4, float4(a_t0.xy + inc * float2( -1.0f, 0.0f), a_t0.xy + inc * float2( 1.0f,  0.0f)));
+
+	}
+
+	pixel ps_main
+	{
+		float4 s0 = sample(Tex0, v_t0.xy);
+		float3 color0 = s0.rgb;
+
+		float4 s1 = sample(Tex0, v_t1.xy);
+		float3 color1 = s1.rgb;
+
+		float4 s2 = sample(Tex0, v_t1.zw);
+		float3 color2 = s2.rgb;
+
+		float4 s3 = sample(Tex0, v_t2.xy);
+		float3 color3 = s3.rgb;
+
+		float4 s4 = sample(Tex0, v_t2.zw);
+		float3 color4 = s4.rgb;
+
+		float4 s5 = sample(Tex0, v_t3.xy);
+		float3 color5 = s5.rgb;
+
+		float4 s6 = sample(Tex0, v_t3.zw);
+		float3 color6 = s6.rgb;
+
+		float4 s7 = sample(Tex0, v_t4.xy);
+		float3 color7 = s7.rgb;
+
+		float4 s8 = sample(Tex0, v_t4.zw);
+		float3 color8 = s8.rgb;
+
+		// color*color: Approximation to linear color
+		float3 final_color = (color0 * color0 + color1 * color1 + color2 * color2 + color3 * color3 + color4 * color4
+		 			+ color5 * color5 + color6 * color6 + color7 * color7 + color8 * color8) ;
+
+		//float3 final_color = (color0 + color1 + color2 + color3 + color4 + color5 + color6 + color7 + color8) * 4.0f;
+
+		float3 avg_color = final_color.rgb / 9.0f;
+		// macro(EDITOR) out(float adpat_factor)
+		// {
+		// 	branch("1")
+		// 	{
+		// 		out(adpat_factor, ArtistAdaptFactor);
+		// 	}
+		// 	branch("0")
+		// 	{
+		// 		out(adpat_factor, u_adapt_factor);
+		// 	}
+		// };
+
+		//float3 linear_color = min(float3(4.0f * 4.0f), avg_color.rgb);
+		// float final_luminance = dot(avg_color, float3(0.299f, 0.587f, 0.114f));
+		// float bloom_luminance =(final_luminance * adpat_factor - BloomThreshold);
+		float luminance = dot(avg_color, float3(0.2126f, 0.7152f, 0.0722f));
+		float bloom_luminance = luminance - BloomThreshold;
+		float bloom_amount = saturate(bloom_luminance * 0.5f);
+		float3 bloom_color = saturate((avg_color * bloom_amount * BloomIntensity) / (1.0f + luminance));
+		float bloom_average = (bloom_color.r + bloom_color.g + bloom_color.b) / 3.0f;
+		float3 final_bloom_color = bloom_color.rgb + (bloom_color.rgb - float3(bloom_average)) * 0.3f;
+		// float3 color = (avg_color.rgb - float3(BloomThreshold)) * BloomIntensity;
+
+		float4 char_color = sample(Tex1,v_t0.xy);
+
+		pixel(float4(final_bloom_color.rgb + char_color.rgb, 1.0f));
+	}
+}

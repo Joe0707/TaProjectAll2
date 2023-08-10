@@ -1,0 +1,1040 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang/xuzhuoliang/fanyu" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+	stencilenable = "1"
+	stencilmask = "0"
+	stencilwritemask = "255"
+	stencilref = "0"
+	stencilfunc= "1"
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+>
+{
+// 宏
+  
+	["是否溶解"]
+	eitheror DISSOLVE_EFFECT;
+	macro(DISSOLVE_EFFECT)
+	<  
+		default = "0"
+		customizable = "0"
+	>;
+
+	["是否冰冻"]
+	eitheror FROZENE_EFFECT;
+	macro(FROZENE_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否金身"]
+	eitheror GOLD_EFFECT;
+	macro(GOLD_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否石化"]
+	eitheror PETRIFY_EFFECT;
+	macro(PETRIFY_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否无敌"]
+	eitheror INVINCIBLE_EFFECT;
+	macro(INVINCIBLE_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否魔免"]
+	eitheror IMMUNE_EFFECT;
+	macro(IMMUNE_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否使用MatCap"]
+	eitheror MATCAP_ENABLE;
+	macro(MATCAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+/*
+	["是否使用MatCap高光通道"]
+	eitheror MATCAP_HIGHLIGHT_ENABLE;
+	macro(MATCAP_HIGHLIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;*/
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["金属度/sss/光滑度"]
+	uniform sampler SamplerRough
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["MatCap贴图:剪影光(R)/压暗(G)/高光(B)"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "common\\textures\\envmap\\matcap_test00.png"
+	>;
+
+	["特殊效果贴图"]
+	uniform sampler BuffTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		//path = "fx\\texture\\effect\\ice_buff.png" //冰冻贴图
+		//path = "fx\\texture\\effect\\gold_buff.png" // 金身贴图
+		// path = "fx\\texture\\effect\\petrify_buff.png" //石化贴图
+	>;
+	["特殊效果Matcap贴图"]
+	uniform sampler Buff_MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		//path = "fx\\texture\\effect\\ice_matcap.png" //冰冻贴图
+		//path = "fx\\texture\\effect\\gold_matcap.png"// 金身贴图
+	>;
+
+	["Ramp颜色图"]
+	uniform sampler RampMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float Hero_Alpha_Random;
+
+	/*
+	["matcap亮度"]
+	uniform float matcap_brightness
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	*/
+
+	["matcap亮部颜色"]
+	uniform lowp float4 matcap_light_color
+	<
+		color = "1"
+		init = "(1,1,1,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap轮廓颜色"]
+	uniform lowp float4 matcap_rim_color
+	<
+		color = "1"
+		init = "(0,0,0,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap亮部强度"]
+	uniform mediump float matcap_light_intensity
+	<
+
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "9.0"
+		uistep = "0.01"
+	>;
+
+	["matcap暗部颜色"]
+	uniform lowp float4 matcap_dark_color
+	<
+		color = "1"
+		init = "(0.5,0.5,0.5,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap暗部强度"]
+	uniform lowp float matcap_dark_intensity
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+
+	["matcap高光颜色"]
+	uniform lowp float4 matcap_highlight_color
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap高光强度"]
+	uniform mediump float matcap_highlight_intensity
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "0.01"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "9.0"
+	>;
+
+	["matcap透明度调节"]
+	uniform lowp float matcap_alpha_adjust
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		uistep = "0.01"
+		min = "0.0"
+		max = "3.0"
+	>;
+		
+	/*["matcap亮度"]
+	uniform float4 matcap_tone
+	<
+		artist = "1"
+		uistep = "1"
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;*/
+	
+	["叠加色"]
+	uniform mediump float3 change_color
+	<
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;
+	
+	["溶解程度"]
+	uniform lowp float DissAmount
+	<
+		init = "0.0"
+	>;
+	// ["uvtiling"]
+	// uniform lowp float uvtiling
+	// <
+	// 	uistep = "0.001"
+	// 	init = "1"
+	// 	max = "5.0"
+	// 	min = "1.0"
+	// 	artist = "1"
+	// >;
+	["frozene color"]
+	uniform mediump float4 frozene_color
+	<
+		color = "1"
+		init = "0.02,0.188,1.0,1.0"
+		artist = "1"
+	>;
+	["frozene intensity"]
+	uniform mediump float frozene_intensity
+	<
+		init = "1.0"
+		artist = "0.5"
+	>;
+	["Frozene Normal Tilling"]
+	uniform mediump float frozene_normal_tilling
+	<
+		uigroup = "BUFF"
+		init = "1.0"
+		artist = "1"
+	>;
+	["Frozene Matcap UV Bias"]
+	uniform mediump float frozene_matcap_uvbias
+	<
+		uigroup = "BUFF"
+		init = "2.0"
+		artist = "1"
+	>;
+	["Frozene Fresnel Bias"]
+	uniform mediump float frozene_fresnel_bias
+	<
+		uigroup = "BUFF"
+		init = "0.5"
+		artist = "1"
+	>;
+	["Frozene Fresnel Scale"]
+	uniform mediump float frozene_fresnel_scale
+	<
+		uigroup = "BUFF"
+		init = "1.0"
+		artist = "1"
+	>;
+	["Frozene Fresnel Power"]
+	uniform mediump float frozene_fresnel_power
+	<
+		uigroup = "BUFF"
+		init = "1.0"
+		artist = "1"
+	>;
+	["Frozene FresnelAdd Bias"]
+	uniform mediump float frozene_fresneladd_bias
+	<
+		uigroup = "BUFF"
+		init = "0.1"
+		artist = "1"
+	>;
+	["Frozene FresnelAdd Scale"]
+	uniform mediump float frozene_fresneladd_scale
+	<
+		uigroup = "BUFF"
+		init = "1.0"
+		artist = "1"
+	>;
+	["Frozene FresnelAdd Power"]
+	uniform mediump float frozene_fresneladd_power
+	<
+		uigroup = "BUFF"
+		init = "2.0"
+		artist = "1"
+	>;
+
+	// ["范围开始"]
+	// uniform mediump float nov_sm1
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "0.31"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+	// ["范围结束"]
+	// uniform mediump float nov_sm2
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "1.0"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+	// ["中央厚度"]
+	// uniform mediump float sm_min
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "0.4"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+	// ["金身-中央厚度"]
+	// uniform mediump float sm_min_gold
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "0.42"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+	["Gold Fresnel Bias"]
+	uniform mediump float gold_fresnel_bias
+	<
+		uigroup = "BUFF"
+		init = "0.0"
+		artist = "1"
+	>;
+	["Gold Fresnel Scale"]
+	uniform mediump float gold_fresnel_scale
+	<
+		uigroup = "BUFF"
+		init = "0.7"
+		artist = "1"
+	>;
+	["Gold Fresnel Power"]
+	uniform mediump float gold_fresnel_power	
+	<
+		uigroup = "BUFF"
+		init = "2.0"
+		artist = "1"
+	>;
+	["Gold Ramp Offset"]
+	uniform mediump float gold_ramp_offset
+	<
+		uigroup = "BUFF"
+		init = "0.0"
+		artist = "1"
+	>;
+	["Gold Ramp Intensity"]
+	uniform mediump float ramp_gold_intensity
+	<
+		uigroup = "BUFF"
+		init = "2.5"
+		artist = "1"
+	>;
+	["Gold Matcap Lerp"]
+	uniform mediump float gold_matcap_lerp
+	<
+		uigroup = "BUFF"
+		init = "0.7"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;	
+	
+	// ["灵魂边缘强度"]
+	// uniform mediump float ghost_rim_sm_multi
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "0.8"
+	// 	max = "5.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+
+	// ["光效强度"]
+	// uniform mediump float sm_multi
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "2.35"
+	// 	max = "5.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+	["UV动画速度"]
+	uniform mediump float sm_vuspeed
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.53"
+		max = "1.0"
+		min = "-1.0"
+		artist = "1"
+	>;	
+
+	// ["U缩放"]
+	// uniform float sm_uvtiling_u
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	init = "0.1"
+	// 	uistep = "0.0001"
+	// 	max = "2.0"
+	// 	min ="0.0"
+	// >;
+	["U偏移"]
+	uniform float sm_uvoffset_u
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "1.0"
+		uistep = "0.0001"
+		max = "1.0"
+		min ="-1.0"
+	>;
+	// ["V缩放"]
+	// uniform float sm_uvtiling_v
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	init = "0.1"
+	// 	uistep = "0.0001"
+	// 	max = "2.0"
+	// 	min ="0.0"
+	// >;
+
+	["金身颜色"]
+	uniform mediump float4 gold_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 0.756, 0.121, 1.0"
+		artist = "1"
+	>;
+	["灵魂颜色"]
+	uniform mediump float4 ghost_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "0.847, 0.847, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	// ["灵魂贴图强度"]
+	// uniform mediump float ghost_sm_multi
+	// <
+	// 	uigroup = "BUFF"
+	// 	uistep = "0.001"
+	// 	init = "1.0"
+	// 	max = "5.0"
+	// 	min = "0.0"
+	// 	artist = "1"
+	// >;
+
+	["颜色"]
+	uniform mediump float4 sm_color_ad
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 1.0, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	["纹理平铺数"]
+	uniform float per_uvtilling
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "3.0"
+	>;
+
+	// ["石化阴影深度"]
+	// uniform float per_lerp
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "1.0"
+	// >;
+
+	// ["石化边缘宽度"]
+	// uniform float height_sm2
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "0.1"
+	// >;
+
+	["石化程度"]
+	uniform float ChangeAmount
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		init = "0.1"
+	>;
+
+
+	// ["抖动速度"]
+	// uniform float shake_speed
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "5"
+	// 	min = "0"
+	// 	init = "0.1"
+	// >;
+
+	// ["抖动强度"]
+	// uniform float shake_intensity
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "5"
+	// 	min = "0"
+	// 	init = "0.1"
+	// >;
+
+	// ["抖动高度"]
+	// uniform float shake_height
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "20"
+	// 	min = "0"
+	// 	init = "0.4"
+	// >;
+
+	["lerp111"]
+	uniform float lerp111
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		init = "1"
+	>;
+
+	["无敌变色强度"]
+	uniform float invincible_colorchange
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+
+	["无敌辉光强度"]
+	uniform float invincible_lightchange
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "3.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+
+	["无敌变色"]
+	uniform float4 invincible_color01
+	<
+		artist = "1"
+		init = "(1.0,0.0,0.0,1.0)"
+		color = "1"
+		uigroup = "变色"
+	>;
+
+	["无敌辉光"]
+	uniform float4 invincible_color02
+	<
+		artist = "1"
+		init = "(1.0,1.0,0.0,1.0)"
+		color = "1"
+		uigroup = "变色"
+	>;
+
+	["魔免变色强度"]
+	uniform float immune_colorchange
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+
+	["魔免辉光强度"]
+	uniform float immune_lightchange
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "3.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+
+	["魔免变色"]
+	uniform float4 immune_color01
+	<
+		artist = "1"
+		init = "(1.0,0.0,0.0,1.0)"
+		color = "1"
+		uigroup = "变色"
+	>;
+
+	["魔免辉光"]
+	uniform float4 immune_color02
+	<
+		artist = "1"
+		init = "(1.0,0.0,0.0,1.0)"
+		color = "1"
+		uigroup = "变色"
+	>;
+
+	// 特效
+	["RampSpeed"]
+	uniform lowp float RampSpeed
+	<
+		uigroup = "gulute"
+		artist = "1"
+		init = "0.5"
+	>;
+	["_StarrySpeed"]
+	uniform lowp float _StarrySpeed
+	<
+		uigroup = "gulute"
+		artist = "1"
+		init = "1.5"
+	>;
+	["_StarryStart"]
+	uniform lowp float _StarryStart
+	<
+		uigroup = "gulute"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		init = "0.0"
+	>;
+	["_StarryEnd"]
+	uniform lowp float _StarryEnd
+	<
+		uigroup = "gulute"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		init = "1"
+	>;
+	["_StarryIntensity"]
+	uniform lowp float _StarryIntensity
+	<
+		uigroup = "gulute"
+		artist = "1"
+		init = "0.5"
+	>;
+	["_GlowIntensity"]
+	uniform lowp float _GlowIntensity
+	<
+		uigroup = "gulute"
+		artist = "1"
+		init = "2"
+	>;
+
+	
+
+	uniform mediump float FrameTime: FRAME_TIME;
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float3 PosWorld;
+	varying mediump float effectlerp;// 替代ghostlerp icelerp firelerp goldlerp petrify_shadow ;
+	varying mediump float height_sm;
+
+	varying mediump float3 v_normalWorld;
+
+	varying mediump float2 effectuv;// 替代petrify_uv v_gold_uv v_ghost_uv;
+	varying mediump float2 v_matcap_uv;
+	varying highp float4 v_vertexcolor;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(PosWorld,pos_world.xyz);
+		out(UV0, texcoord0.xy);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+		
+		mediump float3 normal_view = normalize(transform(normal.rgb,float3x3(wv)));
+		mediump float2 matcap_uv = (normal_view.xy) * float2(0.5f, -0.5f) + float2(0.5f);
+		out(v_matcap_uv, matcap_uv);	        
+		out(v_vertexcolor,float4(a_color.r,texcoord1.x,0.0f,0.0f));
+
+
+		float3 normalWorld = normalize(transform(normal.rgb,float3x3(world)));
+		out(v_normalWorld,normalWorld);
+
+		vertex(pos);
+
+		macro(PETRIFY_EFFECT) {
+			branch ("1") {
+				highp float3 normal_world = normalize(transform(normal.rgb,float3x3(world)));
+				out(effectlerp,max(0.0f,normal_world.y));
+				out(effectuv,texcoord0.xy * per_uvtilling);
+				// 模型高度一般为30
+				out(height_sm,step(30.0f*ChangeAmount,a_position.y));
+			}
+			branch ("0") {
+			}
+		};
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color_ = sample(Tex0,UV0.xy);
+		lowp float4 pbr_map = sample(SamplerRough, UV0.xy);
+		lowp float glowmap = pbr_map.g;
+
+		mediump float PI_two = 3.1415926f * 2.0f;
+		mediump float starry_factor = smoothstep(_StarryStart,_StarryEnd,saturate(sin(v_vertexcolor.y * PI_two + FrameTime * _StarrySpeed)) * _StarryIntensity);
+
+		lowp float4 colorcell = sample(RampMap,float2(v_vertexcolor.y + FrameTime * RampSpeed,0.5f));
+
+		lowp float3 fx_color = diffuse_map_color_.xyz + colorcell.xyz * (1.0f - v_vertexcolor.r + glowmap * _GlowIntensity) * starry_factor;
+
+		lowp float4 diffuse_map_color = float4(fx_color,diffuse_map_color_.a);
+
+		// alpha存储matcap的mask, shader不支持半透明
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(alpha - alphaRef, 0.0f); 
+		  	}
+			branch("0") {
+		 	}
+		}; 
+
+		// 加入matcap
+		mediump float2 v_matcap_uv0 = v_matcap_uv;
+		macro(MATCAP_ENABLE) out(lowp float4 matcap_combined, lowp float alpha_adding) 
+		{
+			branch ("1") 
+			{
+				lowp float4 matcap_map_color = sample(MatcapTex, v_matcap_uv0);
+                lowp float3 rim_color = matcap_map_color.r * matcap_rim_color.rgb;
+                lowp float3 dirlight_color = lerp(matcap_dark_color.rgb, matcap_light_color.rgb, float3(matcap_map_color.g))*2.0f;
+                lowp float3 spec_color = matcap_map_color.b * matcap_highlight_color.rgb * matcap_highlight_intensity;
+                lowp float3 diffuse_light = (diffuse_map_color.rgb * diffuse_map_color.rgb) * (dirlight_color + rim_color + spec_color) + rim_color * 0.5f;
+                out(matcap_combined, float4(lerp(diffuse_map_color.rgb, sqrt(diffuse_light), float3(lerp111)), alpha));
+                out(alpha_adding, matcap_alpha_adjust * dot(spec_color, float3(0.3f, 0.59f, 0.11f)));
+			}
+			branch ("0")
+			{
+				out(matcap_combined, float4(diffuse_map_color.rgb, alpha));
+                out(alpha_adding, 0.0f);
+			} 
+		};
+
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float3 normal_dir = normalize(v_normalWorld);
+
+		// 冰冻状态（无采样贴图）
+		macro(FROZENE_EFFECT) out(lowp float4 combine_frozen) {
+			branch ("1") {
+				mediump float fresnelFactor_frozene = 1.0f - saturate(dot(normal_dir,view_dir));
+				mediump float fresnel_frozene = saturate(frozene_fresnel_bias + frozene_fresnel_scale * pow(fresnelFactor_frozene,frozene_fresnel_power));
+				
+				lowp float4 norm = sample(BuffTex, UV0.xy * float2(frozene_normal_tilling));			
+				mediump float3 normal_viewspace = transform(normal_dir,float3x3(view));
+				mediump float3 normal_bias = normalize(normal_viewspace + norm.xyz * float3(frozene_matcap_uvbias)); 
+				mediump float2 frozene_matcap_uv = (normal_bias * float3(0.5f) + float3(0.5f)).xy;
+				lowp float4 frozene_matcap_color = sample(Buff_MatcapTex,frozene_matcap_uv);
+
+				lowp float3 frozene_combined_color = lerp(matcap_combined.xyz,frozene_matcap_color.xyz,float3(fresnel_frozene));
+
+				lowp float fresnel_add = saturate(frozene_fresneladd_bias + frozene_fresneladd_scale * pow(fresnelFactor_frozene,frozene_fresneladd_power));
+				lowp float3 final_frozene = frozene_combined_color + fresnel_add * frozene_color.xyz; 
+				out(combine_frozen, float4(final_frozene,1.0f));
+			}
+			branch ("0") {
+				out(combine_frozen,matcap_combined);
+			}
+		};
+
+		// 金身
+		macro(GOLD_EFFECT) out(lowp float4 combine_gold) {
+			branch ("1") {
+				mediump float fresnelFactor_gold = 1.0f - saturate(dot(normal_dir,view_dir));
+				mediump float fresnel_gold = saturate(gold_fresnel_bias + gold_fresnel_scale * pow(fresnelFactor_gold,gold_fresnel_power));
+
+				mediump float diffuse_luminance = dot(matcap_combined.xyz,float3(0.22f,0.707f,0.071f));
+				mediump float ramp_u = diffuse_luminance + gold_ramp_offset;
+				lowp float3 diffuse_ramp_color = sample(BuffTex,float2(ramp_u,0.5f)).xyz * float3(ramp_gold_intensity);
+				lowp float3 diffuse_remap_color = lerp(diffuse_ramp_color,matcap_combined.xyz,float3(ramp_u));
+
+				lowp float3 matcap_gold_color = lerp(sample(Buff_MatcapTex,v_matcap_uv).xyz,float3(1.0f),float3(gold_matcap_lerp)); 
+				lowp float3 combine_gold_color = (diffuse_remap_color + float3(fresnel_gold)) * matcap_gold_color;
+				out(combine_gold, float4(combine_gold_color,1.0f));
+
+			}
+			branch("0"){
+				out(combine_gold, combine_frozen);
+			}
+		};
+
+		// 石化状态（采样了一张黑白贴图）
+		macro(PETRIFY_EFFECT) out(lowp float4 combine_petrfy) {
+			branch ("1") {
+				lowp float3 petrify_color = sample(BuffTex,effectuv).rgb * lerp(effectlerp,1.0f,0.6f);
+				lowp float3 petrified_color = float3(0.299f * diffuse_map_color.x + 0.587f * diffuse_map_color.y + 0.114f * diffuse_map_color.z);
+				lowp float3 combine_petrfy_= lerp(petrify_color,petrified_color,float3(0.3f));
+				lowp float3 combine_petrfy_1 = lerp(combine_petrfy_,combine_gold.rgb,float3(height_sm));
+				out(combine_petrfy, float4(combine_petrfy_1, combine_gold.a));
+			}
+			branch ("0") {
+				out(combine_petrfy,combine_gold);	
+			}
+		};
+
+		macro(INVINCIBLE_EFFECT) out(lowp float4 combine_invincible) 
+		{
+			branch ("1") 
+			{
+				lowp float invincible_factor01 = 0.0f;
+				lowp float invincible_factor02 = 1.0f;
+				lowp float invincible_factor03 = 0.17f;
+				lowp float invincible_factor04 = 1.0f;
+
+                lowp float fresnelFactor_invincible0 = 1.0f - saturate(dot(normal_dir,view_dir));
+                lowp float fresnelFactor_invincible = fresnelFactor_invincible0;// * fresnelFactor_invincible0;
+                lowp float invincible_lerp01 = invincible_colorchange * smoothstep(invincible_factor01, invincible_factor02, fresnelFactor_invincible);
+                mediump float invincible_lerp02 = invincible_lightchange * smoothstep(invincible_factor03, invincible_factor04, fresnelFactor_invincible);
+                lowp float3 combine_invincible0 = combine_petrfy.rgb * (1.0f - invincible_lerp01) + invincible_color01.rgb * invincible_lerp01;
+                lowp float3 combine_invincible1 = combine_invincible0 + invincible_lerp02 * invincible_color02.rgb;
+				out(combine_invincible, float4(combine_invincible1, combine_petrfy.a));
+			}
+			branch ("0") 
+			{
+				out(combine_invincible, combine_petrfy);
+			}
+		};
+
+		macro(IMMUNE_EFFECT) out(lowp float4 combine_immune) 
+		{
+			branch ("1") 
+			{
+				lowp float immune_factor01 = 0.75f;
+				lowp float immune_factor02 = 1.0f;
+				lowp float immune_factor03 = 0.0f;
+				lowp float immune_factor04 = 0.75f;
+
+                lowp float fresnelFactor_immune0 = 1.0f - saturate(dot(normal_dir,view_dir));
+                lowp float fresnelFactor_immune = fresnelFactor_immune0;// * fresnelFactor_immune0;
+                lowp float immune_lerp01 = immune_colorchange * smoothstep(immune_factor01, immune_factor02, fresnelFactor_immune);
+                mediump float immune_lerp02 = immune_lightchange * smoothstep(immune_factor03, immune_factor04, fresnelFactor_immune);
+                lowp float3 combine_immune0 = combine_invincible.rgb * (1.0f - immune_lerp01) + immune_color01.rgb * immune_lerp01;
+                lowp float3 combine_immune1 = combine_immune0 + immune_lerp02 * immune_color02.rgb;
+				out(combine_immune, float4(combine_immune1, combine_invincible.a));
+			}
+			branch ("0") 
+			{
+				out(combine_immune, combine_invincible);
+			}
+		};
+	
+		macro(DISSOLVE_EFFECT) out(lowp float4 combine_dissolve)
+		{
+			branch("1") {
+				lowp float4 diss_samp = sample(BuffTex, UV0.xy);
+				lowp float ClipAmount = diss_samp.x - DissAmount;
+				alphatest("<")(ClipAmount, 0.0f);
+				mediump float3 dissolve_color = float3(1.0f, 0.3f, 0.3f);
+				lowp float3 dest = dissolve_color * ClipAmount * 2.0f / 0.1f;
+				lowp float num1 = step(0.1f, ClipAmount);
+				lowp float3 combine_dissolve_ = num1 * change_color * combine_immune.xyz + (1.0f - num1) * dest;
+				out(combine_dissolve, float4(combine_dissolve_, combine_immune.a));
+			}
+			branch("0") {
+				out(combine_dissolve, float4(change_color * combine_immune.xyz, combine_immune.a));
+			}
+		};
+
+		macro(ALPHA_TEST_ENABLE) out (lowp float final_alpha)
+		{
+			branch("1"){
+				out(final_alpha, combine_dissolve.a * AlphaMtl * alpha + alpha_adding);
+			}
+			branch("0"){
+				out(final_alpha, combine_dissolve.a * AlphaMtl + alpha_adding);
+			}
+		};
+		lowp float k = step(1.0f, AlphaMtl);
+		highp float final_alpha_ = lerp(final_alpha, Hero_Alpha_Random, k);
+
+		pixel(float4(combine_dissolve.rgb , final_alpha_));
+	}
+}

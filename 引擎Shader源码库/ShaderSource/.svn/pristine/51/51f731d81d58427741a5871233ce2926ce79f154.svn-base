@@ -1,0 +1,275 @@
+["common"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+    merge = "0"
+>
+{
+// 宏
+    ["颜色修改"]
+    eitheror Enable_PARTICLE_COLOR;
+    macro(Enable_PARTICLE_COLOR)
+    <
+        customizable = "1"
+    >;
+
+    ["边缘光效果"]
+    eitheror FRESNEL_ENABLE;
+    macro(FRESNEL_ENABLE)
+    <
+        customizable = "1"
+    >;
+
+    ["溶解"]
+    eitheror DISSOLVE_EFFECT;
+    macro(DISSOLVE_EFFECT)
+    <
+        customizable = "1"
+    >;
+
+// 贴图
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["自发光强度"]
+	uniform mediump float change_color_bright
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "5.0" 
+		init = "1.0"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+    ////////////////////////////////
+    // fresnel
+    ["fresnel颜色"]
+    uniform float4 fresnel_color
+    <
+        color = "1"
+        artist = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+
+    ["fresnel亮度"]
+    uniform float fresnel_brightness
+    <
+        artist = "1"
+        min = "0"
+        max = "3"
+        init = "0"
+    >;
+
+    ["fresnel大小"]
+    uniform float fresnel_size
+    <
+        artist = "1"
+        min = "1"
+        max = "10"
+        init = "3"
+    >;
+    ////////////////////////////////
+
+    ////////////////////////////////
+    ["溶解"]
+    uniform sampler DissolveTex
+    <
+        artist = "1"
+        mag = "LINEAR"
+        mip = "LINEAR"
+        min = "LINEAR"
+        path = "fx\\texture\\effect\\dissolve.png"
+    >;
+
+    ["溶解Amount"]
+    uniform float DissAmount
+    <
+        artist = "1"
+        min = "0.0"
+        max = "20.0"
+        init = "0.0"
+    >;
+
+    ["溶解颜色"]
+    uniform float4 DissolveColor
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0, 0.3, 0.3, 1.0)"
+    >;
+
+    ["颜色修改"]
+    uniform mediump float4 particle_color
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0,1.0,1.0,1.0)"
+    >;
+
+    ["颜色修改强度"]
+    uniform mediump float particle_color_value
+    <
+        artist = "1"
+        min = "0.0"
+        max = "10.0"
+        init = "0.5"
+    >;
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+    uniform highp float4x4 wv: WORLD_VIEW;
+
+    uniform lowp float alphaRef : ALPHA_REF;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	
+	uniform highp float4x4 proj : PROJECTION;
+	uniform float AlphaMtl : ALPHA_MTL
+    <
+        init = "1.0"
+    >;
+    uniform lowp float2 sfx_direction;
+    uniform lowp float sfx_show_radian;
+
+// varying变量
+	varying mediump float4 UV0;
+    varying lowp float3 NormalView;
+	varying lowp float4 VectorDiffuse;
+    varying float4 model_position;
+
+    ["计算向量之间夹角"]
+    function cal_radian in (
+    float2 dir1,
+    float2 dir2
+    ) out (float out_radian)     
+    {
+        float len1 = length(dir1);
+        float len2 = length(dir2);
+        float costheta = dot(dir1, dir2)/(len1 * len2);
+        float sintheta = (dir1.x * dir2.y - dir1.y * dir2.x) /(len1 * len2);
+        float k = step(0.0f, sintheta);
+        float radian = 3.14f * 2.0f * (1.0f - k) + (2.0f * k - 1.0f) * acos(costheta);
+        //float radian = 0.1f;
+
+        out(out_radian, radian);
+    }; 
+
+	vertex
+	{
+
+        highp float4 position = a_position;
+        out(model_position, position);
+        highp float4 normal = a_normal;
+
+		highp float4 pos = transform(position, wvp);
+        vertex(pos);
+
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+		
+        out (VectorDiffuse, diffuse);
+
+        macro(FRESNEL_ENABLE)
+        {
+            branch("1") {
+                float3x3 worldViewMat = float3x3(wv);
+                lowp float3 nor_value = normalize(transform(normal.xyz, worldViewMat));
+                out(NormalView, nor_value);
+            }
+            branch("0") {
+            }
+        };
+    // diffuse
+		mediump float4 uv0 = float4(uvxyz.xyz, 0.0f);
+		out(UV0, uv0);
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+        macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+        {
+        branch("1") {
+            lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+            out(alpha, separateColor.w);
+        }
+        branch("0") {
+            out(alpha, diffuse_map_color.a);
+        }
+        };
+        macro(ALPHA_TEST_ENABLE)
+        {
+            branch("1") {
+                alphatest("<")(alpha - alphaRef, 0.0f);
+            }
+            branch("0") {
+            }
+        };
+
+        mediump float3 final_lightmap_color = diffuse_map_color.xyz * change_color_bright;
+
+        macro(FRESNEL_ENABLE) out(lowp float3 color1)
+        {
+            branch("1") {
+                lowp float3 inputNormView = NormalView;
+                lowp float fresnel = 1.0f - abs(dot(inputNormView, float3(0.0f, 0.0f, -1.0f)));
+                out(color1, final_lightmap_color + fresnel_color.xyz * pow(fresnel, fresnel_size) * fresnel_brightness);
+            }
+            branch("0") {
+                out(color1, final_lightmap_color);
+            }
+        };
+
+        macro(DISSOLVE_EFFECT) out(lowp float3 color2)
+        {
+            branch("1") {
+                lowp float4 diss_samp = sample(DissolveTex, UV0.xy);
+                lowp float ClipAmount = diss_samp.x - DissAmount;
+                alphatest("<")(ClipAmount, 0.0f);
+                lowp float3 dest = color1 * DissolveColor.xyz * ClipAmount * 2.0f / 0.1f;
+                // 0-0.1 :  color1 >0.1. dest
+                lowp float num1 = step(0.1f, ClipAmount);
+                out(color2, num1 * color1 + (1.0f - num1) * dest);
+            }
+            branch("0") {
+                out(color2, color1);
+            }
+        };
+
+        macro(Enable_PARTICLE_COLOR) out(mediump float3 color3)
+        {
+            branch("1") {
+                out(color3, particle_color.xyz * particle_color_value + color2);
+            }
+            branch("0") {
+                out(color3, color2);
+            }
+        };
+
+        float2 pixel_direction = normalize(float2(model_position.x, model_position.z));
+        function cal_radian(sfx_direction, pixel_direction) out(float radian);
+        float alpha_k = step(radian, sfx_show_radian);
+        
+		pixel(float4(color3.xyz, alpha_k *alpha * AlphaMtl * VectorDiffuse.a));
+       
+	}
+}

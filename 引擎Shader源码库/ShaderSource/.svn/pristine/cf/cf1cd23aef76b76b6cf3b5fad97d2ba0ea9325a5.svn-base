@@ -1,0 +1,273 @@
+["rim shader for FX"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+// 宏
+	["开启高度渐变遮罩"]
+	eitheror GRADIENT_ENABLE;
+	macro (GRADIENT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启屏幕纹理遮罩"]
+	eitheror MASK_ENABLE;
+	macro (MASK_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启径向颜色变化"]
+	eitheror RADIAL_COLOR_ENABLE;
+	macro (RADIAL_COLOR_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启高度颜色变化"]
+	eitheror HEIGHT_COLOR_ENABLE;
+	macro (HEIGHT_COLOR_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	
+
+// 贴图
+	["屏幕空间纹理遮罩"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "1"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+// uniform
+	// ——————rim——————
+		["轮廓光色彩"]
+		uniform float4 u_rim_color
+		<
+			artist = "1"
+			color = "1"
+			init = "(1.0,1.0,1.0,1.0)" 
+			uigroup = "轮廓光"
+		>;
+
+		["轮廓光起始位置"]
+		uniform float u_rim_smooth1
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "0.0" 
+			uigroup = "轮廓光"
+		>;
+
+		["轮廓光结束位置"]
+		uniform float u_rim_smooth2
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "1.0" 
+			uigroup = "轮廓光"
+		>;
+
+		["轮廓光强度"]
+		uniform float u_rim_strength
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.0"
+			max = "5.0"
+			init = "1.0" 
+			uigroup = "轮廓光"
+		>;
+
+	// ——————屏幕空间遮罩——————
+		["屏幕空间纹理uv缩放"]
+		uniform float flow_uv_tiling
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.01"
+			max = "0.5"
+			init = "0.5" 
+			uigroup = "屏幕空间遮罩"
+		>;
+
+	// ——————角色高度遮罩——————
+		["角色顶部遮罩浓度"]
+		uniform float height_alpha1
+		<
+			artist = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "1.0" 
+			uigroup = "角色高度遮罩"
+		>;
+		["角色底部遮罩浓度"]
+		uniform float height_alpha2
+		<
+			artist = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "0.0" 
+			uigroup = "角色高度遮罩"
+		>;
+
+		["角色高度"]
+		uniform mediump float char_height
+		<
+			artist = "1"
+			init = "20"
+			min = "0"
+			uigroup = "角色高度遮罩"
+		>;
+
+	// ——————径向颜色变化——————
+		["径向替换颜色"]
+		uniform float4 u_radial_color
+		<
+			artist = "1"
+			color = "1"
+			init = "(1.0,1.0,1.0,1.0)" 
+			uigroup = "径向颜色变化"
+		>;
+	
+	// ——————高度颜色变化——————
+		["高度替换颜色"]
+		uniform float4 u_height_color
+		<
+			artist = "1"
+			color = "1"
+			init = "(1.0,1.0,1.0,1.0)" 
+			uigroup = "高度颜色变化"
+		>;
+	
+
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;	
+	uniform mediump float4x4 inverse_view : INV_VIEW;	
+	uniform mediump float4x4 view_mat : VIEW;	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+// varying变量
+	varying mediump float2 mask_uv;
+	varying mediump float v_char_height; 
+	varying highp float3 v_NormalWorld;
+	varying highp float4 PosWorld;
+
+
+	vertex {
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+
+		highp float4 screen_pos = float4(transform(vec, wvp));
+		vertex(screen_pos);
+
+		highp float4 pos_world = transform(vec, world);		
+		
+		float3x3 worldMat = float3x3(world);		
+		highp float3 world_normal = float3(normalize(transform(nor.xyz, worldMat)));
+		
+		out(PosWorld, float4(pos_world.xyz, 1.0f));		
+		out(v_NormalWorld, world_normal);
+		out(v_char_height, vec.y/char_height);
+
+		macro(MASK_ENABLE) out(lowp float mask) {
+			branch ("1") {
+				out(mask_uv, screen_pos.xy * flow_uv_tiling);
+			}
+			branch ("0") {
+			}
+		};
+	}
+	pixel {
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float NdotV = saturate(dot(view_dir, v_NormalWorld));
+		lowp float rim_ = 1.0f - NdotV;
+		mediump float height = v_char_height;
+		mediump float rim = smoothstep(u_rim_smooth1, u_rim_smooth2, rim_);
+
+		macro(MASK_ENABLE) out(lowp float mask) {
+			branch ("1") {
+				lowp float4 mask_color = sample(Tex0,mask_uv.xy);
+				out(mask, mask_color.r);
+			}
+			branch ("0") {
+				out(mask,1.0f);
+			}
+		};
+
+		macro(GRADIENT_ENABLE) out(lowp float height_factor) {
+			branch ("1") {
+				out(height_factor,lerp(height_alpha2,height_alpha1,height));
+			}
+			branch ("0") {
+				out(height_factor,1.0f);
+			}
+		};
+
+		macro(RADIAL_COLOR_ENABLE) out(lowp float3 rim_color1) {
+			branch ("1") {
+				out(rim_color1,lerp(u_rim_color.xyz, u_radial_color.xyz, float3(NdotV)));
+			}
+			branch ("0") {
+				out(rim_color1, u_rim_color.xyz);
+			}
+		};
+
+		macro(HEIGHT_COLOR_ENABLE) out(lowp float3 rim_color2) {
+			branch ("1") {
+				out(rim_color2,lerp(rim_color1, u_height_color.xyz, float3(height)));
+			}
+			branch ("0") {
+				out(rim_color2, rim_color1);
+			}
+		};
+		 pixel(float4(rim_color2.rgb * u_rim_strength,rim * height_factor * mask));
+
+	}
+}

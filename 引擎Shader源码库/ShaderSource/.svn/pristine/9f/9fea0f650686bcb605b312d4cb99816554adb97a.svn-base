@@ -1,0 +1,105 @@
+["fire ground"]
+pipeline
+<
+	version = "1.0.0"
+	author = ""
+	company = "Netease"
+	technique = "TShader"
+>
+{
+
+	["遮罩贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+	>;
+
+	["溶解贴图"]
+	uniform sampler SamplerDistortion
+	<
+		artist = "1"
+	>;
+
+	["颜色贴图"]
+	uniform sampler SamplerAlbedo
+	<
+		artist = "1"
+	>;
+
+	["速度"]
+	uniform mediump float Speed
+	<
+		artist = "1"
+		init = "2.0"
+	>;
+
+	["強度"]
+	uniform mediump float a_intensity
+	<
+		artist = "1"
+		init = "4.0"
+	>;
+
+	["顏色"]
+	uniform lowp float4 a_color
+	<
+		artist = "1"
+		color = "1"
+		init = "(0.99, 0.47, 0.235, 1.0)"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	uniform highp float FrameTime : FRAME_TIME;
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	attribute float4 texcoord0: TEXTURE0;
+	attribute float4 position: POSITION;
+
+	varying lowp float4 uv0;
+
+	function GetCycleValue in(highp float time) out(mediump float time_out) {
+		out(time_out, sin(time) * 1.57075f);
+	};
+
+	vertex {
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		out(uv0, texcoord0);
+	}
+	pixel {
+
+		highp float4 distort_map = sample(SamplerDistortion, uv0.xy);
+		highp float cycle_time = FrameTime * Speed;
+
+		function GetCycleValue(cycle_time + 4.0f) out (mediump float value1);	
+		function GetCycleValue(cycle_time + 0.0f) out (mediump float value2);	
+		function GetCycleValue(cycle_time + 2.0f) out (mediump float value3);	
+
+		mediump float3 cycle_array = float3(value1, value2, value3);
+		lowp float uv = dot(distort_map.xyz, cycle_array);
+
+		lowp float4 albedo = sample(SamplerAlbedo, float2(uv, 1.0f - uv));
+		lowp float3 emissive = albedo.rgb * a_intensity * a_color.rgb;
+
+
+		lowp float4 mask_color = sample(Tex0, uv0.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float mask_color_alpha) {
+			branch ("1") {
+				lowp float4 mask_color_alpha1 = sample(sepAlphaTex, uv0.xy);
+				out(mask_color_alpha, mask_color_alpha1.a);
+			}
+			branch ("0") {
+				out(mask_color_alpha, mask_color.a);
+			}
+		};
+
+		pixel(float4(emissive, AlphaMtl * (1.0f - uv) * mask_color_alpha));
+	}
+}

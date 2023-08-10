@@ -1,0 +1,207 @@
+["fx dissolve"]
+pipeline
+<
+	version = "1.0.0"
+	author = "konglingjie"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	["漫反射贴图"]
+	uniform sampler _MainTex: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+	["Color"]
+	uniform float4 _Tint
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["溶解程度"]
+	uniform float _DissolveAmount
+	<
+		artist = "1"
+		init = "1"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["模型高度"]
+	uniform float _MaxHeight
+	<
+		artist = "1"
+		init = "2"
+	>;
+	["切换溶解方向"]
+	eitheror SWITCHDISSOLVEDIR;
+	macro(SWITCHDISSOLVEDIR)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+	["溶解渐变宽度"]
+	uniform float _DissolveWidth
+	<
+		artist = "1"
+		init = "0.1"
+		min = "0.0"
+		max = "2.0"
+		uistep = "0.01"
+	>;
+	["溶解Noise贴图"]
+	uniform sampler NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["是否采用屏幕空间UV采样Noise图"]
+	eitheror USESCREENUV;
+	macro(USESCREENUV)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+	["溶解Noise TillingX"]
+	uniform float noise_tilling_x
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["溶解Noise TillingY"]
+	uniform float noise_tilling_y
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["溶解Noise 平移速度X"]
+	uniform float noise_offset_speed_x
+	<
+		artist = "1"
+		init = "0"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["溶解Noise 平移速度Y"]
+	uniform float noise_offset_speed_y
+	<
+		artist = "1"
+		init = "0.1"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+
+	["溶解边缘硬度"]
+	uniform float _DissolveHardness
+	<
+		artist = "1"
+		init = "20"
+	>;
+	["溶解边缘Color"]
+	uniform float4 _EdgeColor
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	["溶解边缘颜色强度"]
+	uniform float _EdgeIntensity
+	<
+		artist = "1"
+		init = "10"
+	>;
+	
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 u_view_poj:VIEW_PROJECTION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	attribute float4 a_position: POSITION;
+	attribute float3 a_normal : NORMAL;
+	attribute float3 a_tangent : TANGENT;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_texture1 : TEXTURE1;
+	// varying
+	varying mediump float4 v_texture0;
+	varying mediump float2 v_noiseuv;
+	varying float3 v_local_pos;
+
+	vertex{		
+		float4 uv0 = float4(a_texture0.xy, 1.0f, 0.0f) * texTrans0;
+		out(v_texture0,uv0);
+		out(v_local_pos,a_position.xyz);
+		float4 screen_pos = transform(a_position,wvp);
+		vertex(screen_pos);
+		float2 screen_uv = screen_pos.xy / float2(screen_pos.w + 0.000000001f);
+		macro(USESCREENUV) out(mediump float2 noiseuv) {
+			branch ("1") {
+				out(noiseuv,screen_uv);
+			}
+			branch ("0"){
+				out(noiseuv,uv0.xy);
+			}
+		};
+		out(v_noiseuv,noiseuv);
+	}
+
+	pixel
+	{	
+		lowp float4 texColor0 = sample(_MainTex, v_texture0.xy);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 color_out){
+            branch("1"){
+            	lowp float4 sep_color = sample(sepAlphaTex, v_texture0.xy);
+                out(color_out, float4(texColor0.xyz, sep_color.w));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+
+		float dissolveFactor = v_local_pos.y / _MaxHeight;
+
+		macro(SWITCHDISSOLVEDIR) out(mediump float dissolveParam) {
+			branch ("1") {
+				out(dissolveParam,dissolveFactor);
+			}
+			branch ("0"){
+				out(dissolveParam,1.0f - dissolveFactor);
+			}
+		};
+		float dissolvePos = smoothstep( _DissolveAmount , ( _DissolveAmount + _DissolveWidth ) , dissolveParam);
+		float2 noiseMapUV =  FrameTime * float2(noise_offset_speed_x,noise_offset_speed_y) + v_noiseuv * float2(noise_tilling_x,noise_tilling_y);
+		float noiseVar = sample( NoiseTex, noiseMapUV ).r;
+		float finalDissolveParam = pow(dissolvePos * (dissolvePos + noiseVar), _DissolveHardness);
+		float dissolveParama_edge = saturate((finalDissolveParam * (1.0f - finalDissolveParam)) * _EdgeIntensity);
+		float3 resColor = _Tint.rgb * color_out.rgb + float3(dissolveParama_edge) * _EdgeColor.rgb;
+		float resAlpha = saturate(finalDissolveParam + dissolveParama_edge );
+
+		pixel(float4(resColor,resAlpha));
+	}
+}

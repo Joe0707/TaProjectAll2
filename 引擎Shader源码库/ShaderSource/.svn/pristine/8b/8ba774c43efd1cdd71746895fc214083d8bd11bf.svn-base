@@ -1,0 +1,69 @@
+["fog of war blend"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	technique = "TShader"
+	zenable = "0"
+	zwritable = "0"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	uniform mediump float blend_factor
+	<
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+
+	uniform mediump float4 fow_params
+	<
+		artist = "1"
+		init = "(0.05, -0.5, 0.4, 0.6)"
+	>;
+
+	varying mediump float2 TexCoord0;
+
+	["前一帧图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["当前帧图"]
+	uniform sampler Tex1
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		lowp float fow_0 = sample(Tex0, TexCoord0.xy).w;
+		lowp float fow_1 = sample(Tex1, TexCoord0.xy).w;
+		mediump float fow_mix_ = lerp(fow_0, fow_1, blend_factor);
+		mediump float fow_mix = 1.0f - fow_mix_;
+		mediump float x = 1.0f - fow_mix;
+		mediump float y = fow_mix;
+		mediump float z = clamp((fow_mix - 0.1f) * 2.0f, 0.0f, 1.0f);
+		mediump float w = fow_mix_;
+		pixel(float4(x, y, z, w));
+	}
+}

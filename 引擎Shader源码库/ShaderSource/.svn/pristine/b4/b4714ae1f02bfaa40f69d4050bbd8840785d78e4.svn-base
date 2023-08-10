@@ -1,0 +1,347 @@
+["场景地表Splat Height Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "klj" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["是否接受迷雾"]
+	eitheror FOW_ENABLE;
+	macro(FOW_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+    ["是否距离雾"]
+    eitheror FOS_ENABLE;
+    macro(FOS_ENABLE)
+    <
+        customizable = "0"
+        default = "0"
+    >;
+// 贴图	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["diffuse 高度图"]
+	uniform sampler HeightMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["Splat纹理"]
+	uniform sampler splat_texture
+	<
+		artist = "1"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+	["Splat tiling"]
+    uniform float splat_tiling
+    <
+        artist = "1"
+		init = "1"
+    >;
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["ExposureColor"]
+	uniform mediump float4 exposure_color
+	<
+		init = "(1.0, 1.0, 1.0, 1.0)" 
+		artist = "1"
+		color = "1"
+	>;	
+
+	["DarkCorner Intensity"]
+	uniform mediump float4 darkCorner_Intensity
+	<		
+		init = "(1.0, 1.0, 1.0, 1.0)" 
+		artist = "1"
+	>;
+
+	["Height BlendWeight"]
+	uniform mediump float height_BlendWeight
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "1.0"
+		init = "0.5"
+		uistep = "0.01"
+	>;
+
+	uniform mediump float2 scene_size
+    <
+    	init = "(1280.0, 1280.0)"
+    >;
+
+	["迷雾颜色"]
+	uniform mediump float4 fow_color
+	<
+		init = "(0.0, 0.168, 0.298, 0.619)" // 0.5176
+		artist = "1"
+		color = "1"
+	>;	
+	["迷雾纹理"]
+	uniform sampler view_texture: FOW
+	<
+		artist = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+	["迷雾渐变颜色"]
+	uniform mediump float4 gradient_color
+	<		
+		// init = "(0.345, 0.518, 0.678,1.0)"
+		// init = "(0.445, 0.678, 0.838,1.0)"
+		init = "(0.395, 0.598, 0.748,1.0)"
+		artist = "0"
+		color = "1"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	//attribute float4 texcoord2 : TEXTURE2;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying lowp float4 vs_COLOR0;
+	//varying lowp float3 darkCornerColor;
+
+	varying mediump float4 fow_uv;
+	varying mediump float v_fog_distance;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewMat : VIEW;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	
+	uniform lowp float4 u_fog_color: FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+	uniform mediump float4 cam_pos : CAMERA_POSITION;
+	uniform lowp float4 ambient_color : AMBIENT;
+
+
+	["计算线性雾"]
+	function get_fog_linear1 in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	// ["计算高度雾"]
+	// function get_fog_height1 in(
+	// highp float fog_height_begin, // 雾的起始位置，世界空间
+	// highp float fog_height_end, // 雾的结束位置，世界空间
+	// highp float view_y // 顶点在世界空间的高度
+	// ) out (mediump float fog_height_factor) // 计算雾效因子
+	// {
+	// 	highp float fromEnd = fog_height_end - view_y;
+	// 	mediump float delta = fog_height_end - fog_height_begin;
+	// 	mediump float height_factor = saturate( fromEnd / delta );
+		
+	// 	out(fog_height_factor, height_factor);
+	// 	// out(fog_factor, 1.0f - height_factor);
+	// 	// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	// };
+
+	function HeightBlend in(float h1, float h2, float slope, float contrast) out(float blendfactor)
+	{
+	   float h2_Inv = 1.0f -h2;
+	   float tween = saturate( ( slope - min( h1, h2_Inv ) ) / max(abs( h1 - h2_Inv ), 0.001f)); 
+	   float threshold = contrast;
+	   float width = 1.0f - contrast;
+	   float factor = saturate( ( tween - threshold ) / max(width, 0.001f) );
+	   out(blendfactor,factor);
+	};
+	vertex
+	{
+		["wvp变换"]
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);		
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;	
+		mediump	float2 spaltUV = texcoord0.xy * splat_tiling;
+		mediump float4 uv0 = float4(uvxyz.x,uvxyz.y,spaltUV.x,spaltUV.y);
+		mediump float4 pos_world = position * world;		
+		out(vs_COLOR0, diffuse);
+		out(UV0,uv0);
+
+		// float3 viewDir = normalize(cam_pos.xyz - pos_world.xyz);
+		// float2 viewxz = float2(viewDir.y * viewMat[1][1], viewDir.y * viewMat[1][2]);
+		// float2 viewxz2 = float2(viewMat[0][1],viewMat[0][2]) * float2(viewDir.x) + viewxz;
+		// float2 viewxz3 = float2(viewMat[2][1],viewMat[2][2])  * float2(viewDir.z) + viewxz2;
+		// float viewCorner = dot(viewxz3, float2(0.196116135f, 0.980580688f));
+		// float viewCorner1 = viewCorner * viewCorner;
+		// float viewCorner2 = viewCorner1 * viewCorner1;
+		// float viewCorner3 = viewCorner2 * viewCorner2;
+		// float3 darkCorner = float3(viewCorner3) + float3(1.0f - viewCorner3) * darkCorner_Intensity.xyz;
+		// out(darkCornerColor,darkCorner);
+
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float4 uv1 = float4(texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+				out(UV1, uv1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		macro(FOW_ENABLE) {
+			branch ("1") {
+				mediump float2 _fow_uv = float2(pos_world.x / scene_size.x + 0.5f, pos_world.z / scene_size.y + 0.5f);
+                macro(TRANS_ENABLE) out(lowp float trans_factor) {
+                    branch ("1") {
+                        out(trans_factor, -1.0f);
+                    }
+                    branch ("0") {
+                        out(trans_factor, 1.0f);
+                    }
+                };
+                lowp float fog_linear_factor = 0.0f; 
+		        out(fow_uv, float4(_fow_uv, fog_linear_factor, 0.0f)); // z存模型世界空间高度
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(FOS_ENABLE)  {
+			branch ("0") {
+			}
+			branch ("1") {
+				out(v_fog_distance, pos.z);
+			}
+		};
+	}
+
+	pixel
+	{
+		mediump float3 diffuse_color = sample(Tex0, UV0.xy).xyz;
+		//float3 diffuse_color_linear = pow(diffuse_color, float3(2.2f));
+		//mediump float3 splat0_color = diffuse_color_linear * diffuse_color_linear;
+		mediump float3 splattex_color = sample(splat_texture,  UV0.zw).xyz;
+		//float3 splat_color_linear = pow(splattex_color, float3(2.2f));
+		//mediump float3 splat1_color = splat_color_linear * splat_color_linear;
+		mediump float height = sample(HeightMap,UV0.xy).x;
+		float2 blendInput = float2(vs_COLOR0.x,vs_COLOR0.y) + float2(height,0.0f);
+		float2 blendFactor = blendInput - float2(max(blendInput.y, blendInput.x) - height_BlendWeight);
+		float2 blendFactor2 = max(blendFactor, float2(0.0f, 0.0f));
+		float2 blendFactorFinal = blendFactor2 / float2(blendFactor2.x + blendFactor2.y);
+
+		float3 combineColor = diffuse_color * float3(blendFactorFinal.x) + splattex_color * float3(blendFactorFinal.y);
+		//function HeightBlend(height,1.0f,vs_COLOR0.x,height_BlendWeight) out(float blendfactor);
+		//float3 combineColor = lerp(diffuse_color,splattex_color,float3(blendfactor));
+
+		macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)  
+		{
+			branch("1") {
+				// lightmap已经是线性的了
+                lowp float4 _lightmap_color = sample(TexLightmap, UV1.xy);
+                lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+               //lowp float3 light_map_color_gamma = _lightmap_color.xyz * _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz);
+			}
+			branch("0") {
+				out(lightmap_color, float3(u_fog_color.rgb));
+			}
+		};
+
+
+		//float3 combinelightmap_color = combineColor * float3(3.0f, 3.0f, 3.0f);
+		//float3 gradingColor = combinelightmap_color * darkCornerColor.xyz * exposure_color.xyz;
+		//float3 finalColor = (gradingColor / (gradingColor + float3(0.187f))) * 1.03499997f;
+		float3 finalColor = combineColor;
+
+		macro(TRANS_ENABLE) out(lowp float trans_factor) {
+			branch ("1") {
+				out(trans_factor, -1.0f);
+			}
+			branch ("0") {
+				out(trans_factor, 1.0f);
+			}
+		};
+
+
+		macro(FOW_ENABLE) out(mediump float3 final_result) {
+			branch ("1") {
+				// 参数
+		        lowp float fow_sample = sample(view_texture, fow_uv.xy).x;
+		        lowp float fow1 = oneminus(fow_sample);
+		        lowp float fow = smoothstep(0.231f, 0.769f, fow1);
+		        lowp float fow_thick = fow * fow_color.a;
+				lowp float3 combine_linear_fog = lerp(float3(0.0f, 0.168f, 0.298f), gradient_color.rgb, float3(fow_uv.z));
+
+				out(final_result, lerp(finalColor, combine_linear_fog,  float3(fow_thick)));
+			}
+			branch("0")
+			{
+				out(final_result, finalColor);
+			}
+		};
+
+		macro(FOS_ENABLE) out(mediump float3 final_final_result) {
+			branch ("0") {
+				out(final_final_result, final_result);
+			}
+			branch ("1") {
+				// mediump float begin = 60.0f + (cam_pos.y * trans_factor - 150.0f) * 0.639f * 3.0f;
+				// mediump float begin = u_fog_info.x;
+				mediump float begin = 200.0f;
+                // mediump float end = 255.0f + (cam_pos.y * trans_factor - 150.0f) * 0.639f * 3.0f;
+                // mediump float end = u_fog_info.y;
+                mediump float end = 350.0f;
+
+                lowp float fog_linear_factor = saturate(max(0.0f, v_fog_distance-begin)/max(0.01f, end-begin));
+				out(final_final_result, lerp(final_result, gradient_color.rgb, float3(fog_linear_factor * u_fog_color.a)));
+			}
+		};
+		//float3 finalColor_gamma = pow(final_final_result, float3(1.0f / 2.2f));
+		pixel(float4(final_final_result,1.0f));
+	}
+}

@@ -1,0 +1,231 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "mengqingyu" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	//zenable = "1"
+  	//zwriteable = "1"
+  	//alphablend = "true"
+  	//srccolor = "srcalpha"
+  	//dstcolor = "1-srcalpha"
+>
+{
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	//uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+		
+	["中心透明度"]
+	uniform float alpha_min
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.4"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["边缘透明度"]
+	uniform float alpha_max
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.7"
+		max = "2.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	
+	["辉光颜色"]
+	uniform mediump float4 shining
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 0.843, 0.0, 1.0"
+		artist = "1"
+	>;
+	
+	["辉光强度"]
+	uniform mediump float shining_intensity
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.8"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["去色强度"]
+	uniform mediump float gray_intensity
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.5"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["色相与亮度偏移(类似PS中的叠加，50%灰视为无调整)"]
+	uniform mediump float4 bias_color
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "0.5, 0.5, 0.5, 1.0"
+		artist = "1"
+	>;
+
+	["下半身消隐强度"]
+	uniform mediump float lowerbody_intensity
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.1"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["消隐位置上阈值"]
+	uniform mediump float lowerbodyUP
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "27.0"
+		max = "60.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["消隐位置下阈值"]
+	uniform mediump float lowerbodyDOWN
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.0"
+		max = "60.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float3 normalView;
+	varying mediump float3 PosWorld;
+
+	
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		highp float4 pos = transform(position, wvp);
+
+        highp float4 pos_world = transform(position, world);
+		out(PosWorld,pos_world.xyz);
+
+		out(UV0, texcoord0.xy);
+
+		mediump float3 normal_view = normalize(transform(normal.rgb,float3x3(wv)));
+		out(normalView,normal_view);
+
+		vertex(pos);
+
+    }
+
+	pixel
+	{
+		lowp float intensitylerp = (1.1f + min(normalView.z, 0.0f)) * (1.1f + min(normalView.z, 0.0f));
+		lowp float intensity = saturate(lerp(alpha_min, alpha_max, intensitylerp));
+		lowp float3 diffuse_map_color = (sample(Tex0,UV0.xy)).rgb;
+		lowp float color_brightness = diffuse_map_color.r * 0.3f + diffuse_map_color.g * 0.59f + diffuse_map_color.b * 0.11f;
+		lowp float4 gray_color = float4(diffuse_map_color.rgb * (1.0f - gray_intensity) + float3(color_brightness, color_brightness, color_brightness) * gray_intensity, intensity);
+		condition(bias_color.r) out(lowp float biased_colorR) {
+		 	branch ("%0% < 0.5") {
+		 		out(biased_colorR, 2.0f * bias_color.r * gray_color.r);
+		 	}
+		 	default {
+		 		out(biased_colorR, 1.0f - 2.0f * (1.0f - bias_color.r) * (1.0f - gray_color.r));
+		 	}
+		 };
+		 condition(bias_color.g) out(lowp float biased_colorG) {
+		 	branch ("%0% < 0.5") {
+		 		out(biased_colorG, 2.0f * bias_color.g * gray_color.g);
+		 	}
+		 	default {
+		 		out(biased_colorG, 1.0f - 2.0f * (1.0f - bias_color.g) * (1.0f - gray_color.g));
+		 	}
+		 };
+		 condition(bias_color.b) out(lowp float biased_colorB) {
+		 	branch ("%0% < 0.5") {
+		 		out(biased_colorB, 2.0f * bias_color.b * gray_color.b);
+		 	}
+		 	default {
+		 		out(biased_colorB, 1.0f - 2.0f * (1.0f - bias_color.b) * (1.0f - gray_color.b));
+		 	}
+		 };
+		lowp float4 biased_color = float4(biased_colorR, biased_colorG, biased_colorB, gray_color.a);
+		lowp float4 shining_color = biased_color * (1.0f - intensitylerp * shining_intensity) + shining * intensitylerp * shining_intensity;
+		lowp float lowerbody_atten = lerp(lowerbody_intensity, 1.0f, smoothstep(lowerbodyDOWN, lowerbodyUP, abs(PosWorld.y - (world[3]).y)));
+		lowp float4 finalcolor = float4(shining_color.rgb, shining_color.a * lowerbody_atten * AlphaMtl);
+
+		pixel(finalcolor);
+
+
+		//E:\SVN\tools_new\shaderpuzzle_publish_g104\SPScriptCompiler.exe -i E:\SVN\G104trunk\shader_source\shader\soulmode.spzs -o E:\SVN\G104trunk\res\shader
+	}
+}

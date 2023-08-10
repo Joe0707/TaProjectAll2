@@ -1,0 +1,34 @@
+["不带法线效果的场景物件材质"]
+pipeline
+<
+	version = "1.0.0"
+	author = "zkunda"
+	company = "Netease"
+	technique = "TShader"
+	stencilenable = "0"
+>
+{
+	
+	attribute float4 a_position: POSITION;
+
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float2 a_texture0: TEXTURE0;
+
+	uniform sampler u_video_tex: VIDEO_TEXTURE;
+	uniform float4 u_vt_info : VIDEO_TEXTURE_INFO;
+
+	varying mediump float2 v_texture0: TEXTURE0;
+
+	vertex
+	{
+		highp float2 pos = a_position.xy * u_vt_info.xy;
+		out(v_texture0, a_texture0);
+		vertex(float4(pos, 0.999f, 1.0f));
+	}
+
+	pixel
+	{
+		highp float4 color = sample(u_video_tex, v_texture0);
+		pixel(float4(color.rgb, 1.0f));
+	}
+}

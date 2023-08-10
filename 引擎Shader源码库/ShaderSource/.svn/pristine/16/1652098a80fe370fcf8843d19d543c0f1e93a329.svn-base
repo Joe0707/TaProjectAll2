@@ -1,0 +1,173 @@
+﻿["common for huanxiong weiba"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "klj" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+>
+{
+
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["ColorPattern图"]
+	uniform sampler ColorPatternTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressv = "repeat"
+		addressu = "clamp"
+	>;
+	
+	["NoiseTex"]
+	uniform sampler NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	// ---------尾巴特效
+	["TubeControl"]
+	uniform lowp float TubeControl
+	<
+		uigroup = "FX"
+		uistep = "0.001"
+		init = "1.38"
+		max = "2.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+	["TubeWidth"]
+	uniform lowp float TubeWidth
+	<
+		uigroup = "FX"
+		uistep = "0.001"
+		init = "1.0"
+		artist = "1"
+	>;
+	["LerpIntensity"]
+	uniform lowp float LerpIntensity
+	<
+		uigroup = "FX"
+		init = "1.0"
+		artist = "1"
+	>;
+	["EmissIntensity"]
+	uniform lowp float EmissIntensity
+	<
+		uigroup = "FX"
+		init = "5.0"
+		artist = "1"
+	>;
+	["SineSpeed"]
+	uniform lowp float SineSpeed
+	<
+		uigroup = "FX"
+		uistep = "0.001"
+		init = "-2.5"
+		max = "5.0"
+		min = "-5.0"
+		artist = "1"
+	>;
+	["RampSpeed"]
+	uniform lowp float RampSpeed
+	<
+		uigroup = "FX"
+		uistep = "0.001"
+		init = "0.15"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["Random"]
+	uniform lowp float Random
+	<
+		uigroup = "FX"
+		uistep = "0.001"
+		init = "0.20"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+
+	["U缩放"]
+	uniform float pattern_tiling_u
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["V縮放"]
+	uniform float pattern_tiling_v
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+
+	// varying变量
+	varying mediump float2 UV0;
+
+	vertex
+	{	
+		highp float4 pos = transform(a_position, wvp);
+
+		out(UV0, texcoord0.xy);    
+		vertex(pos);
+    }
+
+	pixel
+	{
+		mediump float2 pattern_uv = UV0.xy * float2(pattern_tiling_u,pattern_tiling_v);
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		lowp float4 colorpattern_color = sample(ColorPatternTex,UV0.xy + float2(0.0f,RampSpeed * frame_time));
+		lowp float4 noise_color = sample(NoiseTex,pattern_uv);
+		lowp float noise = noise_color.r;
+		lowp float emiss = noise_color.g;
+		mediump float sinwave_factor = sin((UV0.y + noise * Random) * 6.28318f + SineSpeed * frame_time);
+		lowp float sinewave = smoothstep(TubeControl - TubeWidth, TubeControl + TubeWidth,sinwave_factor);
+		//lowp float4 combined_color = lerp(diffuse_map_color,colorpattern_color,float4(saturate(sinewave * EmissIntensity * emiss)));
+		lowp float4 combined_color_ = lerp(diffuse_map_color,colorpattern_color,float4(saturate(sinewave * LerpIntensity * emiss)));
+		lowp float4 combined_color = combined_color_ + colorpattern_color * sinewave * EmissIntensity * emiss;
+		pixel(float4(combined_color.rgb,saturate(AlphaMtl + emiss * sinewave)));
+	}
+}

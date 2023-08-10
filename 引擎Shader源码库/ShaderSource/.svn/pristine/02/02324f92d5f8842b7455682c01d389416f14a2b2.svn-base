@@ -1,0 +1,346 @@
+["uv 动画shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhang ying peng" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["是否叠加diffuse"]
+	eitheror ADD_DIFFUSE;
+	["是否叠加diffuse2"]
+	eitheror ADD_DIFFUSE2;
+	["开启边缘光(FRESNAL_ENABLE)"]
+	eitheror FRESNAL_ENABLE;
+	["骨骼动画"]
+	eitheror BONE_ANIMATION;
+	
+	macro(BONE_ANIMATION)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	
+	macro(ADD_DIFFUSE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	
+	macro(ADD_DIFFUSE2)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	
+	macro(FRESNAL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["颜色贴图2"]
+	uniform sampler Tex2
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["遮罩贴图(R通道控制透明度)"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	
+// 调整参数
+
+	["半透明强度"]
+	uniform mediump float alpha_intensity
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["颜色贴图1强度"]
+	uniform mediump float diffuse1_intensity
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["颜色贴图2强度"]
+	uniform mediump float diffuse2_intensity
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["环境光"]
+	uniform mediump float4 ambient_color
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	
+	["u_scale"]
+	uniform mediump float u_scale
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["v_scale"]
+	uniform mediump float v_scale
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["base_move_speed_u"]
+	uniform mediump float base_move_speed_u
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.0"
+	>;
+	
+	["base_move_speed_v"]
+	uniform mediump float base_move_speed_v
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.0"
+	>;
+	
+	["叠加diffuse强度"]
+	uniform mediump float add_intensity
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.5"
+	>;
+	
+	["模型外拓"]
+	uniform lowp float extend_dist
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "0.0"
+	>;
+	
+	["sin_extend"]
+	uniform lowp float sin_extend
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "0.0"
+	>;
+	
+	["change_speed"]
+	uniform lowp float change_speed
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "0.0"
+	>;
+	
+	// ====================Fresnel=====================
+	
+	["边缘光颜色(fresnel_color)"]
+	uniform mediump float4 fresnel_color
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+	>;
+	
+	["边缘光强度(fresnel_intensity)"]
+	uniform mediump float fresnel_intensity
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	
+	["边缘光半径(fresnel_radius)"]
+	uniform mediump float fresnel_radius
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "10.0" 
+		init = "5.0"
+	>;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	attribute float4 normal : NORMAL;
+	attribute float4 tangent : TANGENT;
+	
+// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying highp float4 PosWorld;
+	varying mediump float2 ShadowMapUV;
+	varying mediump float2 diffuse_uv;
+	varying lowp float3 NormalWorld;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	vertex
+	{
+		["wvp变换"]
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+		macro(BONE_ANIMATION) out(highp float4 screen_pos) {
+			branch("1") {
+				highp float4 pos = float4(transform(position + float4(normal.xyz * (extend_dist + sin((uvxyz.x + uvxyz.y + FrameTime) * change_speed) * sin_extend), 0.0f), wvp));
+				out(screen_pos, pos);
+			}
+			branch("0") {
+				highp float4 pos = float4(transform(position, wvp));
+				out(screen_pos, pos);
+			}
+		};
+		vertex(screen_pos);
+		
+		
+		mediump float4 pos_world = position * world;
+		
+		macro(FRESNAL_ENABLE) {
+			branch("1") {
+				out(PosWorld, pos_world);
+				
+				float3x3 worldMat = float3x3(world);
+				mediump float3 world_normal = float3(normalize(normal.xyz * worldMat));
+				out(NormalWorld, world_normal);
+			}
+			branch("0") {
+			}
+		};
+		
+		// mediump float4 uv0 = float4(uvxyz.xyz, 1.0f);
+		mediump float2 uv0 = texcoord0.xy;
+			
+		mediump float local_frame_time = fmod(FrameTime, 200.0f);
+		
+		mediump float2 diffuse_uv_temp = uv0.xy + float2(base_move_speed_u, base_move_speed_v) * local_frame_time;
+		
+		out(diffuse_uv, float2(diffuse_uv_temp.x * u_scale, diffuse_uv_temp.y * v_scale));
+		
+		out(UV0, uv0);
+	}
+
+	pixel
+	{		
+		// lowp float4 diffuse_map_color1 = sample(Tex0, fmod(diffuse_uv, float2(1.0f))) * diffuse1_intensity;
+		lowp float4 diffuse_map_color1_temp = sample(Tex0, diffuse_uv);
+		lowp float4 diffuse_map_color1 = diffuse_map_color1_temp * diffuse1_intensity;		
+		lowp float4 diffuse_map_color2 = sample(Tex2, UV0.xy) * diffuse2_intensity;
+		
+		lowp float4 mask_map_color = sample(Tex1, UV0.xy);
+		lowp float3 temp_color = float3(diffuse_map_color1.xyz * diffuse_map_color2.xyz * ambient_color.rgb);
+		
+		macro(ADD_DIFFUSE2) out (lowp float alpha)
+		{
+			  branch("1") {
+				out(alpha, min(1.0f, mask_map_color.r));
+			  }
+			  branch("0") {
+				out(alpha, min(1.0f, mask_map_color.r));
+			  }
+		};
+		lowp float final_alpha = alpha * alpha_intensity;
+		lowp float4 final_color = float4(temp_color.xyz, final_alpha);
+		
+		macro(ADD_DIFFUSE) out(mediump float4 combine_diffuse) {
+			branch("1") {
+				// lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+				out(combine_diffuse, float4(diffuse_map_color2.xyz * add_intensity + final_color.xyz * mask_map_color.g, final_color.a));
+			}
+			branch("0") {
+				out(combine_diffuse, final_color);
+			}
+		};
+		
+		macro(FRESNAL_ENABLE) out(mediump float3 combine_fresnel) {
+			branch("1") {
+				lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+				lowp float noclamp_ndv = dot(view_dir, NormalWorld);
+				lowp float NdotV = clamp(noclamp_ndv, 0.0f, 1.0f);
+				// lowp float onov = max(0.0f, dot(normalWorld, view_dir));
+				lowp float fresnel_factor = pow(abs(1.0f - NdotV), fresnel_radius);
+				lowp float3 fresnel = fresnel_factor * fresnel_intensity * fresnel_color.xyz;
+				out(combine_fresnel, combine_diffuse.xyz + fresnel);
+			}
+			branch("0") {
+				out(combine_fresnel, combine_diffuse.xyz);
+			}
+		};
+		
+		// pixel(float4(combine_fresnel.xyz, (final_alpha * AlphaMtl)) * step(0.2f, combine_diffuse.x + combine_diffuse.y + combine_diffuse.z));
+		pixel(float4(combine_fresnel.xyz, (final_alpha * AlphaMtl)));
+	}
+}

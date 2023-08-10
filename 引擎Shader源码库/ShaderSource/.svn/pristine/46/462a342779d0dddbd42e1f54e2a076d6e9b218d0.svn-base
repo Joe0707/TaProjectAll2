@@ -1,0 +1,59 @@
+["cocos"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_PMatrix;
+  uniform float4x4 CC_MVPMatrix;
+  uniform sampler CC_Texture0
+    <name = "CC_Texture0">;
+  uniform float4 u_textColor;
+
+  varying lowp float4 v_fragmentColor;
+  varying mediump float2 v_texCoord;
+
+  eitheror USE_NO_MV;
+  eitheror USE_SEPARATE_ALPHA;
+
+  vertex main
+  {
+		macro(USE_NO_MV) out(float4 new_pos)
+    {
+      branch("1")
+      {
+        out(new_pos, position * CC_PMatrix);
+      }
+      branch("0")
+      {
+        out(new_pos, position * CC_MVPMatrix);
+      }
+    };
+    vertex(new_pos);
+    out(v_fragmentColor, diffuse);
+    out(v_texCoord, texCoord0);
+  }
+  pixel main
+  {
+    lowp float4 samp = sample(CC_Texture0, v_texCoord);
+    lowp float4 use_color = v_fragmentColor;
+    macro(USE_SEPARATE_ALPHA) out(float4 temp)
+    {
+      branch("1")
+      {
+        out(temp, use_color * float4(u_textColor.rgb,u_textColor.a * samp.r));
+      }
+      branch("0")
+      {
+        out(temp, use_color * float4(u_textColor.rgb,u_textColor.a * samp.a));
+      }
+    };
+    pixel(temp);
+  }
+}

@@ -1,0 +1,1094 @@
+["VBR shader for DM106 Ghost Hero"]
+pipeline
+<
+	version = "1.1.2" 
+	author = "liuyu/xuzhuoliang/konglingjie" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	include(shader\\including\\envir_uniform.spzs)
+	include(shader\\including\\pbr_include_function.spzs)
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["检查AO"]
+	eitheror AO_CHECK;
+	macro(AO_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查diffuse"]
+	eitheror DIFFUSE_CHECK;
+	macro(DIFFUSE_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查金属度"]
+	eitheror METAL_CHECK;
+	macro(METAL_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查粗糙度"]
+	eitheror ROUGHNESS_CHECK;
+	macro(ROUGHNESS_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启透明漆"]
+	eitheror CLEARCOAT_ENABLE;
+	macro(CLEARCOAT_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启细节法线"]
+	eitheror FIBER_ENABLE;
+	macro(FIBER_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启环境反射(ENVIR_ENABLE)"]
+	eitheror ENVIR_ENABLE;
+
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+	
+	["补光"]
+	eitheror DIR_AMBIENT_ENABLE;
+
+	["开启自发光"]
+	eitheror SELF_BLING;
+
+	["接受点光"]
+	eitheror POINT_LIGHT_ENABLE;
+
+	// ["开启羽毛反射"]
+	// eitheror FUR_COLOR_ENABLE;
+
+	["是否开启Oren-nayar因子"]
+	eitheror ORENNAYAR_ENABLE;
+	macro(ORENNAYAR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "1"
+	>;
+	
+	macro(POINT_SHADOW_MAP_ENABLE)
+	<
+		default = "0"
+	>;
+	
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(ENVIR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(DIR_AMBIENT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(SELF_BLING)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(POINT_LIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启网格闪烁消融"]
+	eitheror WEB_SHINING_ENABLE;
+	macro(WEB_SHINING_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["细节法线遮罩贴图"]
+	uniform sampler DetailNormalMask
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;	
+
+	["金属度/sss/光滑度"]
+	uniform sampler SamplerRough
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["碳纤维贴图"]
+	uniform sampler SamplerNormalMap_fiber
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["各向异性贴图（RG方向，B区域）"]
+	uniform sampler SamplerAniso
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["SSS Ramp贴图"]
+	uniform sampler sss_ramp
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressv = "clamp"
+		addressu = "clamp"
+		lodbias = "-1.0"
+		path = "hero\\1001_guhuoniao\\ssslut.png"
+	>;
+
+	["KelemenLUT贴图"]
+	uniform sampler KelemenLUT
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressv = "clamp"
+		addressu = "clamp"
+		lodbias = "-1.0"
+		path = "hero\\1001_guhuoniao\\kelemenlut.png"
+	>;
+
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["非主光源阴影贴图"]
+	uniform highp samplershadow SMAP_REST : SHADOW_REST
+	<
+		artist = "1"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+		addressu = "linear" 
+		addressv = "linear" 
+	>;
+	
+	// —————————————————— PBR调整 ——————————————————
+	["手动金属度"]
+	uniform lowp float manul_metal
+	<
+		uigroup = "1 PBR"
+		uistep = "1"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+	
+	["手动光滑度"]
+	uniform lowp float manul_rough
+	<
+		uigroup = "1 PBR"
+		uistep = "1"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["金属度缩放"]
+	uniform lowp float metal_multi
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+	>;
+	["粗糙度缩放"]
+	uniform lowp float rough_multi
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+	>;
+	
+/*
+	["非金属最低灰阶(min_metal_gray)"]
+	uniform mediump float min_metal_gray
+	<
+		uigroup = "1 PBR"
+		min = "0.0" 
+		max = "10.0" 
+		init = "0.003"
+	>;
+*/
+
+	// —————————————————— 透明漆 ——————————————————
+	["Sparkle Colors Scale"]
+	uniform mediump float SparkleColorsScale
+	<
+		uigroup = "透明漆"
+		artist = "1"
+		init = "64"
+	>;
+
+	["透明漆程度ClearCoat"]
+	uniform mediump float ClearCoat
+	<
+		uigroup = "透明漆"
+		artist = "1"
+		init = "1.0"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+	
+	["透明漆粗糙度ClearCoatRoughness"]
+	uniform mediump float ClearCoatRoughness
+	<
+		uigroup = "透明漆"
+		artist = "1"
+		init = "0.0"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+	>;
+
+	// —————————————————— 细节法线 ——————————————————
+	["细节法线尺寸Fiber Scale"]
+	uniform mediump float FiberScale
+	<
+		uigroup = "细节法线"
+		artist = "1"
+		init = "30"
+	>;
+
+	["细节法线强度Fiber Strength"]
+	uniform mediump float FiberStrength
+	<
+		uigroup = "细节法线"
+		artist = "1"
+		init = "0.0"
+	>;
+
+	["细节法线粗糙度fiber_rough_change"]
+	uniform mediump float fiber_rough_change
+	<
+		uigroup = "细节法线"
+		artist = "1"
+		init = "0.0"
+	>;
+
+	// ——————————————————变色—————————————————————————
+	// ["第一层颜色A"]
+	// uniform lowp float4 changecolor1
+	// <
+	// 	artist = "1"
+	// 	init = "(1.0,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第一层颜色B"]
+	// uniform lowp float4 changecolor2
+	// <
+	// 	artist = "1"
+	// 	init = "(0.5,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第二层颜色A"]
+	// uniform lowp float4 changecolor3
+	// <
+	// 	artist = "1"
+	// 	init = "(1.0,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第二层颜色B"]
+	// uniform lowp float4 changecolor4
+	// <
+	// 	artist = "1"
+	// 	init = "(0.5,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第三层颜色A"]
+	// uniform lowp float4 changecolor5
+	// <
+	// 	artist = "1"
+	// 	init = "(1.0,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第三层颜色B"]
+	// uniform lowp float4 changecolor6
+	// <
+	// 	artist = "1"
+	// 	init = "(0.5,1.0,1.0,1.0)"
+	// 	color = "1"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第一层(A金属度、A粗糙度、B金属度、B粗糙度)"]
+	// uniform lowp float4 change_adj1
+	// <
+	// 	artist = "1"
+	// 	init = "(0,0,0,0)"
+	// 	max = "1.0"
+	// 	min = "-1.0"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第二层(A金属度、A粗糙度、B金属度、B粗糙度)"]
+	// uniform lowp float4 change_adj2
+	// <
+	// 	artist = "1"
+	// 	init = "(0,0,0,0)"
+	// 	max = "1.0"
+	// 	min = "-1.0"
+	// 	uigroup = "变色"
+	// >;
+
+	// ["第三层(A金属度、A粗糙度、B金属度、B粗糙度)"]
+	// uniform lowp float4 change_adj3
+	// <
+	// 	artist = "1"
+	// 	init = "(0,0,0,0)"
+	// 	max = "1.0"
+	// 	min = "-1.0"
+	// 	uigroup = "变色"
+	// >;	
+
+	["曝光度"]
+	uniform mediump float expose_bias
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "1.0"
+		uigroup = "1 环境光"
+	>;
+
+	["天光颜色"]
+	uniform lowp float4 sky_light_color
+	<
+		uigroup = "1 环境光"
+		artist = "0" 
+		color = "1"
+		init = "(0.5569,0.7412,1,1)"
+	>;
+
+	["天光强度"]
+	uniform float sky_light_intensity
+	<
+		uigroup = "1 环境光"
+		artist = "0" 
+		init = "1.0"
+	>;
+	
+	// ——————————————————各向异性——————————————————
+	
+	["抖动偏移值(Anisotropic_offset)"]
+	uniform lowp float noise_offset
+	<
+		uigroup = "各向异性"
+		artist = "1" 
+		uistep = "0.001"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.2"
+	>;
+
+	["整体偏移值(Anisotropic_offset)"]
+	uniform mediump float normal_offset
+	<
+		uigroup = "各向异性"
+		artist = "1" 
+		uistep = "0.001"
+		min = "-5" 
+		max = "5" 
+		init = "-0.2"
+	>;
+
+	
+	// ——————————————————自发光——————————————————
+	
+	["自发光强度"]
+	uniform mediump float emissive_intensity
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		uistep = "0.001"
+		min = "1.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+	// ——————————————————DIFFUSE——————————————————
+
+	["漫反射强度"]
+	uniform mediump float diffuse_intensity
+	<
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		uistep = "0.001"
+		artist = "0"
+		uigroup = "0 漫反射"
+	>;
+
+	["角色高度"]
+	uniform mediump float char_height
+	<
+		artist = "1"
+		init = "20"
+		min = "0"
+		uigroup = "风格化"
+	>;
+
+	["暗部颜色"]
+	uniform lowp float4 dark_color
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		color = "1"
+		init = "(0.15,0.15,0.15,0.15)"
+	>;	
+
+	// ——————————————————自投影——————————————————
+	["阴影bias"]
+	uniform mediump float shadowmap_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["阴影采样bias"]
+	uniform mediump float shadowmap_uv_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	//————————————————补光——————————————————
+
+	["补光强度"]
+	uniform mediump float dir_ambient_intensity
+	<
+		init = "0.9"
+		max = "10.0"
+		min = "0.0"
+		uistep = "1"
+		artist = "1"
+		uigroup = "补光"
+	>;	
+
+	["补光颜色"]
+	uniform lowp float4 dir_ambient
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.2,0.3804,0.7765,1)"
+		uigroup = "补光"
+	>;	
+	
+	["补光位置x"]
+	uniform mediump float l_pos_x
+	<
+		init = "-65"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["补光位置y"]
+	uniform mediump float l_pos_y
+	<
+		init = "14"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["补光位置z"]
+	uniform mediump float l_pos_z
+	<
+		init = "100"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+
+	// ["补光开始"]
+	// uniform lowp float da_start
+	// <
+	// 	init = "0.51"
+	// 	artist = "1"
+	// 	uigroup = "补光"
+	// 	uistep = "0.001"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// >;	
+
+	// ["补光结束"]
+	// uniform lowp float da_end
+	// <
+	// 	init = "0.66"
+	// 	artist = "1"
+	// 	uigroup = "补光"
+	// 	uistep = "0.001"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// >;
+
+	// ————————————————环境光————————————————
+	
+	// ["AO深色区域调整参数"]
+	// uniform lowp float AO_slider
+	// <
+	// 	artist = "1" 
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0.4"
+	// 	init = "1"
+	// 	uigroup = "环境光"
+	// >;
+
+	["自发光bloom强度"]
+	uniform mediump float emissive_bloom
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "0.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["bloom强度"]
+	uniform mediump float illum_multi
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "1"
+		max = "10.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["bloom阈值"]
+	uniform lowp float bloom_threshold
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+	["bloom范围"]
+	uniform lowp float bloom_range
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "0.0"
+		max = "1.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+
+
+	// —————————————————— SSS ——————————————————
+	["SSS强度"]
+	uniform mediump float sss_factor
+	<
+		init = "1.0"
+		artist = "1"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		uigroup = "sss"
+	>;	
+
+	["SSS中阴影强度"]
+	uniform mediump float sss_shadow_factor
+	<
+		init = "0.5"
+		artist = "1"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		uigroup = "sss"
+	>;
+
+	["poisson uniform values"]
+	uniform lowp float4[8] poissonDisk
+	<
+		init = "(0.0, 0.0, -0.94201624, -0.39906216, 0.94558609, -0.76890725, -0.094184101, -0.92938870, 0.34495938, 0.29387760, -0.91588581, 0.45771432, -0.81544232, -0.87912464, -0.38277543, 0.27676845, 0.97484398, 0.75648379, 0.44323325, -0.97511554, 0.53742981, -0.47373420, -0.26496911, -0.41893023, 0.79197514, 0.19090188, -0.24188840, 0.99706507, -0.81409955, 0.91437590, 0.19984126, 0.78641367)"
+	>;
+	
+	uniform lowp float u_tonemapping_factor
+	<
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+		artist = "1"
+	>;
+
+	["ChangeAmount"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	// ------------- Glitch&Chromatic
+	["_GlitchPosMax"]
+	uniform mediump float _GlitchPosMax
+	<
+		init = "1.17"
+		artist = "1"
+		uigroup = "glitch"
+	>;	
+	["_GlitchPosMin"]
+	uniform mediump float _GlitchPosMin
+	<
+		init = "-0.3"
+		artist = "1"
+		uigroup = "glitch"
+	>;
+	["_GlitchRange"]
+	uniform mediump float _GlitchRange
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_GlitchWidth"]
+	uniform mediump float _GlitchWidth
+	<
+		artist = "1"
+		uistep = "0.001"
+		init = "0.31"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_GlitchTime"]
+	uniform mediump float _GlitchTime
+	<
+		artist = "1"
+		// uistep = "0.001"
+		init = "1.5"
+		// max = "3.0"
+		// min = "0.01"
+		uigroup = "glitch"
+	>;
+	["_GlitchIntensity"]
+	uniform mediump float _GlitchIntensity
+	<
+		artist = "1"
+		// uistep = "0.001"
+		init = "3.5"
+		// max = "0.05"
+		// min = "0.01"
+		uigroup = "glitch"
+	>;
+	// ["_WaveOffset"]
+	// uniform mediump float _WaveOffset
+	// <
+	// 	artist = "1"
+	// 	init = "2.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_WaveOnDuration"]
+	uniform mediump float _WaveOnDuration
+	<
+		artist = "1"
+		init = "0.35"
+		uigroup = "glitch"
+	>;
+	["_WaveOffDuration"]
+	uniform mediump float _WaveOffDuration
+	<
+		artist = "1"
+		init = "3.0"
+		uigroup = "glitch"
+	>;
+	["_WaveSmoothIn"]
+	uniform mediump float _WaveSmoothIn
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_WaveSmoothOut"]
+	uniform mediump float _WaveSmoothOut
+	<
+		artist = "1"
+		init = "0.5"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	// ["_WaveNoise"]
+	// uniform mediump float _WaveNoise
+	// <
+	// 	artist = "1"
+	// 	init = "1.0"
+	// 	uistep = "0.001"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_ShakeAmount"]
+	uniform mediump float _ShakeAmount
+	<
+		artist = "1"
+		init = "30.0"
+		uigroup = "glitch"
+	>;
+	["_ShakeRandomDir"]
+	uniform mediump float _ShakeRandomDir
+	<
+		artist = "1"
+		init = "0.5"
+		uigroup = "glitch"
+	>;
+	["_ShakeRandomDir_Freq"]
+	uniform mediump float _ShakeRandomDir_Freq
+	<
+		artist = "1"
+		init = "30.0"
+		uigroup = "glitch"
+	>;
+	// ["_SquareSize"]
+	// uniform mediump float _SquareSize
+	// <
+	// 	artist = "1"
+	// 	init = "1000.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_SquareClipAmount"]
+	uniform mediump float _SquareClipAmount
+	<
+		artist = "1"
+		init = "3.0"
+		// uistep = "0.001"
+		// max = "10.0"
+		// min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_ChromaticIntensity"]
+	uniform mediump float _ChromaticIntensity
+	<
+		artist = "1"
+		init = "10.0"
+		// uistep = "0.001"
+		// max = "1.0"
+		// min = "0.0"
+		uigroup = "glitch"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float4 PosWorld;	
+
+	varying mediump float v_waveFactor;
+	varying mediump float v_glitchFactor;
+
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+	>;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform mediump float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform highp float4x4 lv : LIGHT_VIEW;
+	
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform highp float4x4 lvp2 : LIGHT_VIEW_PROJ2;
+	uniform mediump float4 ZBufferParams: ZBUFFER_PARAMS;
+	
+	uniform highp float3 light_direction:LIGHT_DIRECTION;
+	uniform highp float3 light_direction2:LIGHT_DIRECTION2;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	uniform lowp float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+
+
+	function random in(float2 input) out(highp float random_factor) {
+		highp float randseed = 43758.5453123f;
+		highp float2 randseed2 = float2(12.9898f, 78.233f);
+		highp float factor = fractional(sin(dot(input,randseed2))* randseed);
+		out(random_factor,factor);
+	};
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				//function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				// out(vec, pos1);
+				// out(nor, nor1);
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		
+		highp float4 position = vec;
+		highp float4 normal = nor;
+
+		// 计算顶点位置
+		highp float4 screen_pos = float4(transform(position, wvp));
+		
+		float time = FrameTime + 2.0f;
+		float fracTime = fmod(time, _WaveOnDuration + _WaveOffDuration);
+		float wave = smoothstep(0.0f, _WaveOnDuration * _WaveSmoothIn, fracTime)  * (1.0f - smoothstep(_WaveOnDuration * (1.0f - _WaveSmoothOut), _WaveOnDuration, fracTime));
+
+		float noiseTime = time * (6.2831853f / _WaveOnDuration);
+		float noise = (sin(noiseTime) * (0.5f * cos(noiseTime * 0.6366f + 56.7272f) + 0.5f) + 1.0f) * 0.5f;
+		//float noiseWave = _WaveNoise * noise + (1.0f - _WaveNoise);
+
+		float waveFactor = saturate(wave * noise);
+		out(v_waveFactor,waveFactor);
+
+		float _OptTime = sin(FrameTime * 3.0f * _GlitchTime);
+		float glitchtime = step(0.99f, _OptTime);
+		float ypos = position.y * 0.05f;
+		//float glitchPos = lerp(_GlitchPosMin, _GlitchPosMax,_GlitchRange);
+		float glitchPos = lerp(_GlitchPosMin, _GlitchPosMax,(sin(FrameTime * 10.0f) + 1.0f) * 0.5f);
+		float glitchPosClamped = step(glitchPos,ypos) * step(ypos,glitchPos + _GlitchWidth);
+		float glitchFactor = glitchPosClamped * glitchtime;	
+		out(v_glitchFactor,glitchFactor);
+
+		float shake_wave = sin(FrameTime * 5.0f)  * (fractional(FrameTime * 5.0f) * 2.0f - 1.0f);
+
+		highp float4 glitch_offset = float4(glitchPosClamped * _GlitchIntensity * max(glitchtime,waveFactor) * sin(FrameTime) * sign(shake_wave));
+		highp float4 screen_pos_glitch = screen_pos + float4(1.0f,0.0f,0.0f,0.0f) * glitch_offset;
+
+		float4 shakedir = float4(1.0f, sin(FrameTime * _ShakeRandomDir_Freq) * _ShakeRandomDir, 0.0f,0.0f) * float4(shake_wave);
+		function random(screen_pos_glitch.xy) out(float random_factor);
+		highp float4 screen_pos_shake = screen_pos_glitch + float4(1.0f,1.0f,1.0f,0.0f) * float4(_ShakeAmount * waveFactor * random_factor) * shakedir;
+
+		vertex(screen_pos_shake);
+		
+		highp float4 pos_world = transform(position, world);
+		macro(WEB_SHINING_ENABLE)
+		{
+			branch("1")
+			{
+				out(PosWorld,pos_world);
+			}
+			branch("0")
+			{
+
+			}
+		};
+		
+		float3x3 worldMat = float3x3(world);
+		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		
+		out(UV0, float4(texcoord0.xy, 0.0f, 0.0f));
+	}
+	pixel
+	{
+		lowp float diffuse_map_color_r = sample(Tex0, UV0.xy).r;
+		lowp float diffuse_map_color_g = sample(Tex0, UV0.xy + float2(_ChromaticIntensity * 0.01f) * float2(abs(v_waveFactor) + v_glitchFactor)).g;
+		lowp float diffuse_map_color_b = sample(Tex0, UV0.xy + float2(-_ChromaticIntensity * 0.01f) * float2(abs(v_waveFactor) + v_glitchFactor)).b;
+		lowp float4 diffuse_map_color_1 = float4(diffuse_map_color_r,diffuse_map_color_g,diffuse_map_color_b,1.0f);
+		lowp float4 diffuse_map_color_ = diffuse_map_color_1;
+
+		function random(floor(UV0.xy * 1000.0f)) out(float random_squares);
+		float squaresStep = step(_SquareClipAmount * abs(v_waveFactor), random_squares);
+		alphatest("<")(squaresStep - 0.01f, 0.0f);
+
+		macro(WEB_SHINING_ENABLE) out(mediump float3 fresnel_combine) 
+		{
+			branch ("0") 
+			{
+				out(fresnel_combine,diffuse_map_color_.rgb);
+			}
+			branch ("1") 
+			{
+				["网格闪烁消融效果"]
+				function web_shining
+				(
+					burn_max_height, //角色身高
+					burn_color01,   //闪烁颜色(较暗)
+					burn_color02,	  //闪烁颜色(较亮)
+					burn_style,		 //消融方向控制
+					PosWorld.xyz,	   //当前像素位置
+					(world[3]).xyz,   //角色位置 
+					ChangeAmount,	   //消融量
+					diffuse_map_color_.rgb   //当前颜色 
+				)
+				out(lowp float3 final_shining_color, lowp float alphatest01, lowp float alphatest02);
+
+				alphatest("<")(alphatest01, alphatest02);
+				out(fresnel_combine,final_shining_color.rgb);
+			}
+		};
+		// pixel(float4(diffuse_map_color_));
+		pixel(float4(fresnel_combine,diffuse_map_color_.a));
+	}
+}
+

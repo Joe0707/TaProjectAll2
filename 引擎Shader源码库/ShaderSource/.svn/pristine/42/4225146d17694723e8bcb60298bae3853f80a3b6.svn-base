@@ -1,0 +1,86 @@
+["only1texture"]
+
+/*
+简易反射替换shader 简化镜子里模型的材质
+*/
+pipeline
+<
+	version = "1.0.0" 
+	author = "lqzh" 
+	category = "shader" 
+	company = "netease"
+	technique = "TShaderMirror"
+  	merge = "0"
+>
+{
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+
+	["alpha"]
+	uniform float alpha
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+
+// varying变量
+	varying mediump float4 UV0;
+	vertex vs_mirror
+	{
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		mediump float4 _uv = float4(texcoord0.xy, 1.0f, 0.0f);
+		mediump float4 uvxyz = _uv * texTrans0;
+		// diffuse
+		mediump float4 uv0 = float4(uvxyz.xyz, 0.0f);
+		out(UV0, uv0);
+	}
+
+	pixel ps_mirror
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		// sep alpha
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float oalpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(oalpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(oalpha, diffuse_map_color.a);
+		  }
+		};
+
+		pixel(float4(diffuse_map_color.xyz, alpha*oalpha));
+	}
+}

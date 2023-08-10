@@ -1,0 +1,256 @@
+["场景 PBR Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+	alphablend = "1"
+	srccolor = "dstcolor"
+	dstcolor = "0"
+	srcalpha = "1"
+	dstalpha = "0"
+>
+{
+// 宏
+	["编辑器"]
+	macro(EDITOR)
+	<
+		default = "0"
+	>;
+
+	["雾效"]
+	macro(FOG_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "1"
+	>;
+	["开启倒影"]
+	eitheror MIRROR_ENABLE;
+	macro(MIRROR_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+	uniform sampler TexReflection
+	<
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+	
+	["lightmap亮度"]
+	uniform mediump float lightmap_brightness
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	// ——————————————————自投影——————————————————
+	["fogfade_start"]
+	uniform lowp float fogfade_start
+	<
+		init = "100.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+	["fogfade_end"]
+	uniform lowp float fogfade_end
+	<
+		init = "200.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+	["阴影透明度"]
+	uniform lowp float shadow_alpha
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影颜色"]
+	uniform lowp float4 shadow_color
+	<
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+	["阴影颜色浓度"]
+	uniform lowp float shadow_density
+	<
+		init = "0.1"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影bias"]
+	uniform mediump float shadowmap_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["阴影采样bias"]
+	uniform mediump float shadowmap_uv_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["镜面反射颜色"]
+	uniform mediump float4 MirrorColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	["镜子强度"]
+	uniform float reflect_mirror_percent
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "5.0" 
+		uigroup = "镜面反射"
+	>;
+	["镜子视觉偏移量"]
+	uniform float reflect_mirror_bias
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "0.5" 
+		uigroup = "镜面反射"
+	>;
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_texcoord0 : TEXTURE0;
+	attribute float4 a_texcoord1 : TEXTURE1;
+	   attribute float3 a_normal : NORMAL;
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float4 v_fog_factor_info;
+	varying mediump float4 v_light_proj_pos;
+	varying mediump float4 v_screen_pos;
+	varying mediump float3 v_NormalWorld;
+	varying mediump float4 PosWorld;
+	// varying mediump float3 PosLocal;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float lm_scale : LIGHTMAP_TINT_FACTOR;	
+	uniform mediump float FrameTime: FRAME_TIME;	
+
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+	>;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,0.0)"
+	>;
+	uniform mediump float4 u_fog_info : FOG_INFO; 
+	
+	vertex
+	{
+		highp float4 position = a_position;
+		highp float4 pos_world = transform(position, world);
+		highp float4 final_position = transform(pos_world, viewProj);
+		vertex(final_position);
+	}
+
+	pixel
+	{
+		pixel(float4(float3(1.0f), AlphaMtl));
+	}
+}

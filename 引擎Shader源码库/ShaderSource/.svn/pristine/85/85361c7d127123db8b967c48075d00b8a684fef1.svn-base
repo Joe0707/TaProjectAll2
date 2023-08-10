@@ -1,0 +1,225 @@
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_normal : NORMAL;
+
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform highp float4x4 lv : LIGHT_VIEW;
+
+	varying mediump float fractor;
+	varying mediump float4 v_texture0;
+	varying mediump float4 v_light_proj_pos;
+
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+	>;
+
+	uniform highp float3[4] u_cascade_scale : PRJ_SCALE;
+	uniform highp float3[4] u_cascade_offset : PRJ_OFFSET; 
+	// x: u_min_border_padding y: u_max_border_padding z: u_native_texel_size_x w:u_texel_size
+	uniform float4    u_csm_info : CSM_INFO;
+
+
+function calc_cascade_index1
+	in(int temp_index,
+	float4 sm_texcoord,
+	int in_index,
+	float4 in_texcoord,	
+	float min_padding,
+	float max_padding
+	)out(int cascade_index,
+	float4 shadowmap_texcoord)
+	{
+		float min = min(in_texcoord.x, in_texcoord.y);
+		float max = max(in_texcoord.x, in_texcoord.y);
+
+		condition(min, min_padding)out(float inside)
+		{
+			branch ("%0% > %1%") {
+				out(inside, 1.0f);
+			}
+			default
+			{
+				out(inside, 0.0f);
+			}
+		};
+
+		condition(max, max_padding)out(float inside1)
+		{
+			branch ("%0% < %1%") {
+				out(inside1, inside);
+			}
+			default
+			{
+				out(inside1, 0.0f);
+			}
+		};
+
+		condition(inside1, temp_index) out(int current_cascade_index3, float4 temp_texcoord3)
+		{
+			branch ("%1% >= 0") {
+				out(current_cascade_index3, temp_index);
+				out(temp_texcoord3, sm_texcoord);		
+			}
+			branch ("%0% > 0.0") {
+				out(current_cascade_index3, in_index);
+				out(temp_texcoord3, in_texcoord);		
+			}
+			default
+			{
+				out(current_cascade_index3, -1);
+				out(temp_texcoord3, float4(0.0f, 0.0f, 1.0f, 1.0f));
+			}
+		};
+		
+		out(shadowmap_texcoord, temp_texcoord3);
+		out(cascade_index, current_cascade_index3);
+	};
+
+
+function calc_csm_factor1 in(
+	samplershadow shadow_sampler, 
+	highp float4 light_view_pos,	// 在光源投影空间的坐标
+	highp float3[4] u_cascade_scale,		// 阴影信息
+	highp float3[4] u_cascade_offset,
+	highp float4 u_csm_info,
+	highp float3 shadow_bias_factor
+) out(highp float shadow_factor) // 阴影因子
+{
+	float4 shadowmap_view_space_texcoord = float4(light_view_pos.xyz/light_view_pos.w, 1.0f);
+
+	float4 shadowmap_texcoord0 = shadowmap_view_space_texcoord* float4(u_cascade_scale[0], 1.0f) + float4(u_cascade_offset[0], 0.0f);
+	function calc_cascade_index1(-1, float4(0.0f, 0.0f, 1.0f, 1.0f), 0, shadowmap_texcoord0, u_csm_info.x, u_csm_info.y)
+	out(int cascad_index0, float4 sm_texcoord0);
+
+	float4 shadowmap_texcoord1 = shadowmap_view_space_texcoord* float4(u_cascade_scale[1], 1.0f) + float4(u_cascade_offset[1], 0.0f);
+	function calc_cascade_index1(cascad_index0, sm_texcoord0, 1, shadowmap_texcoord1, u_csm_info.x, u_csm_info.y)
+	out(int cascad_index1, float4 sm_texcoord1);
+
+	float4 shadowmap_texcoord2 = shadowmap_view_space_texcoord* float4(u_cascade_scale[2], 1.0f) + float4(u_cascade_offset[2], 0.0f);
+	function calc_cascade_index1(cascad_index1, sm_texcoord1, 2, shadowmap_texcoord2, u_csm_info.x, u_csm_info.y)
+	out(int cascad_index2, float4 sm_texcoord2);
+
+	float4 shadowmap_texcoord3 = shadowmap_view_space_texcoord* float4(u_cascade_scale[3], 1.0f) + float4(u_cascade_offset[3], 0.0f);
+	function calc_cascade_index1(cascad_index2, sm_texcoord2, 3, shadowmap_texcoord3, u_csm_info.x, u_csm_info.y)
+	out(int cascad_index3, float4 sm_texcoord3);
+
+	float index1 = float(cascad_index3%2);
+	float index2 = float(cascad_index3/2);
+	float shadow_x = sm_texcoord3.x*0.5f+index1*0.5f; 
+	float shadow_y = sm_texcoord3.y*0.5f+(0.5f-index2*0.5f); 
+    float2 shadow_coord = float2(shadow_x, shadow_y);
+
+
+//ios:(0.002, 0.0002)
+	//android(0.004, 0.001)
+	highp float bias = clamp(shadow_bias_factor.x * (1.0f - shadow_bias_factor.z) + shadow_bias_factor.y,  0.0f, 1.0f );
+
+	highp float2 uv = shadow_coord.xy;
+	highp float pos_z_bias = sm_texcoord3.z - bias;
+
+	macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(highp float pos_z)
+	{
+		branch("1")
+		{
+			out(pos_z, pos_z_bias * 0.5f + 0.5f);
+		}
+		branch("0")
+		{
+			out(pos_z, pos_z_bias);
+		}
+	};
+
+	macro(NEOX_HLSL) out (highp float factor){
+		branch("0"){
+		float precent_lit0 = sampleProj(shadow_sampler, 
+				float4(shadow_coord.x,
+						shadow_coord.y, pos_z, 1.0f));
+		float precent_lit1 = sampleProj(shadow_sampler, 
+				float4(shadow_coord.x + u_csm_info.z,
+						shadow_coord.y, pos_z, 1.0f));
+
+		float precent_lit2 = sampleProj(shadow_sampler, 
+				float4(shadow_coord.x,
+						shadow_coord.y + u_csm_info.w, pos_z, 1.0f));
+
+		float precent_lit3 = sampleProj(shadow_sampler, 
+				float4(shadow_coord.x + u_csm_info.z,
+						shadow_coord.y + u_csm_info.w, pos_z, 1.0f));												
+			highp float _factor = (precent_lit0+precent_lit1+precent_lit2+precent_lit3)*0.25f;
+			out(factor, _factor);
+		}
+		branch("1"){
+			lowp float _factor = sample(shadow_sampler, uv).x;
+			lowp float fac_step = step(pos_z, _factor);
+			out(factor, fac_step);
+		}
+	};
+
+	highp float4 inLightVec = sign(float4(uv.x, 1.0f-uv.x, uv.y, 1.0f-uv.y));
+	// 只有inLightVec每一个分量都是1，dot的结果才会为4，inLight的值才会为1
+	highp float inLight = step(3.5f, dot(inLightVec, float4(1.0f, 1.0f, 1.0f, 1.0f)));
+
+	// 投影范围外的shadow_factor是1
+	out(shadow_factor, clamp(factor + (1.0f - inLight), 0.0f, 1.0f));
+};
+
+	vertex
+	{
+		highp float4 screen_pos = float4(transform(a_position, wvp));
+		
+		highp float4 pos_world = transform(a_position, world);
+		highp float4 pos_prj = transform(pos_world, viewProj);
+		vertex(pos_prj);
+
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+
+		//这里实际上是转换到light view space
+		out(v_light_proj_pos, transform(pos_world, lv));
+
+		mediump float4 shadow_light_attr_3 = ShadowLightAttr[3];
+		out(fractor, saturate(dot(-world_normal, normalize(shadow_light_attr_3.xyz))));
+	}
+
+	pixel
+	{
+		highp float3 temp_bias_factor = float3(shadow_bias_factor, fractor);
+		function calc_csm_factor1(
+			SMAP, v_light_proj_pos,	u_cascade_scale, u_cascade_offset,u_csm_info,temp_bias_factor
+		) out(highp float shadow_factor);
+
+		pixel(float4(shadow_factor));
+	}
+}
+
+	

@@ -1,0 +1,150 @@
+["HDR Bloom Sample Illum"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	category = "postprocess"
+	technique = "hdr_bloom"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float4 TexCoord0;
+	varying mediump float4 TexCoord1;
+	varying mediump float4 TexCoord_raw;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	["色阶高光调整"]
+	uniform mediump float highlight
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "2.0"
+	>;
+	["色阶阴影调整"]
+	uniform mediump float shadow
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.6"
+	>;
+	["亮度阀值"]
+	uniform mediump float illum_threhold
+	<
+		artist = "1"
+		min = "0.0"
+		max = "2.0"
+		init = "0.85"
+	>;
+	["bloom 强度"]
+	uniform mediump float bloom_intensity
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "1.2"
+	>;
+
+	["bloom delta"]
+	uniform mediump float bloom_delta
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>;	
+
+	function decode in (mediump float3 color) out (mediump float3 decode_color)
+	{
+		mediump float3 hdr_color = (0.3f * color.xyz) / (float3(1.0f) - color.xyz);
+		out(decode_color, hdr_color);
+	};
+
+	function calc_half_pixel in(mediump float4 rtsize) out (mediump float2 res)
+	{
+	    out(res, float2(0.5f) * rtsize.zw); 
+	};
+
+	function Luminance in (mediump float3 LinearColor) out (mediump float illum)
+	{
+		out(illum, dot(LinearColor, float3(0.3f, 0.59f, 0.11f)));
+	};
+
+	function Unreal_Tonemapping in(mediump float3 color) out(mediump float3 mapping_color)
+	{
+		out(mapping_color,color/(color+ float3(0.187f)) * 1.035f);
+	};
+
+	function Unreal_Tonemapping4 in(mediump float4 color) out(mediump float4 mapping_color)
+	{
+		out(mapping_color,color/(color+ float4(0.187f)) * 1.035f);
+	};
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		function calc_half_pixel(rtSize) out (mediump float2 half_pixel);
+		out(TexCoord0, float4(a_texture0.xy + float2(0.0f, 1.0f) * half_pixel, a_texture0.xy + float2(1.0f, 0.0f) * half_pixel));
+		//out(TexCoord0, float4(a_texture0.xy + float2(1.0f, 1.0f) * half_pixel, a_texture0.xy + float2(1.0f, -1.0f) * half_pixel));
+		out(TexCoord1, float4(a_texture0.xy + float2(0.0f, -1.0f) * half_pixel, a_texture0.xy + float2(-1.0f, 0.0f) * half_pixel));
+		//out(TexCoord1, float4(a_texture0.xy + float2(-1.0f, -1.0f) * half_pixel, a_texture0.xy + float2(-1.0f, 1.0f) * half_pixel));
+		out(TexCoord_raw, float4(a_texture0.xy, 0.0f, 0.0f));
+	}
+	
+	pixel
+	{
+		// function decode(sample(Tex0, TexCoord0).xyz) out (mediump float3 hdr_color);
+		mediump float4 bloom_color = sample(Tex0, TexCoord_raw.xy);
+		mediump float4 color_0 = sample(Tex0, TexCoord0.xy);
+		mediump float4 color_1 = sample(Tex0, TexCoord0.zw);		
+		mediump float4 color_2 = sample(Tex0, TexCoord1.xy);
+		mediump float4 color_3 = sample(Tex0, TexCoord1.zw);
+		//mediump float4 aver_color = 0.25f * (color_0 + color_1 + color_2 + color_3);
+		// mediump float color_bloom_log = log(bloom_delta + bloom_color.a);
+		// mediump float color_0_log = log(bloom_delta + color_0.a);
+		// mediump float color_1_log = log(bloom_delta + color_1.a);
+		// mediump float color_2_log = log(bloom_delta + color_2.a);
+		// mediump float color_3_log = log(bloom_delta + color_3.a);
+
+		
+		//mediump float color_sum = color_bloom_log + color_0_log + color_1_log + color_2_log + color_3_log;
+		mediump float color_sum = (bloom_color.a + color_0.a + color_1.a + color_2.a + color_3.a)/5.0f;
+		//mediump float aver_illum = exp(0.2f * color_sum);
+		//mediump float lumi_scalar = bloom_color.a / aver_illum;
+		//mediump float lumi_bright = max(lumi_scalar - illum_threhold, 0.0f); 
+		//mediump float3 aver_color = bloom_color.rgb * (lumi_bright/(1.0f + lumi_bright));
+		mediump float3 aver_color = bloom_color.rgb * bloom_color.rgb * (color_sum/(1.0f + color_sum));
+		
+		// 方法1(亮度阀值)
+		//function Luminance(aver_color.rgb) out (mediump float illum);
+		// mediump float bloom_luminance = step(illum_threhold, aver_color.w);
+		// pixel(float4(aver_color.xyz * bloom_luminance, 1.0f));
+		// 方法2(色阶)
+		//mediump float _rgb_diff = aver_color.w - shadow;
+		//mediump float rgb_diff = clamp(_rgb_diff, 0.00f, 1.0f);
+		//mediump float3 _final_color = bloom_intensity * rgb_diff * aver_color.rgb / (highlight - shadow);
+		mediump float3 _final_color = bloom_intensity * aver_color.rgb;
+
+		float average = (_final_color.r + _final_color.g + _final_color.b) / 3.0f;
+		float3 final_color = _final_color.rgb + (_final_color.rgb - float3(average)) * 1.0f;
+
+		// function Unreal_Tonemapping(_final_color) out (mediump float3 final_color);
+		//mediump float3 final_color = bloom_intensity * aver_color.rgb * aver_color.w;
+		pixel(float4(final_color, 1.0f));
+	}
+}

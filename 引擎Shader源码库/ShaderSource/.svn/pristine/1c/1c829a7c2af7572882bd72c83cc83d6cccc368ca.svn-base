@@ -1,0 +1,242 @@
+["outfire for fireman"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+>
+{
+// 宏
+
+// 贴图
+
+	["_NoiseTex"]
+	uniform sampler _NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "hero\\hero40_49\\1047_pilihuo\\sf_noise_clouds_01.png"
+	>;	
+	["Aura Color"]
+	uniform mediump float4 _Color2
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,0.87,0.73,1.0"
+	>;
+	["Rim Color"]
+	uniform mediump float4 _ColorR
+	<
+		artist = "1"
+		color = "1"
+		init = "0.87,0.43,0.14,1.0"
+	>;
+	["_Outline"]
+	uniform lowp float _Outline
+	<
+		artist = "1"
+		init = "1.70"
+		uistep = "0.001"
+		min = "0.002"
+		max = "5.0"
+	>;
+	["_OutlineHeight"]
+	uniform lowp float _OutlineHeight
+	<
+		artist = "1"
+		init = "1.70"
+		uistep = "0.001"
+		min = "0.002"
+		max = "5.0"
+	>;
+	["_OutlineZ"]
+	uniform lowp float _OutlineZ
+	<
+		artist = "1"
+		init = "-0.01"
+		uistep = "0.001"
+		min = "-5"
+		max = "5"
+	>;
+	["_ScaleX"]
+	uniform lowp float _ScaleX
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["_ScaleY"]
+	uniform lowp float _ScaleY
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["_SpeedX"]
+	uniform lowp float _SpeedX
+	<
+		artist = "1"
+		init = "-0.2"
+		uistep = "0.001"
+		min = "-10.0"
+		max = "10.0"
+	>;
+	["_SpeedY"]
+	uniform lowp float _SpeedY
+	<
+		artist = "1"
+		init = "9.2"
+		uistep = "0.001"
+		min = "-10.0"
+		max = "10.0"
+	>;
+	["_Opacity"]
+	uniform lowp float _Opacity
+	<
+		artist = "1"
+		init = "3.3"
+		uistep = "0.001"
+		min = "0.01"
+		max = "10.0"
+	>;
+	["Height Fade Position"]
+	uniform lowp float _Height_Fade_Pos
+	<
+		artist = "1"
+		init = "3.0"
+	>;
+	["Height Fade WorldScale"]
+	uniform lowp float _Height_Fade_WorldScale
+	<
+		artist = "1"
+		init = "0.1"
+
+	>;
+	["Height Fade Width"]
+	uniform lowp float _Height_Fade_Width
+	<
+		artist = "1"
+		init = "3.0"
+	>;
+	["_Brightness"]
+	uniform lowp float _Brightness
+	<
+		artist = "1"
+		init = "1.88"
+		uistep = "0.001"
+		min = "0.5"
+		max = "3.0"
+	>;
+	["_Edge"]
+	uniform lowp float _Edge
+	<
+		artist = "1"
+		init = "0.19"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["_RimPower"]
+	uniform lowp float _RimPower
+	<
+		artist = "1"
+		init = "1.91"
+		uistep = "0.001"
+		min = "0.01"
+		max = "10.0"
+	>;
+	
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 projection : PROJECTION;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	// varying变量
+	varying mediump float3 v_viewDir;
+	varying mediump float3 v_normalDir;
+	varying mediump float2 v_projPos;
+	varying mediump float3 v_worldPos;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+
+		highp float4 mdlpos = position;
+		float mdlpos_x = mdlpos.x + normal.x * _Outline * mdlpos.y * a_color.g;
+		float mdlpos_y = mdlpos.y + normal.y * _OutlineHeight * mdlpos.y * a_color.g;
+		float mdlpos_z = mdlpos.z + normal.z * _Outline * mdlpos.y * a_color.g;
+		float4 viewpos = transform(float4(mdlpos_x,mdlpos_y,mdlpos_z,mdlpos.w),wv);
+		float viewpos_z = viewpos.z + _OutlineZ * a_color.b;
+		float4 screenpos = transform(float4(viewpos.x,viewpos.y,viewpos_z,viewpos.w),projection);
+		vertex(screenpos);
+		out(v_projPos,viewpos.xy);
+		
+		float3x3 worldMat = float3x3(world);		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		out(v_normalDir, world_normal);
+		highp float4 pos_world = transform(position, world);
+		out(v_worldPos,pos_world.xyz);
+		float3 viewdir = normalize(camera_pos.xyz - pos_world.xyz);
+		out(v_viewDir, viewdir);
+	}
+
+	pixel
+	{
+		float fade_position = ( _Height_Fade_Pos / _Height_Fade_WorldScale );
+		float fadeFactor = smoothstep( ( fade_position - _Height_Fade_Width ) , ( fade_position + _Height_Fade_Width ) , v_worldPos.y);
+
+		float2 uv = float2(v_projPos.x * _ScaleX * 0.1f - (FrameTime * _SpeedX * 0.1f), v_projPos.y * _ScaleY * 0.1f - (FrameTime * _SpeedY * 0.1f)); 
+		float4 text = float4(sample(_NoiseTex, uv).r);
+		float4 rim = float4(pow(saturate(dot(v_viewDir,v_normalDir)), _RimPower));
+		float4 subtractRim = rim - text; 
+		float texturedRim = saturate(subtractRim.a * _Opacity); 
+		float extraRim = (saturate((_Edge + subtractRim.a) * _Opacity) - texturedRim) * _Brightness;
+		float4 result = (_Color2 * float4(texturedRim)) + (_ColorR * float4(extraRim));
+		float clipvalue = 0.5f + fadeFactor * 2.0f;
+		alphatest("<")(result.a, 0.5f);
+		pixel(result);
+	}
+}

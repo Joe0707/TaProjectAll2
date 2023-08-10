@@ -1,0 +1,313 @@
+["turbulence model"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+>
+{	
+	["开启边缘模糊"]
+	eitheror FRESNEL_ENABLE;
+	macro(FRESNEL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "0"
+		customizable = "0"
+	>;
+
+	// attribute
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点？
+	>;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_normal : NORMAL;
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["漫反射贴图"]
+	uniform sampler diffuse: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+	["偏移贴图1"]
+	uniform sampler turbulence1
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+	>;
+	["偏移贴图2"]
+	uniform sampler turbulence2
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+	>;
+	["vx_vy_scale1"]
+	uniform float3 vx_vy_scale1
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 1.0)"
+	>;
+	["vx_vy_scale2"]
+	uniform float3 vx_vy_scale2
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 1.0)"
+	>;
+
+	["变色"]
+	uniform float4 Alpha
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["振幅1"]
+	uniform float amplitude1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+	>;
+
+	["振幅2"]
+	uniform float amplitude2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+	>;
+
+
+
+	uniform mediump float time: FRAME_TIME;
+	uniform mediump float frame_rate
+	<
+		init = "1.0"
+	>;
+	uniform lowp float4 u_tfactor: TFACTOR;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	varying mediump float3 v_view_dir;
+	varying mediump float3 v_world_normal;
+
+	// varying
+	varying mediump float4 v_texture0;
+	varying mediump float2 v_texture1;
+	varying mediump float2 v_texture2;
+
+	varying lowp float4 v_color;
+	//varying lowp float4 v_diffuse;
+
+	// 顶点世界坐标
+	varying lowp float4 v_pos_world : WORLD_POSITION;
+
+    uniform highp float4 u_clipplane1
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float4 u_clipplane2
+    <
+        init = "(0.0, 0.0, 0.0, 0.0)"
+    >;
+    uniform highp float soft_edge_width
+    <
+    	init = "10.0"
+    >;
+    
+	["边缘虚化范围"]
+	uniform lowp float rim_power
+	<
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+		uigroup = "边缘虚化"
+	>;
+
+
+	["虚化强度削弱"]
+	uniform lowp float rim_multi
+	<
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+		uigroup = "边缘虚化"
+	>;
+
+	["虚化开始"]
+	uniform lowp float rim_start
+	<
+		uistep = "0.001"
+		artist = "1"
+		init = "0.0"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "边缘虚化"
+	>;
+
+	["虚化结束"]
+	uniform lowp float rim_end
+	<
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "边缘虚化"
+	>;	
+
+	// —————————————————— Sphere Gassian ——————————————————
+	function SG in (lowp float x, mediump float k) out (lowp float result)
+	{
+		mediump float a = k * 1.44269504f + 1.089234755f;
+		out (result, exp2(a * x - a));
+	};
+
+	vertex
+	{
+		highp float4 position = a_position;
+
+		["wvp变换"]
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 0.0f) * texTrans0);
+		out(v_texture1, a_texture0.xy * vx_vy_scale1.z + vx_vy_scale1.xy * time * frame_rate);
+		out(v_texture2, a_texture0.xy * vx_vy_scale2.z + vx_vy_scale2.xy * time * frame_rate);
+		out(v_color, a_diffuse);
+
+		macro(FRESNEL_ENABLE){
+			branch ("1") {
+				highp float4 pos_world = transform(a_position, world);
+				lowp float3 vier_dir = normalize(camera_pos.xyz - pos_world.xyz);
+				out(v_view_dir, vier_dir);
+
+				mediump float3 world_normal = normalize(transform(a_normal.xyz, float3x3(world)));
+				out(v_world_normal, world_normal);
+			}
+			branch("0"){
+
+			}
+		};
+
+		// 输出全局顶点位置
+		macro(CLIPPLANE_ENABLE)
+		{
+			branch("1")
+			{
+				highp float4 worldpos = transform(a_position, world);
+				out(v_pos_world, worldpos);
+			}
+			branch("0")
+			{
+			}
+		};
+
+	}
+
+	pixel
+	{	
+		lowp float4 tex1 = sample(turbulence1, v_texture1.xy) - float4(0.5f);
+		lowp float4 tex2 = sample(turbulence2, v_texture2.xy) - float4(0.5f);
+		mediump float2 newUV = v_texture0.xy + tex1.xy * float2(amplitude1) + tex2.xy * float2(amplitude2);
+		lowp float4 texColor0 = sample(diffuse, newUV);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (mediump float4 color_out){
+            branch("1"){
+                out(color_out, float4(texColor0.xyz, sample(sepAlphaTex, newUV.xy).a));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+        mediump float4 result = color_out *  Alpha * 2.0f;
+
+		// —————————————————— 边缘光 ———————————————————
+		macro(FRESNEL_ENABLE) out (lowp float alpha_fresnel){
+			branch("1"){
+				lowp float NdotV = dot(v_world_normal, v_view_dir); 
+				function SG(NdotV, rim_power) out (lowp float rim_out);
+				lowp float rim_out_ = rim_out * rim_multi;
+				out(alpha_fresnel, rim_out_);
+			}
+			branch("0"){
+				out(alpha_fresnel, 1.0f);
+			}
+		};
+
+		// 顶点色控制特效边缘的透明
+		lowp float vertex_alpha = v_color.a;
+		lowp float3 fresnel_color = result.rgb * result.a ;
+        // 裁剪平面
+        macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+        {
+            branch("1")
+            {
+                highp float2 p1_1 = u_clipplane1.xy;
+                highp float2 p2_1 = u_clipplane1.zw;
+                function bcross(p1_1, p2_1, v_pos_world.xz, soft_edge_width) out(highp float t_value1);
+                highp float2 p1_2 = u_clipplane2.xy;
+                highp float2 p2_2 = u_clipplane2.zw;
+                function bcross(p1_2, p2_2, v_pos_world.xz, soft_edge_width) out(highp float t_value2);
+
+				out(clipAlpha, t_value1 * t_value2);
+            }
+            branch("0")
+            {
+                out(clipAlpha, 1.0f);
+            }
+        };
+
+		lowp float fresnel_alpha = result.a  * vertex_alpha * alpha_fresnel * AlphaMtl * clipAlpha;
+		mediump float4 fresnel_result = float4(fresnel_color, fresnel_alpha);
+
+		pixel(float4(fresnel_result));
+	}
+}

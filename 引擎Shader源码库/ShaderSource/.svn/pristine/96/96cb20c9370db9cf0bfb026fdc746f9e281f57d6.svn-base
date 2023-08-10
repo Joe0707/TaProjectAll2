@@ -1,0 +1,38 @@
+["cocos"]
+pipeline
+<
+  author = "ly"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_MVPMatrix;
+
+  varying highp float4 v_pos;
+  varying lowp float4 v_color;
+
+  uniform lowp float4 color_left;
+  uniform lowp float4 color_right;
+  uniform highp float min_x;
+  uniform highp float max_x;
+
+  vertex main
+  {
+    highp float4 pos = position * CC_MVPMatrix; 
+    vertex(pos);
+    out(v_pos, position);
+    out(v_color, diffuse);
+  }
+  pixel main
+  {
+    lowp float4 shadow_color = v_color;
+    lowp float4 poly_color = lerp(color_left, color_right, float4((v_pos.x - min_x) / (max_x - min_x)));
+    lowp float in_shadow = sign(v_color.a);
+    lowp float4 out_color = lerp(poly_color, shadow_color, float4(in_shadow));
+    pixel(out_color);
+  }
+}

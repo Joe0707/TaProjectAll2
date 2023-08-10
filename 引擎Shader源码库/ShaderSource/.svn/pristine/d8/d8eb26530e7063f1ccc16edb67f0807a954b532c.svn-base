@@ -1,0 +1,42 @@
+["最基础的shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{	
+
+	// attribute
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;// uv1
+
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	
+	["漫反射贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+	>;
+
+	vertex
+	{
+		highp float4 position = transform(a_position, wvp);
+		vertex(position);
+	}
+
+	pixel
+	{	
+		alphatest("<")(0.0f, 1.0f);
+        pixel(float4(1.0f, 1.0f, 1.0f, 0.0f * AlphaMtl));
+	}
+}

@@ -1,0 +1,853 @@
+["material for boss"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+	stencilenable = "1"
+	stencilmask = "0"
+	stencilwritemask = "255"
+	stencilref = "0"
+	stencilfunc= "1"
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+>
+{
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启传送出现"]
+	eitheror TELEPORT_ENABLE;
+	macro(TELEPORT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform highp float4x4 inv_world : INV_WORLD;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+	uniform highp float boss_start : BOSS_START;
+
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["遮罩图(R石头 G岩浆 B高度图)"]
+	uniform sampler _MaskTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "1.0"
+	>;
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "1.0"
+	>;
+	["岩浆纹理图R通道"]
+	uniform sampler _EmissTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["调色Ramp"]
+	uniform sampler _RampMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+
+	["肌肉高度"]
+	uniform mediump float _Height
+	<
+		uigroup = "肌肉"
+		uistep = "0.001"
+		init = "-2"
+		max = "0.0"
+		min = "-5.0"
+		artist = "1"
+	>;
+	["边缘光Bias"]
+	uniform mediump float _Rim_Bias
+	<
+		uigroup = "肌肉"
+		uistep = "0.001"
+		init = "0.2"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["边缘光Scale"]
+	uniform mediump float _Rim_Scale
+	<
+		uigroup = "肌肉"
+		uistep = "0.001"
+		init = "0.5"
+		max = "2"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["边缘光Power"]
+	uniform mediump float _Rim_Power
+	<
+		uigroup = "肌肉"
+		uistep = "0.001"
+		init = "1.0"
+		max = "10"
+		min = "0.01"
+		artist = "1"
+	>;
+
+	["岩浆图平铺"]
+	uniform lowp float2 _Emiss_Tilling
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "(10,10)"
+	>;
+	["岩浆图流速"]
+	uniform lowp float2 _Emiss_Speed
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "(0.001,-0.2)"
+	>;
+
+	["岩浆边缘光Bias"]
+	uniform mediump float _Emiss_Rim_Bias
+	<
+		uigroup = "岩浆"
+		uistep = "0.001"
+		init = "0.5"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["岩浆边缘光Scale"]
+	uniform mediump float _Emiss_Rim_Scale
+	<
+		uigroup = "岩浆"
+		uistep = "0.001"
+		init = "-0.35"
+		max = "2.0"
+		min = "-2.0"
+		artist = "1"
+	>;
+
+	["岩浆边缘光Power"]
+	uniform mediump float _Emiss_Rim_Power
+	<
+		uigroup = "岩浆"
+		uistep = "0.001"
+		init = "0.50"
+		max = "10.0"
+		min = "0.01"
+		artist = "1"
+	>;
+	["岩浆呼吸频率"]
+	uniform lowp float _Emiss_Breath_Freq
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "2.0"
+	>;
+	["岩浆呼吸幅度"]
+	uniform lowp float _Emiss_Breath_Amp
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "0.5"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["岩浆区域融化度"]
+	uniform lowp float _Emiss_Noise
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "0.3"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+	>;
+
+	["岩浆区域总亮度"]
+	uniform lowp float _Emiss_Intensity
+	<
+		uigroup = "岩浆"
+		artist = "1"
+		init = "1.0"
+	>;
+
+	["调色Ramp偏移"]
+	uniform lowp float _RampOffset
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "-1.0"
+	>;
+	["显示石头Mask"]
+	uniform lowp float _ShowStoneMask
+	<
+		uigroup = "debug"
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["显示岩浆Mask"]
+	uniform lowp float _ShowLavaMask
+	<
+		uigroup = "debug"
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["显示高度图"]
+	uniform lowp float _ShowHeightMap
+	<
+		uigroup = "debug"
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["是否开启肌肉效果"]
+	uniform lowp float _Rim_Enabled
+	<
+		uigroup = "debug"
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["是否开启岩浆效果"]
+	uniform lowp float _Lava_Enabled
+	<
+		uigroup = "debug"
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+
+	// ------------- Glitch&Chromatic
+	["_GlitchPosMax"]
+	uniform mediump float _GlitchPosMax
+	<
+		init = "1.17"
+		artist = "1"
+		uigroup = "glitch"
+	>;	
+	["_GlitchPosMin"]
+	uniform mediump float _GlitchPosMin
+	<
+		init = "-0.3"
+		artist = "1"
+		uigroup = "glitch"
+	>;
+	["_GlitchRange"]
+	uniform mediump float _GlitchRange
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_GlitchWidth"]
+	uniform mediump float _GlitchWidth
+	<
+		artist = "1"
+		uistep = "0.001"
+		init = "0.31"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_GlitchTime"]
+	uniform mediump float _GlitchTime
+	<
+		artist = "1"
+		// uistep = "0.001"
+		init = "1.5"
+		// max = "3.0"
+		// min = "0.01"
+		uigroup = "glitch"
+	>;
+	["_GlitchIntensity"]
+	uniform mediump float _GlitchIntensity
+	<
+		artist = "1"
+		// uistep = "0.001"
+		init = "3.5"
+		// max = "0.05"
+		// min = "0.01"
+		uigroup = "glitch"
+	>;
+	// ["_WaveOffset"]
+	// uniform mediump float _WaveOffset
+	// <
+	// 	artist = "1"
+	// 	init = "2.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_WaveOnDuration"]
+	uniform mediump float _WaveOnDuration
+	<
+		artist = "1"
+		init = "0.35"
+		uigroup = "glitch"
+	>;
+	["_WaveOffDuration"]
+	uniform mediump float _WaveOffDuration
+	<
+		artist = "1"
+		init = "3.0"
+		uigroup = "glitch"
+	>;
+	["_WaveSmoothIn"]
+	uniform mediump float _WaveSmoothIn
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_WaveSmoothOut"]
+	uniform mediump float _WaveSmoothOut
+	<
+		artist = "1"
+		init = "0.5"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "glitch"
+	>;
+	// ["_WaveNoise"]
+	// uniform mediump float _WaveNoise
+	// <
+	// 	artist = "1"
+	// 	init = "1.0"
+	// 	uistep = "0.001"
+	// 	max = "1.0"
+	// 	min = "0.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_ShakeAmount"]
+	uniform mediump float _ShakeAmount
+	<
+		artist = "1"
+		init = "30.0"
+		uigroup = "glitch"
+	>;
+	["_ShakeRandomDir"]
+	uniform mediump float _ShakeRandomDir
+	<
+		artist = "1"
+		init = "0.5"
+		uigroup = "glitch"
+	>;
+	["_ShakeRandomDir_Freq"]
+	uniform mediump float _ShakeRandomDir_Freq
+	<
+		artist = "1"
+		init = "30.0"
+		uigroup = "glitch"
+	>;
+	// ["_SquareSize"]
+	// uniform mediump float _SquareSize
+	// <
+	// 	artist = "1"
+	// 	init = "1000.0"
+	// 	uigroup = "glitch"
+	// >;
+	["_SquareClipAmount"]
+	uniform mediump float _SquareClipAmount
+	<
+		artist = "1"
+		init = "3.0"
+		// uistep = "0.001"
+		// max = "10.0"
+		// min = "0.0"
+		uigroup = "glitch"
+	>;
+	["_ChromaticIntensity"]
+	uniform mediump float _ChromaticIntensity
+	<
+		artist = "1"
+		init = "10.0"
+		// uistep = "0.001"
+		// max = "1.0"
+		// min = "0.0"
+		uigroup = "glitch"
+	>;
+
+	["World Scale"]
+	uniform float WorldScale
+	<
+		uigroup = "dissolve"
+		artist = "1"
+		init = "0.2"
+	>;
+	["CellTilling"]
+	uniform float CellTilling
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "0.3"
+	>;
+	["Sphere Center"]
+	uniform float4 SphereCenter
+	<
+		uigroup = "dissolve"
+		init = "0.06, 0.7, 0.36,0.0"
+		artist = "1"
+	>;
+	["Radius"]
+	uniform float Radius
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "20.0"
+	>;
+	["RadiusAtten"]
+	uniform float RadiusAtten
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "1.0"
+		uistep = "0.001"  
+		max = "10"
+		min = "-10"
+	>;
+	["PatternSpread"]
+	uniform float PatternSpread
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "-5.0"
+		uistep = "0.001"  
+		max = "5"
+		min = "-5"
+	>;
+	["EdgeDistance"]
+	uniform float EdgeDistance
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "-0.5"
+		uistep = "0.01"
+		max = "2.0"
+		min = "-2.0"
+	>;
+	["EdgeWidth"]
+	uniform float EdgeWidth
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "1.0"
+	>;
+	["EdgeSpread"]
+	uniform float EdgeSpread
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "2"
+		uistep = "0.001"  
+		max = "5"
+		min = "-5"
+	>;
+	["EdgeSmoothness"]
+	uniform float EdgeSmoothness
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "3.0"
+	>;
+	["GridWidth"]
+	uniform float GridWidth
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "0.90"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["EdgeIntensity"]
+	uniform float EdgeIntensity
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "2.0"
+	>;
+	["亮边颜色"]
+	uniform mediump float4 EdgeColor
+	<
+		uigroup = "gem_dissolve"
+		init = "(1.0, 1.0, 1.0,1.0)"
+		artist = "1"
+		color = "1"
+	>;
+	["VertexOffset"]
+	uniform mediump float VertexOffset
+	<
+		uigroup = "dissolve"
+		init = "10.0"
+		artist = "1"
+	>;
+	["VertexDistance"]
+	uniform float VertexDistance
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "1.0"
+		uistep = "0.01"
+		max = "5.0"
+		min = "-5.0"
+	>;
+	["VertexWidth"]
+	uniform float VertexWidth
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "2.0"
+	>;
+	["VertexSpread"]
+	uniform float VertexSpread
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "2.0"
+		uistep = "0.001"  
+		max = "5"
+		min = "-5"
+	>;
+	["VertexSmoothness"]
+	uniform float VertexSmoothness
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "1.0"
+	>;
+	["ChangeAmount"]
+	uniform float ChangeAmount
+	<
+		artist = "1"
+		uigroup = "dissolve"
+		init = "0.0"
+		uistep = "0.01"
+		max = "2.0"
+		min = "-1.0"
+	>;
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+
+	varying mediump float4 PosWorld;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+	varying mediump float3 v_viewDir_tSpace;
+	varying mediump float v_waveFactor;
+	varying highp float3 v_localPos;
+	varying mediump float v_test;
+
+	function ParallaxOffset in(float h, float height, float3 viewDir) out(float2 parallaxoffset)
+	{
+	    float h_bias = h * height - height / 2.0f;
+	    float3 v = normalize(viewDir);
+	    float v_z = v.z + 0.42f;
+	    float2 offset = h_bias * (v.xy / float2(v_z));
+	    //float2 offset = h_bias * v.xy
+	    out(parallaxoffset,float2(offset.x,-offset.y));
+	};
+	function random in(float2 input) out(highp float random_factor) {
+		highp float randseed = 43758.5453123f;
+		highp float2 randseed2 = float2(12.9898f, 78.233f);
+		highp float factor = fractional(sin(dot(input,randseed2))* randseed);
+		out(random_factor,factor);
+	};
+
+	function random2 in(float2 input) out(highp float2 random_factor){
+		highp float randseed = 43758.5453f;
+    	highp float2 factor =  fractional(sin(float2(dot(input,float2(127.1f,311.7f)),dot(input,float2(269.5f,183.3f))))*randseed);
+		out(random_factor,factor);
+	};
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		highp float4 pos_world = transform(position, world);
+
+		macro(LEVEL_HIGH) out(highp float3 mdlpos)
+		{
+			branch("1")
+			{
+				macro(TELEPORT_ENABLE) out(highp float3 mdlpos0)
+				{
+					branch("1")
+					{	
+						highp float change_amount = ((-0.5f + (ChangeAmount - 0.0f) * (1.0f - -0.5f) / (1.0f - 0.0f)));
+						function random(floor(texcoord0.xy * 1000.0f)) out(float noise);
+						highp float sphere_distance = dot(float3(0.0f,1.0f,-0.3f),position.xyz) * WorldScale;
+						mediump float sphere_mask = 1.0f - ((sphere_distance - Radius * change_amount) / (RadiusAtten));
+						mediump float edge_factor = smoothstep(1.0f,0.0f,abs(sphere_mask - VertexDistance) / VertexWidth);
+						mediump float edge_mask = saturate(pow(edge_factor , VertexSmoothness));
+						highp float3 mdlpos_ = position.xyz + edge_mask * VertexOffset * noise * normal.xyz;
+						out(mdlpos0,mdlpos_);
+						out(v_localPos,position.xyz);
+					}
+					branch("0")
+					{
+						out(mdlpos0,position.xyz);
+					}
+				};
+				out(mdlpos,mdlpos0);
+			}
+			branch("0")
+			{
+				out(mdlpos,position.xyz);
+			}
+		};
+
+		highp float4 screen_pos = float4(transform(float4(mdlpos,1.0f),wvp));
+
+		out(UV0, texcoord0.xy);
+		out(UV1,texcoord1.xy);
+
+		highp float4 pos = screen_pos;
+		vertex(pos);
+
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		out(v_NormalWorld, world_normal);
+
+		mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+
+		highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+		mediump float3 binormal_world = cross(tangentWorld, world_normal) * tan_coef;
+
+		out(v_TangentWorld, normalize(tangentWorld));
+		out(v_BinormalWorld, normalize(binormal_world));
+	}
+
+	pixel
+	{
+		macro(LEVEL_HIGH) out(float edge_value)
+		{
+			branch("1")
+			{
+				macro(TELEPORT_ENABLE) out(float edge_value0)
+				{
+					branch("1")
+					{
+						//方格子生成
+						mediump float2 st = float2(v_localPos.x,v_localPos.y) * CellTilling;
+						mediump float2 i_st = floor(st);
+					    mediump float2 f_st = fractional(st);
+						function random2(i_st) out(float2 cellnoise);
+
+					    mediump float cell_fixed = dot(cellnoise,float2(0.0f,1.0f));
+					    mediump float grid_gray = step(GridWidth, f_st.x) + step(GridWidth, f_st.y);
+
+
+					    mediump float2 st2 = float2(v_localPos.x,v_localPos.z) * CellTilling;
+						mediump float2 i_st2 = floor(st2);
+					    mediump float2 f_st2 = fractional(st2);
+						function random2(i_st2) out(float2 cellnoise2);
+
+					    mediump float cell_fixed2 = dot(cellnoise2,float2(0.0f,1.0f));
+					    mediump float grid_gray2 = step(GridWidth, f_st2.x) + step(GridWidth, f_st2.y);
+
+					    mediump float3 normalabs = abs(normalize(v_NormalWorld));
+					    mediump float3 twoplane = normalabs / (normalabs.x + normalabs.z + 0.001f);
+					    mediump float blend1 = twoplane.x;
+					    mediump float belnd2 = twoplane.z;
+					    mediump float cell_fixed_final = cell_fixed * blend1 + cell_fixed2 * belnd2;
+					    mediump float grid_gray_final = grid_gray * blend1 + grid_gray2 * belnd2;
+
+
+					    highp float change_amount = ((-0.5f + (ChangeAmount - 0.0f) * (1.0f - -0.5f) / (1.0f - 0.0f)));
+						//highp float sphere_distance = length((SphereCenter.xyz - v_localPos.xyz) * WorldScale);
+						highp float sphere_distance = dot(float3(0.0f,1.0f,-0.3f),v_localPos) * WorldScale;
+						mediump float sphere_mask = 1.0f - ((sphere_distance - Radius * change_amount) / (RadiusAtten + saturate(ChangeAmount) * 2.0f) ) - cell_fixed_final * PatternSpread;
+						mediump float edge_factor = smoothstep(1.0f,0.0f,abs(sphere_mask - EdgeDistance) / EdgeWidth - (cell_fixed_final + grid_gray_final) * EdgeSpread);
+						mediump float edge_mask = saturate(pow(edge_factor ,EdgeSmoothness)) * EdgeIntensity;
+
+						out(edge_value0, edge_mask);
+						alphatest("<")(sphere_mask - 0.01f, 0.0f);
+					}
+					branch("0")
+					{
+						out(edge_value0,0.0f);
+					}
+				};
+				out(edge_value,edge_value0);
+			}
+			branch("0")
+			{
+				out(edge_value,0.0f);
+			}
+		};
+
+		//
+		lowp float3 mask_tex_value = sample(_MaskTex,UV0.xy).xyz;
+		lowp float stone_mask = mask_tex_value.r;
+		lowp float lava_mask = mask_tex_value.g;
+		lowp float heightmap = mask_tex_value.b;
+
+		//流光计算
+		mediump float2 emiss_uv = UV1.xy * _Emiss_Tilling + frame_time * _Emiss_Speed;
+		lowp float emisstex_value = sample(_EmissTex,emiss_uv).r;
+		lowp float emiss_value = emisstex_value * lava_mask * _Lava_Enabled;
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float3 vertex_normal_world = normalize(v_NormalWorld);
+
+		mediump float3 tangenworld = v_TangentWorld;
+		mediump float3 binormalworld = v_BinormalWorld;
+		//视差偏移
+		macro(LEVEL_MIDDLE) out(float2 parallax_offset)
+		{
+			branch("1")
+			{
+				mediump float3x3 tangentTransform = transpose(float3x3(v_TangentWorld,v_BinormalWorld,v_NormalWorld));
+				mediump float3 view_dir_tangent = normalize(transform(view_dir,tangentTransform));
+				lowp float height_value = (heightmap + emiss_value) * lava_mask; 
+				function ParallaxOffset(height_value,_Height * 0.01f * _Rim_Enabled,view_dir_tangent) out(float2 parallax_offset0);
+				out(parallax_offset,parallax_offset0);
+			}
+			branch("0")
+			{
+				out(parallax_offset,float2(0.0f));
+			}
+		};
+
+		//法线图
+		macro(LEVEL_MIDDLE) out(lowp float3 normalWorld)
+		{
+			branch("1")
+			{
+				macro(XNORMAL_MAP_ENABLE) out(lowp float3 normalWorld0) {
+					branch("1") {
+						mediump float2 normalmap_uv = UV0.xy + parallax_offset + float2(emiss_value * _Emiss_Noise * 0.05f);
+						lowp float4 norm = sample(SamplerNormalMap, normalmap_uv);			
+						lowp float2 normOff = norm.xy * 2.0f - float2(1.0f);
+						lowp float norm_z = 1.0f - dot(normOff,normOff);
+						lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + norm_z * vertex_normal_world);
+						out(normalWorld0, normalWorld_inner);
+					}	
+					branch("0") {
+						out(normalWorld0, vertex_normal_world);
+					}
+				};
+				out(normalWorld,normalWorld0);
+			}
+			branch("0")
+			{
+				out(normalWorld, vertex_normal_world);
+			}
+		};
+
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy + parallax_offset);
+
+		mediump float NdotV = dot(normalWorld,view_dir);
+		mediump float rim_factor = _Rim_Bias + _Rim_Scale * pow(1.0f - NdotV,_Rim_Power);
+		mediump float emiss_rim_factor = _Emiss_Rim_Bias + _Emiss_Rim_Scale * pow(1.0f - NdotV,_Emiss_Rim_Power);
+		mediump float final_emiss_factor = emiss_rim_factor * emiss_value * _Emiss_Intensity;
+		mediump float combined_factor = rim_factor + final_emiss_factor;
+		mediump float2 ramp_uv = float2(combined_factor + _RampOffset,0.5f);
+		lowp float3 lava_color = sample(_RampMap,ramp_uv).rgb;
+
+		lowp float3 combined_color = lerp(diffuse_map_color.rgb + lava_color * _Rim_Enabled,diffuse_map_color.rgb,float3(stone_mask));
+
+		// float3 stonemask_debug = lerp(combined_color,float3(stone_mask),float3(_ShowStoneMask));
+		// float3 lavamask_debug = lerp(stonemask_debug,float3(lava_mask),float3(_ShowLavaMask));
+		// float3 heightmap_debug = lerp(lavamask_debug,float3(heightmap),float3(_ShowHeightMap));
+		// float3 res_color = float3(heightmap_debug);
+		lowp float3 res_color = float3(combined_color);
+
+		pixel(float4(res_color + edge_value * EdgeColor.rgb, AlphaMtl));
+	}
+}

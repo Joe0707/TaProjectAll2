@@ -1,0 +1,68 @@
+["fow minimap"]
+pipeline
+<
+    author = "liuyu"
+    version = "1.0.0"
+    techinque = "TShader"
+>
+{
+    attribute float4 position: POSITION;
+    attribute float4 texcoord0: TEXTURE0;
+    uniform highp float4x4 CC_PMatrix: WORLD_VIEW_PROJECTION;
+
+    uniform sampler CC_Texture0
+    <
+        name = "CC_Texture0"
+    >;
+
+    uniform sampler CC_Texture1
+    <
+        name = "CC_Texture1"
+    >;
+
+    eitheror USE_SEPARATE_ALPHA;
+
+    uniform highp float4 fowparam;
+    varying highp float2 v_texture0:TEXTURE0;
+
+    function rotate in (lowp float2 uv, mediump float rot) out (lowp float2 new_uv){
+        lowp float2 _uv = uv - float2(0.5f, 0.5f);
+        lowp float2 _uv1 = float2(_uv.x * cos(rot) - _uv.y * sin(rot), _uv.y * cos(rot) + _uv.x * sin(rot));
+        out(new_uv, _uv1 + float2(0.5f, 0.5f));
+    };
+
+    vertex main
+    {
+        // 旋转策略
+        // 1 双阵营的（旋转180,延斜线镜像)
+        vertex(transform(position, CC_PMatrix));
+        // 根据阵营旋转
+        function rotate(texcoord0.xy, fowparam.y) out (float2 rot_texcoord0);
+        // 转置
+        lowp float2 _rot_texcoord0 = rot_texcoord0.xy - float2(0.5f);
+        lowp float2 _side_uv = float2(_rot_texcoord0.x * fowparam.z + _rot_texcoord0.y * fowparam.w, _rot_texcoord0.x * fowparam.w - fowparam.x * _rot_texcoord0.y * fowparam.z);
+        lowp float2 side_uv = _side_uv + float2(0.5f);
+        out(v_texture0, side_uv.xy);
+    }
+
+    pixel main
+    {
+        // 由于视野阻挡会比物件小，所以这里要做特殊处理
+        // 通过c0的颜色值判断是否为物件
+        lowp float4 c0 = sample(CC_Texture0, v_texture0);
+
+        macro(USE_SEPARATE_ALPHA) out(lowp float _alpha)
+        {
+            branch("1")
+            {
+                lowp float sep_alpha= sample(CC_Texture1, v_texture0.xy).r;
+                out(_alpha, sep_alpha);
+            }
+            branch("0") {
+                out(_alpha, c0.w);
+            }
+        };
+        lowp float4 res = float4(c0.xyz, _alpha); 
+        pixel(res);
+    }
+}

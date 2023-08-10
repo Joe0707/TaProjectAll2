@@ -1,0 +1,106 @@
+["texture glint"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	// 贴图
+		["刀光贴图"]
+		uniform sampler Tex0 : DIFFUSE
+		<
+			artist = "1"
+			mag = "LINEAR"
+			mip = "LINEAR"
+			min = "LINEAR"
+		>;
+
+		["背景贴图"]
+		uniform sampler BackgroundTex
+		<
+			artist = "1"
+			mag = "LINEAR"
+			mip = "LINEAR"
+			min = "LINEAR"
+		>;
+		["分开的alpha贴图"]
+		uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+		<
+		>;
+	// 参数
+		["背景平铺数"]
+		uniform lowp float bg_uv_tilling
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0"
+			max = "5"
+			init = "1"
+		>;
+
+		["亮度"]
+		uniform lowp float brightness
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0"
+			max = "5"
+			init = "1"
+		>;
+
+		["调整色"]
+		uniform lowp float4 change_color
+		<
+			artist = "1"
+			color = "1"
+			init = "1"
+		>;
+		uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+		uniform float AlphaMtl : ALPHA_MTL
+		<
+			init = "1.0"
+		>;
+
+	// attribute
+		attribute float4 texcoord0 : TEXTURE0;
+		attribute float4 a_position : POSITION;
+		attribute float4 a_color : DIFFUSE;
+
+	// varying
+		varying mediump float2 UV0;
+		varying mediump float2 UV1;
+		varying float4 vertex_color;
+
+	vertex {
+		highp float4 position = a_position;	
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		out(UV0, texcoord0.xy);
+		// 计算映射图片uv
+		out(UV1, (pos.xy/pos.w) * bg_uv_tilling * float2(0.5f,-0.5f) + float2(0.5f));
+
+		out(vertex_color, a_color);
+	}
+	pixel {
+		lowp float4 _color_map = sample(Tex0,UV0);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 color_map)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(color_map, float4(_color_map.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(color_map, _color_map);
+			}
+		};
+
+		lowp float4 bg_color1 = sample(BackgroundTex,UV1);
+		// lowp float3 final_color = color_map.rgb + bg_color1.rgb - color_map.rgb * bg_color1.rgb;
+		lowp float3 final_color = lerp(change_color.rgb,bg_color1.rgb,float3(color_map.r));
+		pixel(float4(final_color * brightness,color_map.a * AlphaMtl * vertex_color.a));
+	}
+}

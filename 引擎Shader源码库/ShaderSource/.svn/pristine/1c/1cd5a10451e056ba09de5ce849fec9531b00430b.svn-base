@@ -1,0 +1,1126 @@
+["最基础的shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+    ["雾效"]
+    eitheror FOG_EFFECT;
+    macro(FOG_EFFECT)
+    <
+		customizable = "0"
+		default = "0"
+    >;
+
+    ["是否接受迷雾"]
+    eitheror FOW_ENABLE;
+    macro(FOW_ENABLE)
+    <
+		customizable = "1"
+		default = "0"
+    >;
+
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["是否双阵营"]
+	eitheror TWOGROUP_ENABLE;
+	macro(TWOGROUP_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["开启区域变色"]
+	eitheror CHANGE_COLOR_ENABLE;
+	macro(CHANGE_COLOR_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+
+	["反向变色区域"]
+	eitheror INVERT_CHANGE_POS;
+	macro(INVERT_CHANGE_POS)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["绿色区域变色"]
+	eitheror CHANGE_GREEN;
+	macro(CHANGE_GREEN)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["红色区域变色"]
+	eitheror CHANGE_RED;
+	macro(CHANGE_RED)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["蓝色区域变色"]
+	eitheror CHANGE_BLUE;
+	macro(CHANGE_BLUE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启待机特效"]
+    eitheror USE_IDLE_VFX;
+    macro(USE_IDLE_VFX)
+    <
+		customizable = "1"
+		default = "0"
+    >;
+
+    ["开启护盾特效"]
+    eitheror USE_SHIELD_VFX;
+    macro(USE_SHIELD_VFX)
+    <
+		customizable = "1"
+		default = "0"
+    >;
+
+    ["开启LUT"]
+	eitheror LUT_ENABLE;
+	macro(LUT_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	
+	// attribute
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;// uv1
+	attribute float4 a_texture1 : TEXTURE1;// uv2
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+    attribute float4 a_tangent : TANGENT;
+   	attribute float4 a_normal : NORMAL;
+
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4 cam_pos : CAMERA_POSITION;
+	uniform highp float4 u_camera_info: CAMERA_INFO;
+
+	uniform highp float4 change_area_p12
+	<
+		init = "(0.0, 0.0, 0.0, 0.0)"
+	>;
+
+	uniform highp float4 change_area_p34
+	<
+		init = "(0.0, 0.0, 0.0, 0.0)"
+	>;
+	
+	uniform lowp float change_alpha
+	<
+		init = "0.2"
+	>;	
+
+	["影子颜色"]
+	uniform mediump float4 u_shadow_color
+	<
+		artist = "1"
+		color = "1"
+		init = "(0.55, 0.98, 1.0)"
+	>;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR; // shader中用于调节lightmap的亮部
+	uniform highp float4 u_fog_info : FOG_INFO; 
+
+	uniform lowp float4 ambient_color : AMBIENT;
+	// uniform lowp float4 ambient_color
+	// <
+	// 	init = "(0.345, 0.518, 0.678,1.0)"
+	// >;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	// ——————————————————★★★ 顶点动画 ★★★—————————————————— 
+	uniform highp float frame_time : FRAME_TIME;
+
+	uniform lowp float4 wind_info : WIND_INFO;
+	
+	["漫反射贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+	>;
+
+	// ["lightmap贴图"]
+	// uniform sampler TexLightmap : LIGHTMAP
+	// <
+	// 	artist = "1"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	lodbias = "-0.5"
+	// >;
+
+	["雾气纹理"]
+	uniform sampler FogDetailTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		path = "shader\\core\\texture\\fog\\fog_detail.png"
+	>;
+
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	["迷雾纹理"]
+	uniform sampler view_texture: FOW
+	<
+		artist = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+
+	["LUT映射图"]
+	uniform sampler lutTex
+	<
+		artist = "0"
+		mag = "nearest"
+		min = "nearest"
+		mip = "nearest"
+		path = "common\\textures\\lutmap_nopack.png"
+		addressv = "clamp"
+		addressu = "clamp"
+	>;
+
+	["流光纹理"]
+	uniform sampler EmissTex
+	<
+		artist = "1"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		path = "monster\\5v5\\emiss.png"	
+	>;
+
+	["发光颜色纹理"]
+	uniform sampler EmissColorMap
+	<
+		artist = "1"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		path = "monster\\5v5\\tower_emiss_colormap.png"	
+	>;
+
+	["护盾纹理"]
+	uniform sampler MaskTex
+	<
+		artist = "1"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		path = "monster\\5v5\\hexagon.png"
+	>;
+
+	uniform mediump float2 scene_size
+    <
+    	init = "(1280.0, 1280.0)"
+    >;
+
+	["迷雾颜色"]
+	uniform mediump float4 fow_color
+	<
+		init = "(0.0, 0.168, 0.298, 0.619)" // 0.5176
+		artist = "1"
+		color = "1"
+	>;	
+
+	["迷雾渐变颜色"]
+	uniform mediump float4 gradient_color
+	<		
+		// init = "(0.345, 0.518, 0.678,1.0)"
+		// init = "(0.445, 0.678, 0.838,1.0)"
+		init = "(0.395, 0.598, 0.748,1.0)"
+		artist = "0"
+		color = "1"
+	>;	
+
+	["雾气纹理平铺"]
+	uniform mediump float2 fog_detail_tilling
+	<
+		artist = "1"
+		init = "(0.006,0.006)"
+	>;
+
+	["雾气纹理平移"]
+	uniform mediump float2 fog_detail_speed
+	<
+		artist = "1"
+		init = "(0.2,0.0)"
+	>;
+
+    ["场景亮度"]
+    uniform lowp float scene_illum : SCENE_ILLUM
+    <
+		init = "1.0"
+		artist = "0"    
+    >; 
+    
+    uniform float max_dist_factor
+    <
+		init = "20.0"
+    >;
+
+    uniform mediump float act_factor
+    <
+		init = "0.0015"
+    >;
+
+    uniform float wind_factor
+    <
+		init = "0.00005"
+    >;
+
+    ["LUT图方格边长/列数"]
+	uniform float2 lutFactor
+	<		
+		// init = "(0.345, 0.518, 0.678,1.0)"
+		// init = "(0.445, 0.678, 0.838,1.0)"
+		init = "(8.0, 8.0)"
+		artist = "1"
+		uigroup = "LUT设置"
+	>;
+
+		
+    ["变色中心x"]
+    uniform lowp float sig_x
+    <
+		init = "0.0"
+		artist = "1"
+    >;
+    ["变色中心z"]
+    uniform lowp float sig_z
+    <
+		init = "0.0"
+		artist = "1"
+    >;
+
+ 	["R染色强度"]
+    uniform lowp float adjust_multi1
+    <
+		init = "0.3"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+ 	["G染色强度"]
+    uniform lowp float adjust_multi2
+    <
+		init = "3"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+ 	["B染色强度"]
+    uniform lowp float adjust_multi3
+    <
+		init = "0.64"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+    ["R染色偏移"]
+    uniform lowp float adjust_area1 
+    <
+		init = "0.0"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+
+    ["G染色偏移"]
+    uniform lowp float adjust_area2
+    <
+		init = "0.19"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+
+    ["B染色偏移"]
+    uniform lowp float adjust_area3
+    <
+		init = "0.01"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+	
+	["R变色颜色"]
+	uniform mediump float4 changed_color1
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.145098,0.156863,0.211765,1.000000)" 
+
+		artist = "1"
+		color = "1"
+	>;	
+	["G变色颜色"]
+	uniform mediump float4 changed_color2
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.1059,0.2588,0.3647,1)" 
+
+		artist = "1"
+		color = "1"
+	>;	
+	["B变色颜色"]
+	uniform mediump float4 changed_color3
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.286275,0.462745,0.282353,1.000000)" 
+
+		artist = "1"
+		color = "1"
+	>;
+	//待机特效
+	["流光纹理是否2U"]
+	uniform mediump float emisstex_seconduv
+	<
+		uigroup = "待机特效"
+		uistep = "0.001"
+		artist = "1"    
+		max = "1.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+	["流光纹理参数(XY控Tilling,ZW控移速)"]
+	uniform mediump float4 emiss_tex_param
+	<
+		uigroup = "待机特效"
+		init = "(1.0,1.0,0.0,-0.2)" 
+		artist = "1"
+	>;
+	["待机流光颜色"]
+	uniform mediump float emiss_lerp_intensity
+	<
+		uigroup = "待机特效"
+		init = "1"
+		artist = "1"
+	>;
+	["待机流光亮度"]
+	uniform mediump float emiss_intensity
+	<
+		uigroup = "待机特效"
+		init = "1"
+		artist = "2"
+	>;
+
+	["雾效修正"]
+	uniform mediump float fog_fix
+	<
+		init = "0.0" 
+		artist = "1"
+	>;
+
+	["护盾扩散点"]
+	uniform float4 SphereCenter
+	<
+		uigroup = "护盾特效"
+		init = "0.0, 30.0, 10.0,0.0"
+		artist = "1"
+	>;
+	["扩散间隔"]
+	uniform float WorldScale
+	<
+		uigroup = "护盾特效"
+		artist = "1"
+		init = "0.25"
+		uistep = "0.001"  
+		max = "1"
+		min = "0"
+	>;
+	["扩散速度"]
+	uniform float SineSpeed
+	<
+		artist = "1"
+		uigroup = "护盾特效"
+		init = "-2"
+	>;
+	["扩散拖尾"]
+	uniform float RadiusAtten
+	<
+		artist = "1"
+		uigroup = "护盾特效"
+		init = "0.3"
+		uistep = "0.001"  
+		max = "3"
+		min = "-3"
+	>;
+	["亮边位移"]
+	uniform float EdgeDistance
+	<
+		artist = "1"
+		uigroup = "护盾特效"
+		init = "0.1"
+		uistep = "0.01"
+		max = "2.0"
+		min = "-2.0"
+	>;
+	// ["亮边宽度"]
+	// uniform float EdgeWidth
+	// <
+	// 	artist = "1"
+	// 	uigroup = "护盾特效"
+	// 	init = "1.0"
+	// >;
+
+	["护盾纹理Tilling"]
+	uniform mediump float2 shield_tex_tilling
+	<
+		uigroup = "护盾特效"
+		init = "(8.0,8.0)"
+		artist = "1"
+	>;
+	["护盾纹理显示"]
+	uniform mediump float shield_pattern_spread
+	<
+		uigroup = "护盾特效"
+		init = "2.0"  
+		// uistep = "0.001"
+		// max = "3.0"
+		// min = "-3.0"
+		artist = "1"
+	>;
+	["护盾发光强度"]
+	uniform mediump float shield_emiss_intensity
+	<
+		uigroup = "护盾特效"
+		init = "1"
+		artist = "1"
+	>;
+	["护盾发光颜色"]
+	uniform mediump float4 shield_emisscolor
+	<
+		uigroup = "护盾特效"
+		init = "(0.282,0.525,0.866,0.0)" 
+		artist = "1"
+		color = "1"
+	>;
+	["护盾边缘光bias"]
+    uniform lowp float fresnel_bias
+    <
+    	uigroup = "护盾特效"
+		init = "0.1"
+		artist = "1"   
+		// uistep = "0.001"
+		// max = "1.0"
+		// min = "0.0"
+    >; 
+    ["护盾边缘光scale"]
+    uniform lowp float fresnel_scale
+    <
+    	uigroup = "护盾特效"
+		init = "0.5"
+		artist = "1"   
+		// uistep = "0.001"
+		// max = "5.0"
+		// min = "0.0"
+    >; 
+    ["护盾边缘光power"]
+    uniform lowp float fresnel_power
+    <
+    	uigroup = "护盾特效"
+		init = "2.0"
+		artist = "1"
+		// uistep = "0.001"
+		// max = "5.0"
+		// min = "0.01"
+    >; 
+
+	["大龙系数"]
+	uniform lowp float dawn_factor:DAWN_VALUE;
+	["大龙出现"]
+	uniform highp float boss_start:BOSS_START;
+	["大龙消失"]
+	uniform highp float boss_end:BOSS_END;
+
+	// varying
+	// 漫反射贴图的uv
+	varying mediump float4 v_fog_info;
+	// lightmap uv
+	varying mediump float2 v_texture1;
+
+	//varying lowp float3 TangentWorld;
+	//varying lowp float3 BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+
+	varying mediump float4 v_light_proj_pos;
+	varying mediump float v_fog_distance;
+	varying mediump float4 PosWorld;
+	varying mediump float4 fow_uv;
+	varying lowp float v_cl_changed_sig;
+	varying mediump float2 v_screen_uv;
+	varying mediump float3 v_localPos;
+
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	["反射向量转UV"]
+	function ToRadialCoords in(float3 coords) out (float2 panoramauv)
+    {
+        mediump float3 normalizedCoords = normalize(coords);
+        mediump float latitude = acos(normalizedCoords.y);
+        mediump float longitude = atan2(normalizedCoords.z, normalizedCoords.x);
+        mediump float2 sphereCoords = float2(longitude, latitude) * float2(0.15915494309189533576888376337251f, 0.31830988618379067153776752674503f);
+        out(panoramauv,float2(0.5f,1.0f) - sphereCoords);
+    };
+    ["计算河道mask"]
+	function get_hedao_mask in (
+	highp float2 st,
+	highp float pct,
+	highp float Width
+	) out (mediump float hedao_mask) // 计算雾效因子
+	{
+		out(hedao_mask,smoothstep(pct-Width, pct, st.y) - smoothstep(pct, pct+Width, st.y));
+	};
+    ["LUT采样"]
+	function Lut in(float3 color, sampler lutmap, float2 lut_factor) out(lowp float3 colorOut)
+	{
+		float3 color01 = saturate(color);
+		float column = lut_factor.y;
+		float row = ceil(lut_factor.x / lut_factor.y);
+        //float2 pixelBias = float2(1.0f / column / 2.0f / lut_factor.x, 1.0f / row / 2.0f / lut_factor.x);
+        float2 UVRG0 = (floor(color01.rg * (lut_factor.x - 1.0f)) + float2(0.5f)) / lut_factor.x / float2(column, row);
+        float2 UVRG1 = (ceil(color01.rg * (lut_factor.x - 1.0f)) + float2(0.5f)) / lut_factor.x / float2(column, row);
+        
+        float UVBIndex = color01.b * (lut_factor.x - 1.0f);
+        float UVBIndex0 = floor(UVBIndex);
+        float UVBIndex1 = ceil(UVBIndex);
+
+        float rowB0 = floor(UVBIndex0 / column);
+        float columnB0 = UVBIndex0 - column * rowB0;
+
+        float rowB1 = floor(UVBIndex1 / column);
+        float columnB1 = UVBIndex1 - column * rowB1;
+
+        float2 UVRGB0 = UVRG0 + float2(columnB0, rowB0) / float2(column, row);
+        float2 UVRGB1 = UVRG1 + float2(columnB1, rowB1) / float2(column, row);
+        float3 RGBLerp = fractional(color01 * (lut_factor.x - 1.0f));
+
+        float3 colorOut01 = sample(lutmap, UVRGB0).rgb;
+        float3 colorOut02 = sample(lutmap, UVRGB1).rgb;
+        out(colorOut, lerp(colorOut01, colorOut02, RGBLerp));
+	};
+
+	vertex
+	{
+		highp float4 position = a_position;
+
+		// 世界空间坐标
+		macro(EDITOR) out(mediump float4 pos_world){
+			branch("1")
+			{
+				out(pos_world, transform(position, world));
+			}
+			branch("0"){
+				macro(INSTANCE_TYPE) out(mediump float4 _pos_world)
+				{
+				    branch("INSTANCE_TYPE_PRS")
+				    {
+						float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+												     float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+												     float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+												     float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+						float4 world_pos = transform(position, instWorldMat);
+
+				    	macro(TRANS_ENABLE) out(float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+						out(_pos_world, trans_world_pos);
+				    }
+				    
+				    branch("INSTANCE_TYPE_PRS_LM")
+				    {
+						mediump float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+												     float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+												     float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+												     float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+						mediump float4 world_pos = transform(position, instWorldMat);
+						
+				    	macro(TRANS_ENABLE) out(mediump float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+						out(_pos_world, trans_world_pos);
+				    }
+
+				    branch("INSTANCE_TYPE_NONE")
+				    {
+				    	// 未合批的在引擎中已经转了world了
+				    	out(_pos_world, transform(position, world));
+				    }
+				};
+				out(pos_world,  _pos_world);
+			}
+		};
+
+		highp float4 posworld_ = pos_world;
+		out(PosWorld,posworld_);
+
+		highp float4 final_position = transform(pos_world, viewProj);
+		
+		macro(TRANS_ENABLE) out(mediump float height) {
+			branch ("1") {
+				out(height, -pos_world.y);
+			}
+			branch ("0") {
+				out(height, pos_world.y);
+			}
+		};
+		function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor1);
+
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance1)
+			{
+				branch("1")
+				{
+					["GL渲染系统下"]
+					// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+					out(fog_distance1, final_position.w * ((final_position.z/final_position.w) *0.5f + 0.5f));
+				}
+				branch("0")
+				{
+					["Dx和Metal渲染系统下"]
+					out(fog_distance1, final_position.z);
+				}
+			};
+
+		out(v_fog_info, float4(a_texture0.xy, fog_distance1, 1.0f - fog_height_factor1));
+		out(v_texture1,a_texture1.xy);
+		vertex(final_position+float4(0.0f, 0.0f, 0.001f, 0.00f));
+		
+		// 在vertex中计算高度雾
+		macro(FOW_ENABLE) {
+			branch ("1") {
+				mediump float2 _fow_uv = float2(pos_world.x / scene_size.x + 0.5f, pos_world.z / scene_size.y + 0.5f);
+				mediump float height_factor = 1.0f - saturate(pos_world.y / 135.0f);
+
+				macro(TRANS_ENABLE) out(lowp float trans_factor) {
+				    branch ("1") {
+						out(trans_factor, -1.0f);
+				    }
+				    branch ("0") {
+						out(trans_factor, 1.0f);
+				    }
+				};
+				lowp float fog_linear_factor = 0.0f;				
+				out(fow_uv, float4(_fow_uv, height_factor, fog_linear_factor)); // z存模型世界空间高度
+
+			}
+			branch ("0") {
+			}
+		};
+
+		out(v_localPos,position.xyz);
+
+		macro(TWOGROUP_ENABLE) out(lowp float v_cl_changed_sig1) {
+			branch ("1") {
+				lowp float signal = saturate((pos_world.x + pos_world.z+90.0f)/180.0f);
+				out(v_cl_changed_sig1, signal);
+			}
+			branch ("0") {
+				out(v_cl_changed_sig1, 0.0f);
+			}
+		};
+		out(v_cl_changed_sig,v_cl_changed_sig1 * u_fog_color.a);
+
+		macro(USE_SHIELD_VFX)
+		{
+			branch("1")
+			{
+				macro(LEVEL_HIGH)
+				{
+					branch ("1") 
+					{
+						float3x3 worldMat = float3x3(world);
+						highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+						out(v_NormalWorld, world_normal);
+					}
+					branch("0")
+					{
+					}
+				};
+				
+			}
+			branch("0")
+			{
+			}
+		};
+
+	}
+
+	pixel
+	{	
+		mediump float2 UV0 = v_fog_info.xy;
+		// mediump float fog_distance = v_fog_info.z;
+		// mediump float fog_height_factor = v_fog_info.w;
+		lowp float3 view_dir = normalize(cam_pos.xyz - PosWorld.xyz);
+		mediump float2 UV1 = v_texture1.xy;
+		// macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color, lowp float shadow)
+		// {
+		//     branch("1") {
+		// 		// lightmap已经是线性的了
+		// 		lowp float4 _lightmap_color = sample(TexLightmap, v_texture1.xy);
+		// 		// 不再对lightmap染色
+		// 		// lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+		// 		lowp float3 light_map_color_gamma = _lightmap_color.xyz * LightMapScale.yzw;
+		// 		out(lightmap_color, light_map_color_gamma.xyz);
+		// 		out(shadow, _lightmap_color.w);
+
+		//     }
+		//     branch("0") {
+		// 		out(lightmap_color, float3(1.0f));
+		// 		out(shadow, 0.5f);
+		//     }
+		// };
+
+		mediump float3 lightmap_color = float3(1.0f);
+		lowp float shadow = 0.5f;
+		lowp float4 diffuse_tex_ = sample(Tex0, UV0);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 diffuse_tex)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, UV0);
+				out(diffuse_tex, float4(diffuse_tex_.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(diffuse_tex, float4(diffuse_tex_.xyz, diffuse_tex_.w));
+			}
+		};
+
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(diffuse_tex.a - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		// 区域分色
+		lowp float area_factor = v_cl_changed_sig;
+
+		macro(CHANGE_COLOR_ENABLE) out(lowp float3 diffuse_changed_color) {
+			branch ("1") {
+				macro(CHANGE_RED) out(lowp float3 changed_red) {
+					branch ("1") {
+						lowp float _mix_result_red = saturate((diffuse_tex.r * 2.0f - diffuse_tex.g - diffuse_tex.b + adjust_area1) * adjust_multi1);
+						out(changed_red, lerp(diffuse_tex.rgb ,(diffuse_tex.r + diffuse_tex.g + diffuse_tex.b) * changed_color1.rgb, float3(_mix_result_red)));
+					}
+					branch("0"){
+						out(changed_red, diffuse_tex.rgb);
+					}
+				};
+				macro(CHANGE_GREEN) out(lowp float3 changed_green) {
+					branch ("1") {
+						lowp float _mix_result_green = saturate((diffuse_tex.g * 2.0f - diffuse_tex.g - diffuse_tex.r + adjust_area2) * adjust_multi2);
+						out(changed_green, lerp(changed_red ,(diffuse_tex.r + diffuse_tex.g + diffuse_tex.b) * changed_color2.rgb, float3(_mix_result_green)));
+					}
+					branch("0"){
+						out(changed_green, changed_red);
+					}
+				};
+				macro(CHANGE_BLUE) out(lowp float3 changed_blue) {
+					branch ("1") {
+						lowp float _mix_result_blue = saturate((diffuse_tex.b * 2.0f - diffuse_tex.r - diffuse_tex.b + adjust_area3)) * adjust_multi3;
+						out(changed_blue, lerp(changed_green ,(diffuse_tex.r + diffuse_tex.g + diffuse_tex.b) * changed_color3.rgb, float3(_mix_result_blue)));
+					}
+					branch("0"){
+						out(changed_blue, changed_green);
+					}
+				};
+				out(diffuse_changed_color, lerp(diffuse_tex.rgb, changed_blue, float3(area_factor)));
+			}
+			branch("0"){
+				out(diffuse_changed_color, diffuse_tex.rgb);
+			}
+		};
+
+		["线性空间"]
+		mediump float3 color_diffuse_lightmap = diffuse_changed_color.rgb * lightmap_color.xyz;
+		
+		lowp float3 lerp_color = color_diffuse_lightmap;
+
+		macro(FOW_ENABLE) out(mediump float3 final_result) {
+			branch ("1") {
+				// 计算雾效混合区域
+				// 参数
+				lowp float fow_sample = sample(view_texture, fow_uv.xy).x;
+				lowp float fow = oneminus(fow_sample);
+				lowp float fow1 = saturate((fow + 0.5f)*(fow + 0.5f)- 0.5f);
+				lowp float fow_thick = fow1 * fow_color.a;
+				lowp float3 combine_height_fog = lerp(lerp_color.rgb, float3(0.0f, 0.168f, 0.298f), float3(lerp(0.65f, 1.0f, shadow))); // 50~100作为参数不错
+				// 计算深度雾效混合
+				lowp float3 combine_linear_fog = lerp(lerp_color, combine_height_fog * float3(0.8856f,0.9117f, 1.0f),  float3(fow_thick));
+				out(final_result,combine_linear_fog);
+			}
+			branch("0")
+			{
+				out(final_result, lerp_color);
+			}
+		};
+
+		["黄昏染色"]
+		// 取绿通道做熔岩自发光
+		lowp float emissive_mask = oneminus(saturate(diffuse_tex_.g + 0.8f))/0.2f;
+		lowp float emissive_multi = 0.8f + 0.2f * sin(3.0f * frame_time);
+		lowp float3 dawn_color = lerp(final_result.rgb * lerp(1.0f,0.863f,dawn_factor), float3(1.0f, 0.0f, 0.0f), float3(emissive_mask * emissive_multi * dawn_factor));
+
+		// mediump float2 screen_uv = v_screen_uv;
+
+		mediump float2 fog_uv = v_fog_info.xy;
+		mediump float fog_distance = v_fog_info.z;
+		mediump float fog_height_factor = v_fog_info.w;
+        /*
+		macro(LEVEL_HIGH) out(mediump float3 fog_combined_0)
+		{
+			branch("1")
+			{
+				// macro(FOG_EFFECT) out(float3 dawn_combined0)
+				// {
+				// 	branch("0")
+				// 	{
+				// 		out(dawn_combined0,changed_diffuse);
+				// 	}
+				// 	branch("1")
+				// 	{
+				// 		mediump float4 cloud = sample(FogDetailTex, screen_uv);
+				// 		mediump float fog_start = 200.0f + fog_fix + dawn_factor * 20.0f;
+				// 		mediump float fog_end = 310.0f + fog_fix + dawn_factor * 10.0f;
+				// 		function get_fog_mix(fog_start, fog_end, fog_distance) out(mediump float fog_linear_factor);
+
+				// 		// 对fol进行模拟
+				// 		lowp float4 fol_color_nod = lerp(float4(0.839f, 0.4686f, 0.3193f, 0.0f),float4(0.714f, 0.719f, 0.707f, 1.0f), float4(fog_linear_factor));
+				// 		mediump float3 dawn_combined_nod = lerp(lerp(changed_diffuse.rgb, u_fog_color.rgb, float3(fog_height_factor * u_fog_info.y * 0.000002f)), fol_color_nod.rgb, 0.75f * float3(saturate(fol_color_nod.a + cloud.r * fol_color_nod.a ) * u_fog_color.a));
+				// 		lowp float4 fol_color_d = lerp(float4(0.839f, 0.4686f, 0.3193f, 0.0f),float4(0.714f, 0.719f, 0.707f, 1.0f), float4(fog_linear_factor)) * float4(0.8856f, 0.9117f, 1.0f,1.0f);
+				// 		// 对foh进行模拟
+				// 		mediump float3 dawn_combined_d = lerp(lerp(changed_diffuse.rgb, float3(0.217f,0.4058f, 0.4558f), 0.8f * float3(sqrt(fog_height_factor))), fol_color_d.rgb, 0.75f * float3(saturate(fol_color_d.a + cloud.r * fol_color_d.a ) * u_fog_color.a));
+
+				// 		mediump float3 dawn_combined_ = lerp(dawn_combined_nod, dawn_combined_d, float3(dawn_factor));
+				// 		out(dawn_combined0,dawn_combined_);
+				// 	}
+				// };
+				highp float fog_uniform = 0.000002f;
+				mediump float4 cloud = sample(FogDetailTex, fog_uv);
+				mediump float fog_start = 290.0f + fog_fix + dawn_factor * 20.0f + u_fog_info.x * fog_uniform * 200.0f;
+				mediump float fog_end = 390.0f + fog_fix + dawn_factor * 10.0f + u_fog_info.x * fog_uniform * 200.0f;
+				function get_fog_mix(fog_start, fog_end, fog_distance) out(mediump float fog_linear_factor);
+
+		        // 对fol进行模拟
+				lowp float4 fol_color_nod = lerp(float4(0.364f, 0.572f, 0.705f, 0.0f),float4(0.564f,0.664f,0.749f, 1.0f), float4(fog_linear_factor));
+
+				mediump float3 dawn_combined_nod = lerp(lerp(dawn_color.rgb, u_fog_color.rgb, float3(fog_height_factor * u_fog_info.y * fog_uniform)), fol_color_nod.rgb, 0.75f * float3(saturate(fol_color_nod.a + cloud.r * fol_color_nod.a ) * u_fog_color.a));
+				lowp float4 fol_color_d = lerp(float4(0.364f, 0.572f, 0.705f, 0.0f),float4(0.564f,0.664f,0.749f, 1.0f), float4(fog_linear_factor)) * float4(0.8856f, 0.9117f, 1.0f,1.0f);
+		        // 对foh进行模拟
+				mediump float3 fog_combined_d = lerp(lerp(dawn_color.rgb, float3(0.217f,0.4058f, 0.4558f), 0.8f * float3(sqrt(fog_height_factor))), fol_color_d.rgb, 0.75f * float3(saturate(fol_color_d.a + cloud.r * fol_color_d.a ) * u_fog_color.a));
+
+				mediump float3 fog_combined = lerp(dawn_combined_nod, fog_combined_d, float3(dawn_factor));
+				out(fog_combined_0, fog_combined);
+			}
+			branch("0")
+			{
+				out(fog_combined_0, dawn_color);
+			}
+		};*/
+		highp float fog_uniform = 0.000002f;
+		mediump float4 cloud = sample(FogDetailTex, fog_uv);
+		mediump float fog_start = 330.0f + fog_fix + dawn_factor * 20.0f + u_fog_info.x * fog_uniform * 200.0f;
+		mediump float fog_end = 730.0f + fog_fix + dawn_factor * 10.0f + u_fog_info.x * fog_uniform * 200.0f;
+		function get_fog_mix(fog_start, fog_end, fog_distance) out(mediump float fog_linear_factor);
+
+		        // 对fol进行模拟
+		lowp float4 fol_color_nod = lerp(float4(0.364f, 0.572f, 0.705f, 0.0f),float4(0.564f,0.664f,0.749f, 1.0f), float4(fog_linear_factor));
+
+		mediump float3 dawn_combined_nod = lerp(lerp(dawn_color.rgb, u_fog_color.rgb, float3(fog_height_factor * u_fog_info.y * fog_uniform)), fol_color_nod.rgb, 0.75f * float3(saturate(fol_color_nod.a + cloud.r * fol_color_nod.a ) * u_fog_color.a));
+		lowp float4 fol_color_d = lerp(float4(0.364f, 0.572f, 0.705f, 0.0f),float4(0.564f,0.664f,0.749f, 1.0f), float4(fog_linear_factor)) * float4(0.8856f, 0.9117f, 1.0f,1.0f);
+		        // 对foh进行模拟
+		mediump float3 fog_combined_d = lerp(lerp(dawn_color.rgb, float3(0.217f,0.4058f, 0.4558f), 0.8f * float3(sqrt(fog_height_factor))), fol_color_d.rgb, 0.75f * float3(saturate(fol_color_d.a + cloud.r * fol_color_d.a ) * u_fog_color.a));
+
+		mediump float3 fog_combined = lerp(dawn_combined_nod, fog_combined_d, float3(dawn_factor));
+		mediump float3 fog_combined_0 = fog_combined;
+
+		macro(LUT_ENABLE) out(lowp float3 fog_combined_) 
+		{
+			branch ("1") 
+			{
+				function Lut(fog_combined_0, lutTex, lutFactor) out(lowp float3 lutedColor00);
+				mediump float3 fog_combined_color = lerp(fog_combined_0,lutedColor00,float3(u_fog_color.a));
+				out(fog_combined_, fog_combined_color);
+			}
+			branch ("0") 
+			{
+				out(fog_combined_, fog_combined_0);
+			}
+		};
+
+		mediump float3 changetone1 = lerp(float3(1.0f),float3(0.627f, 0.745f, 1.0f),float3(area_factor));
+		mediump float3 changetone = lerp(changetone1, float3(0.814f, 0.7239f, 0.6039f), float3(dawn_factor));
+		mediump float illum = dot(fog_combined_ * changetone1, float3(0.3f, 0.59f, 0.11f));
+		mediump float illum_fix2 = lerp(1.095f, 0.894f,illum);
+		mediump float illum_fix = lerp(lerp(1.0f, illum_fix2,area_factor),1.0f,dawn_factor);
+
+		lowp float3 color_export = fog_combined_ * changetone * illum_fix;
+
+		macro(LEVEL_HIGH) out(lowp float3 idle_vfx_color)
+		{
+			branch("1")
+			{
+				macro(USE_IDLE_VFX) out (lowp float3 idle_vfx_color0)
+				{
+					branch("1")
+					{
+						mediump float2 emiss_uv = lerp(UV0,UV1,float2(emisstex_seconduv));
+						lowp float4 emisstex_color = sample(EmissTex,emiss_uv * emiss_tex_param.xy + float2(frame_time) * emiss_tex_param.zw);
+						lowp float4 emisscolormap_color = sample(EmissColorMap,UV0);
+						mediump float emisscolor_illum = dot(emisscolormap_color.rgb, float3(0.3f, 0.59f, 0.11f));
+						lowp float3 emiss_lerp_color = lerp(color_export,emisscolormap_color.rgb,float3(saturate(emisstex_color.r * emisscolor_illum * emiss_lerp_intensity)));
+						lowp float3 idle_vfx_color_ = emiss_lerp_color + emisstex_color.r * emisscolormap_color.rgb * emiss_intensity;
+						out(idle_vfx_color0,idle_vfx_color_);
+					}
+					branch("0")
+					{
+						out(idle_vfx_color0,color_export);
+					}
+				};
+				out(idle_vfx_color,idle_vfx_color0);
+			}
+			branch("0")
+			{
+				out(idle_vfx_color,color_export);
+			}
+		};
+
+		highp float3 localPos = v_localPos;
+		macro(USE_SHIELD_VFX) out(lowp float3 shield_vfx_color)
+		{
+			branch("1")
+			{
+				macro(LEVEL_HIGH) out(lowp float fresnel_factor)
+				{
+					branch("1")
+					{
+						mediump float3 normal_dir = normalize(v_NormalWorld);
+						lowp float NdotV = (dot(normal_dir,view_dir));
+						mediump float fresnel_factor0 = fresnel_bias + pow((1.0f - NdotV),fresnel_power) * fresnel_scale;
+						out(fresnel_factor,fresnel_factor0);
+					}
+					branch("0")
+					{
+						out(fresnel_factor,0.3f);
+					}
+				};
+				macro(LEVEL_HIGH) out(lowp float pattern_mask)
+				{
+					branch("1")
+					{
+						lowp float4 masktex_color = sample(MaskTex,UV0 * shield_tex_tilling);
+						out(pattern_mask,masktex_color.r);
+					}
+					branch("0")
+					{
+						out(pattern_mask,1.0f);
+					}
+				};
+				highp float sphere_distance = length((SphereCenter.xyz - localPos) * WorldScale * 0.1f);
+				lowp float sphere_mask = sin(frame_time * SineSpeed + sphere_distance * 6.28318f) / RadiusAtten - (1.0f - pattern_mask) * shield_pattern_spread;
+				mediump float edge_factor = smoothstep(1.0f,0.0f,abs(sphere_mask - EdgeDistance));
+
+				lowp float3 shield_vfx_color1 = idle_vfx_color + (edge_factor * shield_emiss_intensity + fresnel_factor) * shield_emisscolor.rgb;
+				out(shield_vfx_color,float3(shield_vfx_color1));
+			}
+			branch("0")
+			{
+				out(shield_vfx_color,idle_vfx_color);
+			}
+		};
+
+		pixel(float4(shield_vfx_color * scene_illum, diffuse_tex.a));
+	}
+}

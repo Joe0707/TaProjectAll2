@@ -1,0 +1,73 @@
+["shadow"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhouyingjie" 
+	category = "shader" 
+	company = "netease"
+  	merge = "1"
+  	alphablend = "true"
+	srccolor = "1"
+	srcalpha = "1"
+	dstcolor = "1"
+	dstalpha = "1"
+>
+{
+// 宏
+
+// 贴图	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+// 调整参数
+	
+// attribute变量
+	attribute mediump float3 a_position : POSITION;
+	attribute mediump float3 texcoord0 : TEXTURE0;
+	
+// varying变量
+	varying mediump float2 uv;
+	varying mediump float cos_yaw;
+	varying mediump float sin_yaw;
+	varying mediump float ratio;
+	
+	vertex
+	{
+		vertex(float4(a_position.xy / 640.0f, 0.0f, 1.0f));
+		out(ratio, a_position.z);
+		out(cos_yaw, cos(texcoord0.z));
+		out(sin_yaw, sin(texcoord0.z));
+		out(uv, texcoord0.xy);
+	}
+
+	pixel
+	{
+		mediump float4 diffuse_tex_ = sample(Tex0, uv.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 loc_result)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, uv.xy);
+				out(loc_result, float4(diffuse_tex_.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(loc_result, float4(diffuse_tex_.xyz, diffuse_tex_.w));
+			}
+		};
+		mediump float2 loc_dir = float2(loc_result.x - loc_result.y, loc_result.z - loc_result.w);
+		mediump float2 dir = float2((loc_dir.x * cos_yaw - loc_dir.y* sin_yaw)*ratio, (loc_dir.x * sin_yaw + loc_dir.y* cos_yaw)*ratio);
+		mediump float4 result = float4(max(dir.x, 0.0f), -min(dir.x, 0.0f), max(dir.y, 0.0f), -min(dir.y, 0.0f));
+		pixel(result);
+	}
+}

@@ -1,0 +1,44 @@
+["hide mask"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "ly" 
+	category = "shader" 
+	company = "netease"
+  	merge = "1"
+>
+{
+// uniform 
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	uniform mediump float2 half_scene_size
+    <
+    	init = "(640.0, 640.0)"
+    >;
+	
+// attribute变量
+	attribute mediump float3 a_position : POSITION;
+	attribute mediump float2 texcoord0 : TEXTURE0;
+	
+// varying变量
+	varying mediump float ratio;
+	
+	vertex
+	{
+		vertex(float4(a_position.xy / half_scene_size.xy , 0.0f, 1.0f));
+	}
+
+	pixel
+	{
+		pixel(float4(1.0f, 0.0f, 0.0f, 1.0f));
+	}
+}

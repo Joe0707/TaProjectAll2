@@ -1,0 +1,677 @@
+["energy flow for character"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuzhuoliang/konglingjie/liuyu" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+>
+{
+// 宏
+	["是否轮廓光"]
+	eitheror FRESNEL_ENABLE;
+	macro(FRESNEL_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否自发光"]
+	eitheror EMISSIVE_ENABLE;
+	macro(EMISSIVE_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否自发光贴图"]
+	eitheror EMISSIVE_MASK;
+	macro(EMISSIVE_MASK)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否流光遮罩"]
+	eitheror FLOW_MASK;
+	macro(FLOW_MASK)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否流光贴图"]
+	eitheror FLOW_ENABLE;
+	macro(FLOW_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否使用2U"]
+	eitheror SECONDUV_ENABLE;
+	macro(SECONDUV_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["材质贴图"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "common\\textures\\envmap\\matcap_test00.png"
+	>;
+
+	["流动贴图(顶点色R通道)"]
+	uniform sampler FlowTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["流动遮罩"]
+	uniform sampler FlowMaskTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["自发光遮罩"]
+	uniform sampler EmissiveTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	// uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+
+	["matcap亮度"]
+	uniform float matcap_brightness
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+	
+	["叠加色"]
+	uniform mediump float3 change_color
+	<
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;
+
+	["是否采用2U（1为2U）"]
+	uniform lowp float UV12_step
+	<
+		artist = "1"
+		init = "0"
+		uistep = "1"
+		min = "0"
+		max = "1"
+	>;
+
+	["流动贴图平铺"]
+	uniform lowp float2 flowtex_tilling
+	<
+		artist = "1"
+		init = "(1,1)"
+	>;
+
+	["流动贴图速度"]
+	uniform lowp float2 flowtex_speed
+	<
+		artist = "1"
+		init = "(0,0)"
+	>;
+
+	["流动贴图扭曲"]
+	uniform lowp float flowtex_distort
+	<
+		artist = "1"
+		init = "0"
+	>;
+
+	["流动贴图色调"]
+	uniform lowp float4 flowtex_tone
+	<
+		artist = "1"
+		color = "1"
+		init = "(1,1,1,1)"
+	>;
+
+	["流动贴图强度"]
+	uniform lowp float flowtex_inten
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["Diffuse强度"]
+	uniform lowp float diffuse_inten
+	<
+		artist = "1"
+		init = "1"
+		uistep = "1"
+		min = "0"
+		max = "1"
+	>;
+
+	["轮廓光颜色强度"]
+	uniform mediump float rim_multi
+	<
+		uigroup = "轮廓光"
+		init = "1.0"
+		uistep = "0.001"
+		artist = "1"
+		max = "5.0"
+		min = "1.0"
+	>;
+
+	["轮廓颜色"]
+	uniform mediump float4 rim_outside
+	<
+		uigroup = "轮廓光"
+		init = "(0.4, 0.0, 0.0,1)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["内部颜色"]
+	uniform mediump float4 rim_inner
+	<
+		uigroup = "轮廓光"
+		init = "(0.5,0.5,0.5,1)"
+		artist = "1"
+		color ="1"
+	>;	
+
+	["rim 开始"]
+	uniform mediump float u_rim_start
+	<
+		uigroup = "轮廓光"
+		uistep = "0.001"
+		init = "0.15"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["rim 结束"]
+	uniform mediump float u_rim_end
+	<
+		uigroup = "轮廓光"
+		uistep = "0.001"
+		init = "1.50"
+		max = "1.5"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["自发光颜色(顶点色G通道)"]
+	uniform mediump float4 emissive_color
+	<
+		uigroup = "自发光"
+		init = "(0,0,0,0)"
+		artist = "1"
+		color ="1"
+	>;	
+
+	
+	["溶解程度"]
+	uniform lowp float DissAmount
+	<
+		init = "0.0"
+	>;
+	["uvtiling"]
+	uniform lowp float uvtiling
+	<
+		uistep = "0.001"
+		init = "1"
+		max = "5.0"
+		min = "1.0"
+		artist = "1"
+	>;
+
+	["范围开始"]
+	uniform mediump float nov_sm1
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.31"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["范围结束"]
+	uniform mediump float nov_sm2
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "1.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["中央厚度"]
+	uniform mediump float sm_min
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.4"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["金身-中央厚度"]
+	uniform mediump float sm_min_gold
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.42"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["灵魂边缘强度"]
+	uniform mediump float ghost_rim_sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.8"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+
+	["光效强度"]
+	uniform mediump float sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "2.35"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["UV动画速度"]
+	uniform mediump float sm_vuspeed
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "0.53"
+		max = "1.0"
+		min = "-1.0"
+		artist = "1"
+	>;	
+
+	["U缩放"]
+	uniform float sm_uvtiling_u
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "0.1"
+		uistep = "0.0001"
+		max = "2.0"
+		min ="0.0"
+	>;
+	["U偏移"]
+	uniform float sm_uvoffset_u
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "1.0"
+		uistep = "0.0001"
+		max = "1.0"
+		min ="-1.0"
+	>;
+	["V缩放"]
+	uniform float sm_uvtiling_v
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "0.1"
+		uistep = "0.0001"
+		max = "2.0"
+		min ="0.0"
+	>;
+
+	["金身颜色"]
+	uniform mediump float4 gold_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 0.756, 0.121, 1.0"
+		artist = "1"
+	>;
+	["灵魂颜色"]
+	uniform mediump float4 ghost_color_add
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "0.847, 0.847, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	["灵魂贴图强度"]
+	uniform mediump float ghost_sm_multi
+	<
+		uigroup = "BUFF"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["颜色"]
+	uniform mediump float4 sm_color_ad
+	<
+		color = "1"
+		uigroup = "BUFF"
+		init = "1.0, 1.0, 1.0, 1.0"
+		artist = "1"
+	>;
+
+	["纹理平铺数"]
+	uniform float per_uvtilling
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		init = "3.0"
+	>;
+
+	// ["石化阴影深度"]
+	// uniform float per_lerp
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "1.0"
+	// >;
+
+	// ["石化边缘宽度"]
+	// uniform float height_sm2
+	// <
+	// 	artist = "1"
+	// 	uigroup = "BUFF"
+	// 	uistep = "1"
+	// 	max = "1"
+	// 	min = "0"
+	// 	init = "0.1"
+	// >;
+
+	["石化程度"]
+	uniform float ChangeAmount
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "1"
+		min = "0"
+		init = "0.1"
+	>;
+
+
+	["抖动速度"]
+	uniform float shake_speed
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "5"
+		min = "0"
+		init = "0.1"
+	>;
+
+	["抖动强度"]
+	uniform float shake_intensity
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "5"
+		min = "0"
+		init = "0.1"
+	>;
+
+	["抖动高度"]
+	uniform float shake_height
+	<
+		artist = "1"
+		uigroup = "BUFF"
+		uistep = "1"
+		max = "20"
+		min = "0"
+		init = "0.4"
+	>;
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float2 v_flowtex_uv;
+	varying mediump float effectlerp;// 替代ghostlerp icelerp firelerp goldlerp petrify_shadow ;
+	// varying mediump float icelerp;
+	// varying mediump float firelerp;
+	// varying mediump float goldlerp;
+	// varying mediump float2 petrify_uv;
+	// varying mediump float petrify_shadow;
+	varying mediump float height_sm;
+	varying mediump float v_vertical_fac;
+	varying mediump float v_gold_gradient;
+	// varying mediump float2 v_gold_uv;
+	// varying mediump float2 v_ghost_uv;
+	//varying lowp float v_height_fac;
+	varying mediump float2 effectuv;// 替代petrify_uv v_gold_uv v_ghost_uv;
+	varying mediump float2 v_matcap_uv;
+	varying mediump float4 PosWorld;
+	varying lowp float3 v_NormalWorld;
+	varying lowp float4 v_vertex_color;
+	//varying lowp float v_height_fac;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+
+		mediump float3 normal_view = normalize(transform(normal.rgb,float3x3(wv)));
+		mediump float2 matcap_uv = (normal_view.xy) * float2(0.5f, -0.5f) + float2(0.5f);
+		out(v_matcap_uv, matcap_uv);
+
+		vertex(pos);
+
+		// ——————————以上是特殊效果————————————
+
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		
+		float3x3 worldMat = float3x3(world);		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		out(v_NormalWorld, world_normal);
+	
+		out(v_vertex_color, a_color);
+
+		macro(FLOW_ENABLE){
+			branch ("1") {
+				macro(SECONDUV_ENABLE) out(highp float2 v_flowtex_uv1) {
+					branch ("1") {
+						out(v_flowtex_uv1, texcoord1.xy);
+					}
+					branch ("0") {
+						out(v_flowtex_uv1, texcoord0.xy);
+					}
+				};
+				out(v_flowtex_uv, v_flowtex_uv1);
+			}
+			branch ("0") {}
+		};
+}
+
+	pixel
+	{
+		lowp float4 vertex_color = v_vertex_color;
+		// 视线方向
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float3 vertex_normal = v_NormalWorld;
+
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		//lowp float height_fac = v_height_fac;
+
+		// alpha存储matcap的mask, shader不支持半透明
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float matcap_mask)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(matcap_mask, separateColor.w);
+		  }
+		  branch("0") {
+			out(matcap_mask, diffuse_map_color.a);
+		  }
+		};
+
+		// 加入matcap
+		lowp float4 matcap_map_color = sample(MatcapTex, v_matcap_uv);
+		lowp float3 matcap_color = matcap_map_color.rgb * matcap_brightness * matcap_mask;
+		// lowp float3 matcap_color = matcap_map_color.r  * matcap_mask * matcap_tone.rgb + matcap_map_color.ggg;
+		lowp float4 matcap_combined = float4(diffuse_map_color.rgb + matcap_color.rgb, 1.0f);
+
+		macro(FLOW_ENABLE) out(lowp float3 flow_combined) {
+			branch ("0") {
+				out(flow_combined, matcap_combined.rgb);
+			}
+			branch ("1") {
+				// lowp float diffuseLuminance = dot(matcap_combined.rgb, float3(0.3f, 0.59f, 0.11f));
+
+				mediump float2 flowtex_uv1 = v_flowtex_uv;
+				mediump float2 view_distort = (v_matcap_uv - float2(0.5f))/ float2(0.5f, -0.5f);
+				mediump float2 flowtex_uv = flowtex_uv1 * flowtex_tilling + frame_time * flowtex_speed + view_distort * flowtex_distort;
+				lowp float4 flowtex_color = sample(FlowTex, flowtex_uv);
+				macro(FLOW_MASK) out(lowp float flow_mask) {
+					branch ("0") {
+						out(flow_mask, vertex_color.r);
+					}
+					branch ("1") {
+						lowp float4 flow_maskmap = sample(FlowMaskTex, UV0.xy);
+						out(flow_mask, saturate(vertex_color.r * flow_maskmap.r));
+					}
+				};					
+				out(flow_combined, matcap_combined.rgb * lerp(1.0f, diffuse_inten, flow_mask) + flowtex_color.rgb * flowtex_inten * flowtex_tone.rgb * flow_mask);
+			}
+		};
+		
+		macro(FRESNEL_ENABLE) out(lowp float3 fresnel_combined) {
+			branch ("0") {
+				out(fresnel_combined,flow_combined.rgb);
+			}
+			branch ("1") {
+				lowp float NdotV = saturate(dot(view_dir, vertex_normal));
+				lowp float rim_ = oneminus(NdotV);
+				mediump float rim = smoothstep(u_rim_start, u_rim_end, rim_);
+				lowp float3 fresnel_color = lerp(flow_combined.rgb * rim_inner.rgb * 2.0f, rim_outside.rgb * rim_multi, float3(rim));
+				out(fresnel_combined,fresnel_color);
+			}
+		};
+
+		macro(EMISSIVE_ENABLE) out(lowp float3 emissive_combined) {
+			branch ("0") {
+				out(emissive_combined,fresnel_combined);
+			}
+			branch ("1") {
+				macro(EMISSIVE_MASK) out(lowp float emissive_mask) {
+					branch ("0") {
+						out(emissive_mask, vertex_color.g);
+					}
+					branch ("1") {
+						lowp float4 emissive_map = sample(EmissiveTex, UV0.xy);
+						out(emissive_mask, saturate(vertex_color.g * emissive_map.r));
+					}
+				};
+				out(emissive_combined, emissive_mask * emissive_color.rgb + fresnel_combined);
+			}
+		};
+
+		lowp float4 special_common = float4(emissive_combined, matcap_combined.a);
+
+		lowp float final_alpha = special_common.a * AlphaMtl;
+		pixel(float4(special_common.rgb , final_alpha));
+	}
+}

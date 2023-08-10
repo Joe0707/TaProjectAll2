@@ -1,0 +1,83 @@
+["cocos"]
+pipeline
+<
+  author = "linjiale"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_PMatrix;
+  uniform sampler CC_Texture0
+    <name = "CC_Texture0">;
+  uniform sampler CC_Texture1
+    <name = "CC_Texture1">;
+  uniform float2 texSize;
+
+  varying lowp float4 v_fragmentColor;
+  varying mediump float2 v_texCoord;
+  varying mediump float2 v_texCoord1;
+  varying mediump float2 v_texCoord2;
+  varying mediump float2 v_texCoord3;
+  varying mediump float2 v_texCoord4;
+  varying mediump float2 v_texCoord5;
+  varying mediump float2 v_texCoord6;
+  varying mediump float2 v_texCoord7;
+  varying mediump float2 v_texCoord8;
+  
+  eitheror USE_SEPARATE_ALPHA;
+
+  vertex main
+  {
+    vertex(position * CC_PMatrix);
+    out(v_fragmentColor, diffuse);
+    out(v_texCoord, texCoord0);
+	mediump float2 temp = texSize * 1.0f;
+    out(v_texCoord1, texCoord0 + float2(-1.0f, 1.0f) * temp);
+    out(v_texCoord2, texCoord0 + float2(0.0f, 1.0f) * temp);
+    out(v_texCoord3, texCoord0 + float2(1.0f, 1.0f) * temp);
+    out(v_texCoord4, texCoord0 + float2(-1.0f, 0.0f) * temp);
+    out(v_texCoord5, texCoord0 + float2(1.0f, 0.0f) * temp);
+    out(v_texCoord6, texCoord0 + float2(-1.0f, -1.0f) * temp);
+    out(v_texCoord7, texCoord0 + float2(0.0f, -1.0f) * temp);
+    out(v_texCoord8, texCoord0 + float2(1.0f, -1.0f) * temp);
+  }
+  pixel main
+  {
+    lowp float4 samp0 = sample(CC_Texture0, v_texCoord);
+    lowp float4 samp1 = sample(CC_Texture0, v_texCoord1);
+    lowp float4 samp2 = sample(CC_Texture0, v_texCoord2);
+    lowp float4 samp3 = sample(CC_Texture0, v_texCoord3);
+    lowp float4 samp4 = sample(CC_Texture0, v_texCoord4);
+    lowp float4 samp5 = sample(CC_Texture0, v_texCoord5);
+    lowp float4 samp6 = sample(CC_Texture0, v_texCoord6);
+    lowp float4 samp7 = sample(CC_Texture0, v_texCoord7);
+    lowp float4 samp8 = sample(CC_Texture0, v_texCoord8);
+
+	lowp float4 samp_x = samp3 - samp1 - samp4 + samp5 - samp6 + samp8;
+	lowp float4 samp_y = samp6 + samp7 + samp8 - samp1 - samp2 - samp3;
+	lowp float4 samp = samp3 - samp1 - samp4 + samp5 - samp6 + samp8;
+    lowp float4 use_color = v_fragmentColor;
+    macro(USE_SEPARATE_ALPHA) out(float4 temp)
+    {
+      branch("1")
+      {
+        lowp float4 samp_a = sample(CC_Texture1, v_texCoord);
+        out(temp, use_color * float4(samp.rgb,samp_a.r));
+      }
+      branch("0")
+      {
+        out(temp, use_color * float4(samp.rgb,samp0.a));
+      }
+    };
+	lowp float3 original_color = float3(0.2126f*samp0.r + 0.7152f*samp0.g + 0.0722f*samp0.b);
+	lowp float t = lerp(0.0f, 1.0f, 0.2126f*temp.r + 0.7152f*temp.g + 0.0722f*temp.b);
+	lowp float3 color_l = float3(1.0f, 0.9f, 0.4f);
+	lowp float3 color_h = float3(0.32f, 0.24f, 0.2f);
+	lowp float3 color = t * color_h + color_l.rgb;
+    pixel(float4(color.rgb * samp0.a, samp0.a));
+  }
+}

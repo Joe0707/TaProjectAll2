@@ -1,0 +1,399 @@
+	["检查AO"]
+	eitheror AO_CHECK;
+	macro(AO_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查diffuse"]
+	eitheror DIFFUSE_CHECK;
+	macro(DIFFUSE_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查金属度"]
+	eitheror METAL_CHECK;
+	macro(METAL_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["检查粗糙度"]
+	eitheror ROUGHNESS_CHECK;
+	macro(ROUGHNESS_CHECK)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启环境反射(ENVIR_ENABLE)"]
+	eitheror ENVIR_ENABLE;
+
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+	
+	["镜头主光"]
+	eitheror MAIN_LIGHT_ENABLE;
+
+	["补光"]
+	eitheror DIR_AMBIENT_ENABLE;
+
+	["开启自发光"]
+	eitheror SELF_BLING;
+
+	["接受点光"]
+	eitheror POINT_LIGHT_ENABLE;
+
+	["启用半球光照"]
+	eitheror SPHEREAO_ENABLE;
+
+	//["暗部补光"]
+	//eitheror AMBIENT_FIX;
+
+	// ["开启羽毛反射"]
+	// eitheror FUR_COLOR_ENABLE;
+
+	["是否开启Oren-nayar因子"]
+	eitheror ORENNAYAR_ENABLE;
+	macro(ORENNAYAR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启网格闪烁消融"]
+	eitheror WEB_SHINING_ENABLE;
+	macro(WEB_SHINING_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "0"
+	>;
+	
+	macro(POINT_SHADOW_MAP_ENABLE)
+	<
+		default = "0"
+	>;
+	
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(ENVIR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	macro(MAIN_LIGHT_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+
+	macro(SELF_BLING)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(POINT_LIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(SPHEREAO_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	//macro(AMBIENT_FIX)
+	// <
+	// 	default = "1"
+	// 	customizable = "1"
+	// >;
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	["金属度/sss/光滑度"]
+	uniform sampler SamplerRough
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	
+	// —————————————————— PBR调整 ——————————————————
+
+	["天光颜色"]
+	uniform lowp float4 sky_light_color
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		color = "1"
+		// init = "(0.5569,0.7412,1,1)"
+		init = "(1,1,1,1)"
+	>;
+
+	["天光强度"]
+	uniform float sky_light_intensity
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		init = "5.0"
+	>;
+	["天光平滑度"]
+	uniform float skylight_smooth
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		init = "-0.5"
+		uistep = "0.01"
+		max = "1.0"
+		min = "-1.0"
+	>;
+	["天光垂直范围"]
+	uniform float sky_light_height
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		init = "20.0"
+		uistep = "0.01"
+		max = "30.0"
+		min = "0.0"
+	>;
+	["天光饱和调整"]
+	uniform float sky_light_saturate
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		init = "0.3"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+	>;
+	
+	
+
+	// ——————————————————DIFFUSE——————————————————
+
+	["漫反射强度"]
+	uniform mediump float diffuse_intensity
+	<
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		uistep = "0.001"
+		artist = "0"
+		uigroup = "0 漫反射"
+	>;
+
+
+	["暗部颜色"]
+	uniform lowp float4 dark_color
+	<
+		uigroup = "风格化"
+		artist = "1" 
+		color = "1"
+		init = "(0.15,0.15,0.15,0.15)"
+	>;	
+
+
+
+	//————————————————主光——————————————————
+	["环境贴图旋转"]
+	uniform mediump float env_rotation
+	<
+		init = "0.0"
+		artist = "1"
+		uigroup = "补光"
+		uistep = "0.001"
+		max = "360.0"
+		min = "0.0"
+	>;
+	["主光强度"]
+	uniform mediump float main_light_intensity
+	<
+		init = "2.5"
+		max = "10.0"
+		min = "0.0"
+		uistep = "1"
+		artist = "1"
+		uigroup = "主光"
+	>;	
+
+	["主光颜色"]
+	uniform lowp float4 main_light_color
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0,1.0,1.0,1)"
+		uigroup = "主光"
+	>;	
+	
+	["主光位置x"]
+	uniform mediump float main_pos_x
+	<
+		init = "-6"
+		artist = "1"
+		uigroup = "主光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["主光位置y"]
+	uniform mediump float main_pos_y
+	<
+		init = "-13"
+		artist = "1"
+		uigroup = "主光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+	["主光位置z"]
+	uniform mediump float main_pos_z
+	<
+		init = "13"
+		artist = "1"
+		uigroup = "主光"
+		uistep = "0.001"
+		max = "100"
+		min = "-100"
+	>;
+
+
+	["垂直AO范围"]
+	uniform mediump float sphere_range
+	<
+		init = "30.0"
+		artist = "1"
+		uistep = "1"
+		max = "30"
+		min = "0"
+		uigroup = "ao"
+	>;
+	["垂直AO高度"]
+	uniform mediump float sphere_dist
+	<
+		init = "5.0"
+		artist = "1"
+		uistep = "1"
+		max = "10"
+		min = "-5"
+		uigroup = "ao"
+	>;
+	["垂直AO强度"]
+	uniform mediump float sphere_bias
+	<
+		init = "0.65"
+		artist = "1"
+		uistep = "1"
+		max = "1"
+		min = "-1"
+		uigroup = "ao"
+	>;
+
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV0;
+	
+	varying highp float4 PosWorld;	
+	varying mediump float4 PosLocal;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	// uniform mediump float4x4 envSHR
+	// <
+	//	 init = "(0.014678, -0.012044, -0.040482, -0.029212, -0.012044, -0.014678, 0.022421, 0.014336, -0.040482, 0.022421, 0.136843, 0.068306, -0.029212, 0.014336, 0.068306, 0.175862)"
+	// >;
+	// uniform mediump float4x4 envSHG
+	// <
+	//	 init = "(0.008648, -0.017736, -0.028054, -0.027763, -0.017736, -0.008648, 0.025042, 0.036537, -0.028054, 0.025042, 0.103563, 0.055276, -0.027763, 0.036537, 0.055276, 0.206319)"
+	// >;
+	// uniform mediump float4x4 envSHB
+	// <
+	//	 init = "(-0.002828, -0.022570, -0.018314, -0.026353, -0.022570, 0.002828, 0.025450, 0.066163, -0.018314, 0.025450, 0.069045, 0.040577, -0.026353, 0.066163, 0.040577, 0.261003)"
+	// >;
+
+	uniform highp float4x4 proj : PROJECTION;
+
+
+	
+

@@ -1,0 +1,269 @@
+["溶解shader"]
+pipeline
+<
+    version = "1.0.0"
+    author = "ly"
+    company = "netease"
+    technique = "TShader"
+>
+{
+    ["开启第二张纹理"]
+    eitheror SECOND_ENABLE;
+    macro(SECOND_ENABLE)
+    <
+        customizable = "1"
+        default = "0"
+    >;
+    
+    ["虚体"]
+    eitheror FRESNEL_ENABLE;
+    macro(FRESNEL_ENABLE)
+    <
+        customizable = "1"
+        default = "1"
+    >;
+    
+    ["溶解"]
+    eitheror DISSOLVE_ENABLE;
+    macro(DISSOLVE_ENABLE)
+    <
+        customizable = "1"
+        default = "1"
+    >;
+
+    ["模型坐标"]
+    attribute float4 a_position: POSITION;
+    ["顶点UV"]
+    attribute float4 a_texture0: TEXTURE0;
+    ["顶点色"]
+    attribute float4 a_diffuse: DIFFUSE;
+
+    attribute float4 a_blendweight: BLENDWEIGHT;
+    attribute float4 a_blendindices: BLENDINDICES;
+
+    attribute float4 a_normal: NORMAL;
+
+    ["MVP矩阵"]
+    uniform highp float4x4 world_view_projection: WORLD_VIEW_PROJECTION;
+    ["世界矩阵"]
+    uniform highp float4x4 u_world: WORLD;
+
+    uniform highp float u_clip_plane;//: CLIP_PLANE;
+
+    ["颜色贴图"]
+    uniform sampler Tex0: DIFFUSE
+    <
+        artist = "1"
+    >;
+    ["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA;
+
+    ["第二张贴图"]
+    uniform sampler Tex1
+    <
+        artist = "1"
+    >;
+
+    ["溶解贴图"]
+    uniform sampler DissolveTex
+    <
+        artist = "1"
+    >;
+    ["渐变色贴图"]
+    uniform sampler GradientTex
+    <
+        artist = "1"
+    >;
+    // uv transform
+    uniform float4x4 u_texture_trans0:TEXTURE_TRANS0;
+    ["贴图2平铺U"]
+    uniform float second_u;
+    ["贴图2平铺V"]
+    uniform float second_v;
+
+    ["贴图2平移U"]
+    uniform float second_speed_u;
+    ["贴图2平移V"]
+    uniform float second_speed_v;
+    ["溶解因子"]
+    uniform float dissolve_factor
+    <
+        artist = "1"
+        init = "-0.1"
+        min = "-0.1"
+        max = "1"
+    >;
+    ["溶解宽度"]
+    uniform float dissolve_width
+    <
+        artist = "1"
+        init = "0.1"
+        min = "0.001"
+        max = "1"
+    >;
+    ["染色"]
+    uniform float4 u_color1
+    <
+        artist = "1"
+        color = "1"
+        init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+
+    uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+    ["帧时间"]
+    uniform float u_frame_time: FRAME_TIME;
+    ["摄像机位置"]
+    uniform float4 u_camera_position: CAMERA_POSITION;
+    ["虚化大小"]
+    uniform float u_fresnel_size
+    <   
+        min = "0"
+        max = "5"
+        artist = "1"
+        init = "2.0"
+    >;
+    ["虚体亮度"]
+    uniform float u_fresnel_brightness
+    <
+        min = "1"
+        max = "20"
+        artist = "1"
+        init = "0.0"
+    >;
+
+    uniform float u_alpha_mtl: ALPHA_MTL;
+    uniform float u_alpha_ref: ALPHA_REF;
+
+    // varying
+    varying highp float4 v_texture0;
+    varying highp float4 v_diff_color;
+
+
+    varying lowp float2 v_texture_raw0;
+
+    varying mediump float3 world_normal;
+    varying highp float4 world_pos;
+
+    vertex
+    {
+        float4 pos = float4(a_position.x, max(a_position.y, u_clip_plane), a_position.zw);
+
+
+        macro(GPU_SKIN_ENABLE) out(float4 pos_out, float4 normal_out)
+        {
+            branch("1")
+            {
+                function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), pos, a_normal, u_bone_vec) out (highp float4 _position_out, highp float4 _normal_out);
+
+                out(pos_out, _position_out);
+                out(normal_out, _normal_out);
+
+            }
+            branch("0")
+            {
+                out(pos_out, pos);
+                out(normal_out, a_normal);
+            }
+        };
+
+        macro(FRESNEL_ENABLE)
+        {
+            branch("1"){
+                out(world_pos, transform(pos_out, u_world));
+                // 这里原来用的是a_normal，我改成normal_out
+                out(world_normal, transform(normal_out.xyz, float3x3(u_world)));
+
+            }
+            branch("0"){
+
+            }
+        };
+
+        vertex(transform(pos_out, world_view_projection));
+
+        out(v_diff_color, a_diffuse);
+
+        out(v_texture0, transform(float4(a_texture0.xy, 1.0f, 0.0f), u_texture_trans0));
+
+        out(v_texture_raw0, a_texture0.xy);
+
+    }
+
+    pixel
+    {
+        float4 color = sample(Tex0, v_texture0.xy);
+        macro(DIFFUSE_ALPHA_SEPARATE) out (mediump float4 color_out){
+            branch("1"){
+                out(color_out, float4(color.xyz, sample(sepAlphaTex, v_texture0.xy).a));
+            }
+            branch("0")
+            {
+                out(color_out, color);
+            }
+        };
+        macro(SECOND_ENABLE) out (mediump float4 color_out_2){
+            branch("1")
+            {
+               float2 uv = v_texture_raw0 * float2(second_u, second_v) + float2(u_frame_time) * float2(second_speed_u, second_speed_v);
+               float4 emi_color = sample(Tex1, uv);
+               float4 sum_color = float4(emi_color.x, emi_color.yz, emi_color.x) + color_out;
+               out(color_out_2, sum_color);
+
+            }
+            branch("0")
+            {
+                out(color_out_2, color_out);
+            }
+        };
+        macro(DISSOLVE_ENABLE) out (mediump float4 color_out_3)
+        {  
+            branch("1")
+            {
+                float dissolve_x = sample(DissolveTex, v_texture_raw0).x;
+
+                function linearstep(dissolve_factor - dissolve_width, dissolve_factor, dissolve_x) out (mediump float b1);
+                function linearstep(dissolve_factor - dissolve_width, dissolve_factor + dissolve_width, dissolve_x) out (mediump float b3);
+
+                float3 c1 = lerp(color_out_2.xyz, sample(GradientTex, float2(0.5f, b3)).xyz, float3(clamp(-10f * b3 + 10.0f, 0.0f, 1.0f)));
+                out(color_out_3, float4(c1, color_out_2.w * b1));
+            }
+            branch("0")
+            {
+                out(color_out_3, color_out_2);
+            }
+
+        };
+        float4 shade_color = u_color1 * color_out_3;
+        macro(FRESNEL_ENABLE) out (mediump float4 color_out_4)
+        {
+            branch("1")
+            {
+                float3 pos_to_view = normalize((u_camera_position - world_pos).xyz);
+                float v_dot_n = dot(pos_to_view, normalize(world_normal));
+                
+                out(color_out_4, float4(shade_color.xyz, shade_color.w * u_fresnel_brightness));//pow(v_dot_n, u_fresnel_size) *
+            }
+            branch("0")
+            {
+                out(color_out_4, color_out_3);
+            }
+        };
+        // v_texture_raw0.x * 0.0f 无用的，为了解决varying的问题
+        float final_alpha = v_diff_color.x * u_alpha_mtl * color_out_4.w + v_texture_raw0.x * 0.0f;
+        macro(ALPHA_TEST_ENABLE)
+        {
+            branch("1")
+            {
+                alphatest("<")(final_alpha, u_alpha_ref);
+            }
+            branch("0")
+            {
+
+            }
+        };
+        pixel(float4(color_out_4.xyz, final_alpha));
+
+    }
+
+}

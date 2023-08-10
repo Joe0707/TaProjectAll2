@@ -1,0 +1,85 @@
+["color_grading的后处理"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	["LerpValue"]
+	uniform float LerpValue: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+	>;
+	
+	varying mediump float2 v_texture0: TEXTURE0;
+	
+	["原来图"]
+	uniform sampler sam_diffuse: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+		
+	// 用于过渡的映射图
+	["LutTexture2"]
+	uniform sampler texture_lut_2: OTHER0
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;	
+	
+	["16*16*16版本"]
+	function trans_uv in(float4 org_clr) out(float2 uv, float2 uv2, float factor)
+	{
+		["是否存在半像素问题"]
+		macro(NEOX_METAL) out (float2 offset)
+		{
+			branch("1")
+			{
+				["半像素偏移,u是 0.5/16, v是0.5/(16*16)"]
+				out(offset, float2(1.0f / 32.0f, 1.0f / 512.0f));
+			}
+			branch("0")
+			{
+				out(offset, float2(0.0f, 0.0f));
+			}
+		};
+		float2 scale = float2( 15.0f/16.0f );
+		float2 uv_base = float2( org_clr.x, org_clr.y/16.0f );
+		float z16 = org_clr.z * 15.0f;
+		float z16_idx = floor( z16 );
+		float z16_idx2 = min( z16_idx + 1.0f, 15.0f );
+		out(factor, z16-z16_idx);
+		float2 uv_base1 = uv_base*scale + offset;
+		out(uv, uv_base1 + float2(0.0f, z16_idx/16.0f ));
+		out(uv2, uv_base1 + float2(0.0f, z16_idx2/16.0f));
+	};
+	
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(v_texture0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		lowp float4 org_clr = sample(sam_diffuse, v_texture0);
+		function trans_uv(org_clr) out(float2 uv, float2 uv2, float factor);
+		lowp float4 clr = sample(texture_lut_2, uv);
+		lowp float4 clr2 = sample(texture_lut_2, uv2);
+		float4 lerp1 = lerp(clr, clr2, float4(factor));
+		pixel(lerp(org_clr, lerp1, float4(LerpValue)));
+	}
+}

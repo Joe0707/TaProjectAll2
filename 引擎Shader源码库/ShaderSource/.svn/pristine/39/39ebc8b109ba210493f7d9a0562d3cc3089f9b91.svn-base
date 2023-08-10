@@ -1,0 +1,191 @@
+["极坐标UV"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	// 贴图	
+	["第一层"]
+	uniform sampler _RingTex : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["第二层"]
+	uniform sampler _RingTex2 
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["闪光序列帧"]
+	uniform sampler _LightingTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	["上色图"]
+	uniform sampler _RampTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp"
+		addressv = "repeat"
+		lodbias = "-1.0"
+	>;
+	["漩涡扭曲"]
+    uniform float _RadialDistort
+    <
+        artist = "1"
+        uistep = "0.01"
+        min = "-5.0" 
+		max = "5.0" 
+		init = "-0.5"
+    >;
+	["第一层漩涡速度"]
+    uniform float2 _RingSpeed
+    <
+        artist = "1"
+		init = "(-0.2,0.5)"
+    >;
+	["第一层漩涡UV大小"]
+    uniform float2 _RingScale
+    <
+        artist = "1"
+		init = "(1.0,2.0)"
+    >;
+	["第一层边缘处理"]
+    uniform float _EdgeDistort
+    <
+        artist = "1"
+        uistep = "0.01"
+        min = "0.001" 
+		max = "10.0" 
+		init = "0.1"
+    >;
+	["第二层漩涡速度"]
+    uniform float2 _Ring2Speed
+    <
+        artist = "1"
+		init = "(0.0,1.0)"
+    >;
+    ["第二层漩涡UV大小"]
+    uniform float2 _Ring2Scale
+    <
+        artist = "1"
+		init = "(2.0,2.0)"
+    >;
+    ["第二层边缘处理"]
+    uniform float _EdgeDistort2
+    <
+        artist = "1"
+        uistep = "0.01"
+        min = "0.001" 
+		max = "10.0" 
+		init = "2"
+    >;
+    ["第二层亮度"]
+    uniform float _Ring2Intenisty
+    <
+        artist = "1" 
+		init = "1.0"
+    >;
+    ["序列帧行数"]
+    uniform float _LightingRows
+    <
+        artist = "1" 
+		init = "4.0"
+    >;
+    ["序列帧列数"]
+    uniform float _LightingColums
+    <
+        artist = "1" 
+		init = "4.0"
+    >;
+    ["序列帧播放速度"]
+    uniform float _LightingSpeed
+    <
+        artist = "1" 
+		init = "3.0"
+    >;
+    ["序列帧层亮度"]
+    uniform float _LightingIntensity
+    <
+        artist = "1" 
+		init = "2.0"
+    >;
+	["序列帧层颜色"]
+	uniform mediump float4 _AddColor
+	<
+		init = "(0.662,0.796,0.949,0)"
+		artist = "1"
+		color = "1"
+	>;
+
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 position : POSITION;
+	attribute float4 a_color : DIFFUSE;
+	
+// varying变量
+	varying mediump float2 UV0;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	vertex
+	{
+		["wvp变换"]				
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		out(UV0, texcoord0.xy);
+	}
+
+	pixel
+	{
+		float UNITY_PI = 3.14159f;
+		float radial_factor = UNITY_PI * (1.0f - length((UV0.xy * 2.0f - float2(1.0f)))) * _RadialDistort;
+		float cos420 = cos(radial_factor);
+		float sin420 = sin(radial_factor);
+		float2 rot_vector = UV0.xy - float2(0.5f);
+		float2 rotator420 = float2(dot(rot_vector,float2(cos420 , -sin420)), dot(rot_vector,float2(sin420 , cos420))) + float2(0.5f);
+		float2 temp_output_347_0 = rotator420 * 2.0f - float2(1.0f);
+		highp float tau = 6.28318548202515f;
+		float temp_output_357_0 = fractional(atan2(temp_output_347_0.x , temp_output_347_0.y)/ tau);
+		float temp_output_346_0 = length( temp_output_347_0 );
+		float2 appendResult352 = float2(temp_output_357_0 , pow(temp_output_346_0 , _EdgeDistort));
+		float2 ring_uv = (FrameTime * _RingSpeed + appendResult352) * _RingScale;
+		float sphere_mask = length(UV0.xy * 2.0f - float2(1.0f));
+		float2 appendResult520 = float2(temp_output_357_0 , pow(temp_output_346_0,_EdgeDistort2));
+		float2 ring2_uv = (FrameTime * _Ring2Speed + appendResult520) * _Ring2Scale;
+		float2 rampuv = float2(sample(_RingTex,ring_uv).r - sphere_mask * sphere_mask * 0.5f + 
+			sample(_RingTex2,ring2_uv).r * _Ring2Intenisty, 0.5f);
+		float totalFrames = _LightingColums * _LightingRows;
+		float2 colum_row = float2(_LightingColums , _LightingRows);
+		float2 total_row = float2(totalFrames , _LightingRows);
+		float clampResult42_g12 = clamp(0.0f,0.0001f,totalFrames - 1.0f);
+		float temp_output_35_0_g12 = fractional(( _LightingSpeed * FrameTime * UNITY_PI + clampResult42_g12 )/ totalFrames);
+		float2 appendResult29_g12 = float2(temp_output_35_0_g12 , 1.0f - temp_output_35_0_g12);
+		float2 flipbookuv = (UV0.xy / colum_row) + floor(total_row * appendResult29_g12) / colum_row;
+		lowp float3 combined_color = sample(_RampTex, rampuv).rgb + sample(_LightingTex, flipbookuv).r * _LightingIntensity * _AddColor.rgb;
+
+		pixel(float4(combined_color, 1.0f));
+	}
+}

@@ -1,0 +1,408 @@
+["适用于修改人物轮廓、雾化效果、顶点区域染色等特效效果"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang/fanyu"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+
+//宏
+	["开启雾化纹理"]
+	eitheror SSTEXTURE_ENABLE;
+	macro(SSTEXTURE_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启顶点动画"]
+	eitheror VERTEXANIMATION_ENABLE;
+	macro(VERTEXANIMATION_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启膨胀效果"]
+	eitheror SWELL_ENABLE;
+	macro(SWELL_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;	
+
+	["开启顶点区域染色"]
+	eitheror VERTEX_ADD_ENABLE;
+	macro(VERTEX_ADD_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;	
+
+
+	["开启雾化角色"]
+	eitheror FOG_FIGURE_ENABLE;
+	macro(FOG_FIGURE_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;		
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "1"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["纹理贴图"]
+	uniform sampler Flowmap
+	<
+		artist = "1"
+		mag = "1"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\noise_simplex.png"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+// uniform变量
+	["uv缩放"]
+	uniform float flow_uv_tiling
+	<
+		uigroup = "雾化"
+		artist = "1"
+		uistep = "1"
+		min = "0.5"
+		max = "5.0"
+		init = "1.0" 
+	>;
+
+
+	// ["屏幕空间纹理纵向uv缩放"]
+	// uniform float flow_uv_tiling2
+	// <
+	// 	artist = "0"
+	// 	uistep = "1"
+	// 	min = "0.5"
+	// 	max = "5.0"
+	// 	init = "1.0" 
+	// >;
+
+	["横向移动速度"]
+	uniform float flow_uv_panner1
+	<
+		uigroup = "雾化"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "0.5"
+		init = "0.15" 
+	>;
+
+	["纵向移动速度"]
+	uniform float flow_uv_panner2
+	<
+		uigroup = "雾化"
+		artist = "1"
+		uistep = "1"
+		min = "0.1"
+		max = "0.5"
+		init = "0.15" 
+	>;
+
+	["边缘虚化起始位置"]
+	uniform float NdotV_smooth1
+	<
+		uigroup = "雾化"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.3" 
+	>;
+
+	["边缘虚化结束位置"]
+	uniform float NdotV_smooth2
+	<
+		uigroup = "雾化"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0" 
+	>;
+
+	["顶点动画周期"]
+	uniform float va_speed
+	<
+		uigroup = "顶点动画"
+		artist = "1"
+		uistep = "1"
+		min = "1.0"
+		max = "20.0"
+		init = "5.0"
+	>;
+
+	["顶点动画幅度"]
+	uniform float va_scale
+	<
+		uigroup = "顶点动画"
+		artist = "1"
+		uistep = "1"
+		min = "0.1"
+		max = "1.0"
+		init = "0.2"
+	>;
+
+	["膨胀度"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "膨胀"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>;	
+
+	["最大膨胀速率"]
+	uniform lowp float swell_multi
+	<
+		uigroup = "膨胀"
+		artist = "1"
+		uistep = "1"
+		min = "1.0"
+		max = "5.0"
+		init = "1.0"
+	>;		
+
+	["最大膨胀体积"]
+	uniform lowp float swell_volume
+	<
+		uigroup = "膨胀"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "1.0"
+	>;	
+
+	["内核颜色"]
+	uniform mediump float4 inner_color
+	<
+		uigroup = "膨胀"
+		artist = "1"
+		color ="1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	["顶点区域染色"]
+	uniform mediump float4 area_color
+	<
+		uigroup = "顶点区域染色"
+		artist = "1"
+		color ="1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	uniform lowp float frame_time : FRAME_TIME;
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4 wv : WORLD_VIEW;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL;
+
+// varying变量
+	varying mediump float2 UV0;
+	varying lowp float2 flow_uv;
+	varying highp float3 v_normal;
+	//varying mediump float4 PosWorld;
+	varying mediump float3 v_vertex_color;
+	varying lowp float v_offset_fac;
+	varying lowp float3 v_view_dir;
+	// varying mediump float3 vertex_offset;
+
+function overlay in(lowp float A,lowp float B) out(lowp float C) {
+	float C1 = A * B * 2.0f;
+	float C2 = 1.0f - (1.0f - A) * (1.0f - B) * 2.0f;
+	out(C, lerp(C1,C2,step(A,0.5f)));
+};
+
+
+vertex 
+{
+
+	["是否开启GPU蒙皮"]
+	macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+	{
+		branch("1")
+		{
+			function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+			out(vec, pos1);
+			out(nor, nor1);
+			
+		}
+		branch("0") 
+		{
+			out(vec, a_position);
+			out(nor, a_normal);
+		}
+	};
+	highp float4 position = vec;	
+	highp float4 normal = nor;	
+	// 顶点动画
+	macro(VERTEXANIMATION_ENABLE) out(lowp float3 vertex_offset) {
+		branch ("1") {
+			// 顶点膨胀
+			macro(SWELL_ENABLE) out(lowp float3 vertex_offset_inner) {
+				branch ("1") {
+					// 用膨胀度来影响角色的扰动幅度、扰动频率和整体外拓的大小；
+					// 顶点色（a_color.g）的B通道用来表示角色不同部位的基础膨胀率（低的地方不受外拓影响）
+
+					lowp float speed_contribute = (1.0f + step(0.5f, ChangeAmount)) * swell_multi;
+					lowp float volume_contribute = (1.0f + ChangeAmount);
+
+
+					lowp float va_time = frame_time * va_speed * speed_contribute;
+					lowp float3 offset = sin(float3(va_time) + position.rgb);
+
+					lowp float3 offset_contribute = volume_contribute * normal.xyz * a_color.g;
+					lowp float3 whole_offset = normal.xyz * swell_volume * ChangeAmount * step(0.1f, a_color.g);
+					out(vertex_offset_inner, offset * offset_contribute * va_scale + whole_offset);
+				}
+				branch("0"){
+					// 普通顶点动画
+					lowp float va_time = frame_time * va_speed;
+					lowp float3 offset = sin(float3(va_time) + position.rgb);
+					out(vertex_offset_inner, offset * va_scale * normal.xyz);
+				}
+			};
+
+			out(vertex_offset, vertex_offset_inner);
+		}
+		branch ("0") {
+			out(vertex_offset,float3(0.0f));
+		}
+	};
+
+	macro(SWELL_ENABLE){
+		branch ("1") {
+			out(v_offset_fac, abs(vertex_offset.x + vertex_offset.y + vertex_offset.z));
+		}
+		branch("0"){}
+	};
+	
+
+	highp float4 position1 = float4(position.rgb + vertex_offset,1.0f);	
+	highp float4 pos = transform(position1, wvp);
+	vertex(pos);
+	out(UV0, texcoord0.xy);
+
+
+
+	float3x3 worldMat = float3x3(world);
+	lowp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+	out(v_normal,world_normal);
+	
+	highp float4 pos_world = transform(position1, world);
+	//out(PosWorld, float4(pos_world.xyz, 1.0f));
+	out(v_vertex_color, a_color.rgb);
+
+	macro(FOG_FIGURE_ENABLE){
+		branch ("1") {
+			out(v_view_dir,  normalize(camera_pos.xyz - pos_world.xyz));
+			macro(SSTEXTURE_ENABLE){
+				branch ("1") {
+					out(flow_uv, texcoord0.xy * float2(flow_uv_tiling) + float2(flow_uv_panner1,flow_uv_panner2) * frame_time);
+				}
+				branch ("0") {
+				}
+			};
+		}
+		branch("0"){}
+	};
+
+
+
+}
+pixel 
+{
+	lowp float3 vertex_color = v_vertex_color;
+	lowp float3 normalWorld = v_normal;
+	lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+
+	// 雾化角色
+	macro(FOG_FIGURE_ENABLE) out(lowp float mask) {
+		branch ("1") {
+			lowp float3 view_dir = v_view_dir;
+			lowp float NdotV = saturate(dot(view_dir,normalWorld.xyz));
+			lowp float rim = smoothstep(NdotV_smooth1,NdotV_smooth2,NdotV);
+			lowp float rim_1 = lerp(rim,1.0f,saturate(vertex_color.r * 2.0f -1.0f));
+
+			// 屏幕空间纹理
+			macro(SSTEXTURE_ENABLE) out(lowp float mask_inner) {
+				branch ("1") {
+					lowp float4 sstex1 = sample(Flowmap,flow_uv);
+					function overlay(sstex1.r,rim_1) out (lowp float mask1);
+					out(mask_inner,mask1);
+				}
+				branch ("0") {
+					out(mask_inner,rim_1);
+				}
+			};
+			out(mask, mask_inner);
+		}
+
+		branch("0"){
+			out(mask, 1.0f);
+		}
+	};
+
+	
+
+
+	// 膨胀染色
+	macro(SWELL_ENABLE) out(lowp float3 tint_inner_color) {
+		branch ("1") {
+			lowp float3 tint_inner_color_ = diffuse_map_color.rgb + inner_color.rgb * (vertex_color.g + v_offset_fac) * ChangeAmount;
+			out(tint_inner_color, tint_inner_color_);
+		}
+		branch("0"){
+			out(tint_inner_color, diffuse_map_color.rgb);
+		}
+	};
+	
+	// 顶点区域染色
+	macro(VERTEX_ADD_ENABLE) out(lowp float3 tint_vertex_color) {
+		branch ("1") {
+			lowp float3 tint_vertex_color_ = tint_inner_color + area_color.rgb * ChangeAmount * vertex_color.b;
+			out(tint_vertex_color, tint_vertex_color_);
+		}
+		branch("0"){
+			out(tint_vertex_color, tint_inner_color);
+		}
+	};
+
+	pixel(float4(tint_vertex_color.xyz, mask * AlphaMtl * diffuse_map_color.a));
+	// pixel(float4(float3(mask,1.0f)));
+}
+}

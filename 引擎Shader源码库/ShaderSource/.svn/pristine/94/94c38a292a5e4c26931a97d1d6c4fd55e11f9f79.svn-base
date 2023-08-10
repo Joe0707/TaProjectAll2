@@ -1,0 +1,142 @@
+﻿["简易matcap，制作球状特效使用，支持半透明"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "fanyu" 
+	category = "common" 
+	company = "netease"
+ 	merge = "1"
+>
+{
+// 宏
+
+
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+
+
+
+	["雪球贴图"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	// uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["强度"]
+	uniform mediump float sm_multi
+	<
+		uigroup = "matcap"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float icelerp;
+	varying mediump float firelerp;
+	varying mediump float height_sm;
+	//varying lowp float v_height_fac;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		
+		highp float4 position = a_position;	
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+
+		highp float3 normal_view = normalize(transform(nor.rgb,float3x3(wv)));
+		out(UV1,normal_view.rg * float2(0.5f, -0.5f) + float2(-0.5f, -0.5f));
+
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		//lowp float height_fac = v_height_fac;
+
+		lowp float3 gold_color = sample(MatcapTex,UV1.xy).rgb * sm_multi;
+
+		
+		// alpha
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+		
+
+		pixel(float4(diffuse_map_color.rgb * gold_color , alpha * AlphaMtl));
+	}
+}

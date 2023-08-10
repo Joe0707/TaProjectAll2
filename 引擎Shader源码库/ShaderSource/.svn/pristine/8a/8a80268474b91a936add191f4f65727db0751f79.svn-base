@@ -1,0 +1,26 @@
+["cocos"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_PMatrix;
+
+  varying lowp float4 v_fragmentColor;
+
+
+  vertex main
+  {
+    vertex(position * CC_PMatrix);
+    out(v_fragmentColor, diffuse);
+  }
+  pixel main
+  {
+    pixel(v_fragmentColor);
+  }
+}

@@ -1,0 +1,601 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+	["雾效"]
+	eitheror SCENE_FOG;
+	macro(SCENE_FOG)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	["FX_ENABLE"]
+	eitheror FX_ENABLE;
+	macro(FX_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	macro(SHADOW_MAP_ENABLE)
+	<
+		default = "1"
+	>;
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressv = "clamp"
+		addressu = "clamp"
+		lodbias = "-0.5"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["composemask贴图"]
+	uniform sampler _ComposeMask
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressv = "clamp"
+		addressu = "clamp"
+		lodbias = "-0.5"
+	>;
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+	// ["fxmask贴图"]
+	// uniform sampler _FXMask
+	// <
+	// 	artist = "1"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	lodbias = "-0.5"
+	// >;
+	// ["pattern贴图"]
+	// uniform sampler _PatternTex
+	// <
+	// 	artist = "1"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	lodbias = "0.0"
+	// >;
+	["_ChangeAmount"]
+	uniform mediump float _ChangeAmount
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "-0.5"
+		init = "1.61"
+	>;
+	["_ChangeOffset"]
+	uniform mediump float _ChangeOffset
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.5"
+		min = "-0.5"
+		init = "0.1"
+	>;
+	["_ChangeSmooth"]
+	uniform mediump float _ChangeSmooth
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.3"
+		min = "0.001"
+		init = "0.1"
+	>;
+	["_ChangeSmooth2"]
+	uniform mediump float _ChangeSmooth2
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.3"
+		min = "0.001"
+		init = "0.3"
+	>;
+	["_ChangeLineSmooth"]
+	uniform mediump float _ChangeLineSmooth
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.3"
+		min = "0.001"
+		init = "0.1"
+	>;
+	["_Width"]
+	uniform mediump float _Width
+	<
+		artist = "1"    
+		init = "0.5"
+	>;
+	["_EdgeDistance"]
+	uniform mediump float _EdgeDistance
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+	["_EdgeHardness"]
+	uniform mediump float _EdgeHardness
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"  
+		max = "0.99"
+		min = "0.0"
+	>;
+	["_EdgeIntensity"]
+	uniform mediump float _EdgeIntensity
+	<
+		artist = "1"    
+		init = "1.0"
+	>;
+	["_Width1"]
+	uniform mediump float _Width1
+	<
+		artist = "1"    
+		init = "5.0"
+	>;
+	["_EdgeDistance1"]
+	uniform mediump float _EdgeDistance1
+	<
+		artist = "1"    
+		init = "3.0"
+	>;
+	["_EdgeHardness1"]
+	uniform mediump float _EdgeHardness1
+	<
+		artist = "1"    
+		init = "0.1"
+		uistep = "0.001"  
+		max = "0.99"
+		min = "0.0"
+	>;
+	["_EdgeIntensity1"]
+	uniform mediump float _EdgeIntensity1
+	<
+		artist = "1"    
+		init = "1.5"
+	>;
+	["_LineIntensity"]
+	uniform mediump float _LineIntensity
+	<
+		artist = "1"    
+		init = "1.0"
+	>;
+	["_Width2"]
+	uniform mediump float _Width2
+	<
+		artist = "1"    
+		init = "0.15"
+	>;
+	["_EdgeDistacen2"]
+	uniform mediump float _EdgeDistacen2
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+	["_EdgeHardness2"]
+	uniform mediump float _EdgeHardness2
+	<
+		artist = "1"    
+		init = "0.1"
+		uistep = "0.001"  
+		max = "0.99"
+		min = "0.0"
+	>;
+	["_OffsetIntensity"]
+	uniform mediump float _OffsetIntensity
+	<
+		artist = "1"    
+		init = "0.5"
+	>;
+	["_EmissAdd"]
+	uniform mediump float _EmissAdd
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"  
+		max = "1.0"
+		min = "0.0"
+	>;
+	["_EmissColor"]
+	uniform mediump float4 _EmissColor
+	<
+		init = "(0.4039,0.4745,0.5411,0.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+	["_TileOffsetFactor"]
+	uniform mediump float _TileOffsetFactor
+	<
+		artist = "1"    
+		init = "0.24"
+	>;
+	["_TileHeightFactor"]
+	uniform mediump float _TileHeightFactor
+	<
+		artist = "1"    
+		init = "-0.4"
+	>;
+	["_RimHeightFactor"]
+	uniform mediump float _RimHeightFactor
+	<
+		artist = "1"    
+		init = "0.1"
+	>;
+	// ["_HeightFactor"]
+	// uniform mediump float _HeightFactor
+	// <
+	// 	artist = "1"    
+	// 	init = "0.1"
+	// 	uistep = "0.001"  
+	// 	max = "0.5"
+	// 	min = "0.0"
+	// >;
+	// ["_TileHeightFactor"]
+	// uniform mediump float _TileHeightFactor
+	// <
+	// 	artist = "1"    
+	// 	init = "0.25"
+	// 	uistep = "0.001"  
+	// 	max = "0.5"
+	// 	min = "-0.5"
+	// >;
+
+	["_SineSpeed"]
+	uniform mediump float _SineSpeed
+	<
+		artist = "1"    
+		init = "150.0"
+	>;
+	["_BlinkFreq"]
+	uniform mediump float _BlinkFreq
+	<
+		artist = "1"    
+		init = "0.75"
+		uistep = "0.001"  
+		max = "1.0"
+		min = "0.0"
+	>;
+	["_BlinkScale"]
+	uniform mediump float _BlinkScale
+	<
+		artist = "1"    
+		init = "1.5"
+	>;
+
+	["_EmissAdjust"]
+	uniform mediump float _EmissAdjust
+	<
+		artist = "1"    
+		init = "0.6"
+	>;
+	["_Luminance"]
+	uniform mediump float _Luminance
+	<
+		artist = "1"    
+		init = "0.3"
+	>;
+	["_DeSaturate"]
+	uniform mediump float _DeSaturate
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+	// ——————————————————自投影——————————————————
+	["阴影透明度"]
+	uniform lowp float shadow_alpha
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影颜色"]
+	uniform lowp float4 shadow_color
+	<
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+	["阴影颜色浓度"]
+	uniform lowp float shadow_density
+	<
+		init = "0.1"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+	["阴影bias"]
+	uniform mediump float shadowmap_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+	["阴影采样bias"]
+	uniform mediump float shadowmap_uv_bias
+	<
+		uigroup = "自投影"
+		init = "0.5"
+		artist = "1"
+	>;
+
+// attribute变量
+	// attribute float4 texcoord0 : TEXTURE0;
+	// attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float3 a_normal : NORMAL;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform lowp float HeightFogDensity: HEIGHT_FOG_DENSITY; 
+	uniform highp float frame_time : FRAME_TIME;
+	uniform highp float4 viewport_size : VIEWPORT_SIZE;
+
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+		artist = "1"
+	>;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying lowp float fog_distance;
+	varying lowp float fog_height_factor;
+	varying highp float4 v_screenpos;
+	varying mediump float4 v_light_proj_pos;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	
+	vertex
+	{
+		highp float4 screen_pos = transform(a_position, wvp);
+	    vertex(screen_pos);
+	    out(v_screenpos,screen_pos);
+    	// diffuse
+		// mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		// out(UV0, uv0);
+
+
+		// // 在vertex中计算高度雾
+		// macro(SCENE_FOG) {
+		// 	branch ("1") {
+		// 		mediump float4 pos_world = transform(a_position, world);
+		// 		mediump float height = pos_world.y;
+
+		// 		function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor1);
+
+		// 		mediump float distance = pos.z;
+		// 		out(fog_distance , distance);
+		// 		out(fog_height_factor, 1.0f - fog_height_factor1);
+		// 	}
+		// 	branch ("0") {
+		// 	}
+		// };
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+		highp float4 pos_world = transform(a_position, world);
+		macro(LEVEL_MIDDLE)
+		{
+			branch("1")
+			{
+				macro(SHADOW_MAP_ENABLE)
+				{
+					branch("1")
+					{				
+						mediump float4 shadow_light_attr_3 = ShadowLightAttr[3];
+						function calc_shadow_info(
+							pos_world,
+							world_normal,
+							lvp,
+							shadow_light_attr_3.xyz)
+						out(
+							highp float2 uv_out,
+							highp float  depth_out,
+							highp float  factor_out
+						);
+						out(v_light_proj_pos, float4(uv_out, depth_out, factor_out));
+					}
+					branch("0")
+					{
+					}
+				};
+			}
+			branch("0")
+			{
+			}
+		};
+	}
+
+	pixel
+	{
+		// lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		highp float4 screenpos = v_screenpos;
+		mediump float2 screenuv_ = screenpos.xy / screenpos.w;
+		mediump float aspect = viewport_size.x / viewport_size.y;
+		mediump float aspect_fixed = 1.0f + max(aspect - 1.7777f,0.0f) / 0.383f * 0.2f;
+		mediump float screenuv_fixed_x = screenuv_.x * aspect_fixed;
+		mediump float2 screenuv_fixed_ = float2(screenuv_fixed_x,screenuv_.y);
+		mediump float2 screenuv_fixed = (screenuv_fixed_ + float2(1.0f)) * 0.5f;
+
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float2 screenuv)
+		{
+			branch("1")
+			{
+				["GL渲染系统下"]
+				out(screenuv, float2(screenuv_fixed.x,1.0f - screenuv_fixed.y));
+			}
+			branch("0")
+			{
+				["Dx和Metal渲染系统下"]
+				//out(screenuv, float2(screenuv_));
+				out(screenuv, float2(screenuv_fixed.x,1.0f - screenuv_fixed.y));
+			}
+		};
+
+		macro(FX_ENABLE) out(mediump float3 fx_color,lowp float fx_alpha,lowp float2 offset_uv){
+			branch("1"){
+				lowp float4 composemask_value = sample( _ComposeMask, screenuv );
+				lowp float DepthMask = composemask_value.r;
+				lowp float RimMask = composemask_value.g;
+				lowp float PatternMask = composemask_value.b;
+				mediump float screen_offset_factor = abs((DepthMask + PatternMask * _TileOffsetFactor) - _ChangeAmount - _EdgeDistacen2) / _Width2;
+				lowp float OffsetFactor = smoothstep(1.0f, _EdgeHardness2 ,screen_offset_factor);
+
+				lowp float change_factor = DepthMask + RimMask * _RimHeightFactor;
+				mediump float edge_factor_ = abs(_EdgeDistance - (change_factor + _TileHeightFactor * PatternMask - _ChangeAmount ) / _ChangeSmooth) / (_Width + _ChangeAmount * 0.5f);
+				lowp float edge_factor = smoothstep( 1.0f , _EdgeHardness ,edge_factor_) * _EdgeIntensity;
+				float mulTime = frame_time * _SineSpeed;
+				float BlinkFactor = ((step(sin(mulTime) , _BlinkFreq) - 0.5f) * _BlinkScale) * edge_factor * (1.0f - saturate(_ChangeAmount / 1.5f));
+
+				float edgeline_change_factor = ( change_factor - _ChangeAmount ) / _ChangeLineSmooth;
+				lowp float line_factor_ = smoothstep( 1.0f, _EdgeHardness1 , abs(_EdgeDistance1 - edgeline_change_factor) / _Width1);
+				float LineMask = RimMask * _LineIntensity;
+				float line_factor = line_factor_ * _EdgeIntensity1 * LineMask ;
+
+				mediump float2 offset_uv_ = OffsetFactor * _OffsetIntensity * 0.01f * float2(1.0f,0.0f);
+				mediump float3 output_color = _EmissColor.xyz * (edge_factor + BlinkFactor + line_factor);
+
+				float clampResult108 = saturate(edge_factor + line_factor);
+				float clampResult104 = 1.0f - saturate((DepthMask - (_ChangeAmount + _ChangeOffset)) / _ChangeSmooth2);
+				float output_aplha = saturate(clampResult108 + clampResult104);
+				out(fx_color,output_color);
+				out(fx_alpha,output_aplha);
+				out(offset_uv,offset_uv_);
+			}
+			branch("0"){
+				out(fx_color,float3(0.0f));
+				out(fx_alpha,1.0f);
+				out(offset_uv,float2(0.0f));
+			}
+		};
+
+		lowp float4 diffuse_color = sample(Tex0, screenuv + offset_uv);
+		mediump float3 output_color = diffuse_color.xyz + fx_color;
+
+		// —————————————————— 自投影(shadow_fac计算) ——————————————————	
+		macro(LEVEL_MIDDLE) out(mediump float shadow_fac_) 
+		{
+			branch ("1") 
+			{
+				macro(SHADOW_MAP_ENABLE) out (mediump float shadow_fac_0)
+				{
+					branch("1") {         
+						mediump float4 v_light_proj_pos_ = v_light_proj_pos;
+						macro(LEVEL_HIGH) out(mediump float fac0) 
+						{
+							branch ("1") 
+							{
+								function calc_shadowmap_factor_sampling5(SMAP, v_light_proj_pos_, u_shadowmap_info, shadow_bias_factor * shadowmap_bias, shadowmap_uv_bias)
+						        out(lowp float factor);
+						        out(fac0, factor);
+							}
+							branch ("0") 
+							{
+								function calc_shadowmap_factor(SMAP, v_light_proj_pos_, u_shadowmap_info, shadow_bias_factor * shadowmap_bias)
+						        out(lowp float factor);
+						        out(fac0, factor);
+							}
+						};
+						out(shadow_fac_0, fac0);
+					}
+					branch("0") {
+						out(shadow_fac_0, 1.0f);
+					}
+				};
+				out(shadow_fac_, shadow_fac_0);
+			}
+			branch("0")
+			{
+				out(shadow_fac_, 1.0f);
+			}
+		};
+
+		lowp float shadow_lerp = lerp(shadow_alpha, 1.0f, shadow_fac_);
+		lowp float3 shadow_color_lerp = lerp(output_color.rgb, shadow_color.rgb, float3(shadow_density));
+		lowp float3 shadow_blend_ = lerp(shadow_color_lerp * shadow_lerp, output_color.rgb, float3(shadow_fac_));
+
+	    macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(fx_alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		pixel(float4(shadow_blend_, fx_alpha * AlphaMtl));
+	}
+}

@@ -1,0 +1,294 @@
+["场景水"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["是否双阵营"]
+	eitheror TWOGROUP_ENABLE;
+	macro(TWOGROUP_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+// 贴图	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["法线贴图"]
+	uniform sampler NormalMap 
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+		path = "shader\\core\\texture\\rain\\water_normal0.png"
+	>;
+	
+	["反射贴图"]
+	uniform sampler TexReflection
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "shader\\core\\texture\\reflect\\sky_ref1.png"
+	>;
+
+	["法线强度"]
+    uniform float normal_factor
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.63"
+    >;
+    ["波纹强度"]
+    uniform float wave_factor
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.05"
+    >;
+
+    ["水颜色强度开始范围"]
+    uniform float nov_factor1
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.13"
+    >;
+
+    ["水颜色强度结束范围"]
+    uniform float nov_factor2
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.87"
+    >;
+
+	["UV1 Tiling"]
+    uniform float u_UVTiling1
+    <
+        artist = "1"
+        init = "10"
+    >;
+
+    ["UV2 Tiling"]
+    uniform float u_UVTiling2
+    <
+        artist = "1"
+        init = "12"
+    >;
+
+    ["UV1 Speed U"]
+    uniform float u_uvSpeedU1
+    <
+        artist = "1"
+        init = "0.05"
+    >;
+
+    ["UV1 Speed V"]
+    uniform float u_uvSpeedV1
+    <
+        artist = "1"
+        init = "0.05"
+    >;
+
+    ["UV2 Speed U"]
+    uniform float u_uvSpeedU2
+    <
+        artist = "1"
+        init = "-0.08"
+    >;
+
+    ["UV2 Speed V"]
+    uniform float u_uvSpeedV2
+    <
+        artist = "1"
+        init = "0.02"
+    >;
+
+	["反射强度"]
+	uniform mediump float reflect_factor
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "1.0"
+		init = "0.3"
+	>;
+	
+	["水颜色"]
+	uniform mediump float4 WaterColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.125, 0.380, 0.294, 1.0)"
+	>;
+
+    ["场景亮度"]
+    uniform lowp float scene_illum : SCENE_ILLUM
+    <
+		init = "1.0"
+		artist = "0"    
+    >; 
+
+	["水底扰动"]
+	uniform mediump float underwater_noise
+	<
+		init = "0.05" 
+		artist = "1"
+		uigroup = "折射扰动"
+	>;
+
+	["大龙系数"]
+	uniform lowp float dawn_factor:DAWN_VALUE;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+	
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float4 v_vertical_horizon_uv;
+	varying lowp float3 v_compose_info; 
+	varying lowp float3 v_view_dir;
+	varying lowp float3 v_changetone;
+	varying lowp float3 TangentWorld;
+	varying lowp float3 BinormalWorld;
+	varying lowp float3 NormalWorld;
+
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	
+	uniform lowp float4 u_fog_color: FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+	uniform mediump float4 cam_pos : CAMERA_POSITION;
+
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+
+	vertex
+	{
+		["wvp变换"]		
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;		
+		mediump float4 pos_world = position * world;		
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(float3(0.0f, 1.0f, 0.0f), worldMat)));
+		out(NormalWorld, world_normal);
+		mediump float3 tangentWorld = float3(normalize(float3(0.0f, 0.0f, 1.0f) * worldMat));
+		mediump float3 binormal_world = cross(world_normal, tangentWorld);
+		out(TangentWorld, tangentWorld);
+		out(BinormalWorld, binormal_world);
+		highp float4 mdl_pos_world = float4(pos_world.xyz,1.0f);
+		highp float4 pos = transform(mdl_pos_world, viewProj);
+		vertex(pos);
+
+		float2 nor_uv1 = pos_world.xz * 0.001f * float2(u_UVTiling1) + float2(FrameTime) * float2(u_uvSpeedU1, u_uvSpeedV1);
+		float2 nor_uv2 = pos_world.xz * 0.001f *  float2(u_UVTiling2) + float2(FrameTime) * float2(u_uvSpeedU2, u_uvSpeedV2);
+
+		out(v_vertical_horizon_uv, float4(nor_uv1,nor_uv2));
+		
+		mediump float4 uv0 = float4(texcoord0.xy, 0.0f, 1.0f);
+		out(UV0, uv0);
+		lowp float emissive_multi = 0.8f + 0.2f * sin(3.0f * FrameTime) * 0.5f;
+		lowp float l_dawn_factor = lerp(1.0f, 0.863f, dawn_factor);
+
+		out(v_compose_info, float3((1.0f - a_color.r) * 0.77f * (1.0f - dawn_factor), emissive_multi, l_dawn_factor));
+		lowp float3 view_dir = normalize(cam_pos.xyz - pos_world.xyz);
+		out(v_view_dir, view_dir);
+
+		macro(TWOGROUP_ENABLE) out(lowp float signal) {
+			branch ("1") {
+				lowp float _signal = saturate((pos_world.x + pos_world.z+90.0f)/180.0f);
+				out(signal, _signal);
+			}
+			branch ("0") {
+				out(signal, 0.0f);
+			}
+		};
+
+		lowp float3 c1 = lerp(float3(1.0f), float3(0.545f, 0.632f, 1.0f), float3(signal));
+
+		lowp float3 changetone = lerp(c1, float3(0.804f, 0.6039f, 0.6039f), float3(dawn_factor));
+		out(v_changetone, changetone);
+	}
+
+	pixel
+	{
+		mediump float2 uv01 = UV0.xy;
+		mediump float2 vertical_uv = v_vertical_horizon_uv.xy;
+		mediump float2 horizon_uv = v_vertical_horizon_uv.zw;
+		lowp float emissive_multi = v_compose_info.y;
+		lowp float l_dawn_factor = v_compose_info.z;
+		lowp float water_mask = v_compose_info.x;
+
+		lowp float3 vertex_normal_world = NormalWorld;
+		lowp float4 normal_map_color1 = sample(NormalMap, vertical_uv);
+		lowp float4 normal_map_color2 = sample(NormalMap, horizon_uv);
+		lowp float3 new_binormal = BinormalWorld;		
+		lowp float2 normOff1 = normal_map_color1.xy * 2.0f - float2(1.0f);
+		lowp float2 normOff2 = normal_map_color2.xy * 2.0f - float2(1.0f);
+		lowp float3 normalWorld_inner1 = normalize(TangentWorld * float3(normOff1.x * normal_factor)  + new_binormal * float3(normOff1.y * normal_factor)  + vertex_normal_world);
+		lowp float3 normalWorld_inner2 = normalize(TangentWorld * float3(normOff2.x * normal_factor)  + new_binormal * float3(normOff2.y * normal_factor)  + vertex_normal_world);
+		lowp float3 normalWorld = lerp(normalWorld_inner1 ,normalWorld_inner2, float3(0.5f));
+		lowp float3 wave_nor = lerp(vertex_normal_world,normalWorld,float3(wave_factor));
+		
+		lowp float NdotV = saturate(dot(v_view_dir, wave_nor));
+		lowp float NdotV2 = 1.0f - smoothstep(nov_factor1,nov_factor2,NdotV);
+
+		lowp float3 NaV = (v_view_dir + normalWorld + float3(1.0f)) * 0.5f;
+		lowp float2 reflect_uv = NaV.rg;
+		lowp float4 reflect_color = sample(TexReflection, reflect_uv);
+
+
+		float2 refraction0 = (1.0f - dot(normalWorld, v_view_dir)) * water_mask * normalWorld.xz;
+		float2 diffUV = uv01.xy + refraction0 * underwater_noise;
+		lowp float4 land_color = sample(Tex0, diffUV);
+
+        mediump float3 land_color1 = land_color.rgb * ((1.0f - water_mask) * 0.5f + 0.5f);
+		mediump float3 fresnel_water_color = lerp(land_color1, WaterColor.xyz, float3(NdotV2) * water_mask);
+		mediump float3 combined_color = fresnel_water_color + (reflect_color.rgb * 0.55f * (reflect_factor + NdotV2)) * water_mask;
+
+		// 取绿通道做熔岩自发光
+		lowp float emissive_mask = oneminus(saturate(land_color.g + 0.8f)) / 5.0f;
+		lowp float3 changed_diffuse = lerp(combined_color.rgb * l_dawn_factor, float3(1.0f, 0.0f, 0.0f), float3(emissive_mask * emissive_multi * dawn_factor));
+	
+		lowp float3 color_export = changed_diffuse * v_changetone;
+		pixel(float4(color_export * scene_illum, 1.0f));
+	}
+}

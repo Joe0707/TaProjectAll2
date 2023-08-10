@@ -1,0 +1,117 @@
+["dissolve"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "wlj"
+	category = "dissolve"
+	company = "netease"
+  merge = "1"
+>
+{
+
+// 宏
+
+// 贴图
+	
+	["滚动贴图"]
+	uniform sampler Tex0 : EMISSIVE
+	<
+		artist = "1"
+	>;
+
+	["遮罩贴图"]
+	uniform sampler Tex4 : MASK
+	<
+		artist = "1"
+	>;
+
+
+// uniform 定制参数
+	["流动光颜色"]
+  uniform lowp float4 Emissive_color
+  <
+    color = "1"
+    artist = "1"
+    init = "1.0, 1.0, 1.0, 1"
+  >;
+
+  ["流动光参数:XY:第一张Tilling;ZW:第二Tilling"]
+  uniform mediump float4 Emissive_tilling
+  <
+		artist = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+  >;
+
+  ["流动光速度参数:XY:第一张UV;ZW:第二UV"]
+  uniform mediump float4 Emissive_speed
+  <
+		artist = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+  >;
+
+  ["其余调节参数:XY:DissolveTilling;Z:AnimationSpeed1;W:AnimationSpeed2"]
+  uniform mediump float4 Shader_Attributes
+  <
+		artist = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+  >;
+
+
+// attribute变量
+  attribute float4 a_position : POSITION;
+	attribute float4 texcoord0 : TEXTURE0;
+  attribute float4 a_normal : NORMAL;
+  attribute float4 diffuse : DIFFUSE;
+
+// uniform变量
+  uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+  uniform highp float4 camera_pos : CAMERA_POSITION;
+  uniform highp float FrameTime: FRAME_TIME;
+
+
+// varying变量
+  varying mediump float4 UV0;
+  varying mediump float4 RAWUV0;
+  varying lowp float4 VetexColor;
+
+	vertex
+	{
+	  float3x3 worldNormalMat = float3x3(world);
+	  float3 normal_out_vec3 = float3(a_normal);
+    vertex(transform(a_position, wvp));
+
+    mediump float4 texc = float4(texcoord0.xy, 1.0f, 0.0f);
+
+    out(UV0, transform(texc, texTrans0));
+	  out(RAWUV0, texc);
+    out(VetexColor, diffuse);
+	}
+
+	pixel
+	{
+    float4 frag_color = float4(1.0f);
+
+    float frametime_scale = 0.1f;
+    float emissive_scale = 4.0f;
+    highp float frame_time = FrameTime * frametime_scale;
+    highp float2 animation_speed = float2(frame_time);
+
+    highp float2 animation_uv = RAWUV0.xy + Emissive_speed.xy * animation_speed;
+    highp float2 animation_uv1 = animation_uv * Emissive_tilling.xy;
+    lowp float4 emissive_color1 = sample(Tex0, animation_uv1);
+
+    lowp float3 mask_color = sample(Tex4,UV0.xy).rgb;
+
+
+    mediump float3 emissive_color2 = emissive_color1.rgb;
+
+    mediump float3 emissive_color3 = emissive_color2 * Shader_Attributes.w;
+    lowp float temp_alpha = emissive_color3.r;
+    mediump float3 emissive_color = emissive_color3 * Emissive_color.rgb * Emissive_color.a * emissive_scale;
+
+    pixel(float4(emissive_color, temp_alpha * mask_color.r * VetexColor.a));
+	}
+}

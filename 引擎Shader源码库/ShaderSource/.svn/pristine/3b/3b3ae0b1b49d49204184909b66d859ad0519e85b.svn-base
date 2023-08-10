@@ -1,0 +1,104 @@
+["极坐标UV"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+	// 贴图	
+	["序列帧"]
+	uniform sampler _LightingTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+    ["序列帧行数"]
+    uniform float _LightingRows
+    <
+        artist = "1" 
+		init = "4.0"
+    >;
+    ["序列帧列数"]
+    uniform float _LightingColums
+    <
+        artist = "1" 
+		init = "4.0"
+    >;
+    ["序列帧播放速度"]
+    uniform float _LightingSpeed
+    <
+        artist = "1" 
+		init = "3.0"
+    >;
+    ["序列帧层亮度"]
+    uniform float _LightingIntensity
+    <
+        artist = "1" 
+		init = "2.0"
+    >;
+	["序列帧层颜色"]
+	uniform mediump float4 _AddColor
+	<
+		init = "(0.662,0.796,0.949,0)"
+		artist = "1"
+		color = "1"
+	>;
+	["顶点偏移值"]
+    uniform float _VertexOffset
+    <
+        artist = "1" 
+		init = "1.0"
+    >;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float3 a_normal : NORMAL;
+	attribute float4 position : POSITION;
+	attribute float4 a_color : DIFFUSE;
+	
+// varying变量
+	varying mediump float2 UV0;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	function random in(float2 input) out(highp float random_factor) {
+		highp float randseed = 43758.5453123f;
+		highp float2 randseed2 = float2(12.9898f, 78.233f);
+		highp float factor = fractional(sin(dot(input,randseed2))* randseed);
+		out(random_factor,factor);
+	};
+
+	vertex
+	{
+		["wvp变换"]
+		function random(texcoord0.xy * 1000.0f + float2(FrameTime)) out(highp float random_factor);
+		highp float3 mdl_pos = position.xyz + a_normal.xyz * random_factor * _VertexOffset;
+		highp float4 pos = transform(float4(mdl_pos,position.w), wvp);
+		vertex(pos);
+		out(UV0, texcoord0.xy);
+	}
+
+	pixel
+	{
+		float UNITY_PI = 3.14159f;
+		float totalFrames = _LightingColums * _LightingRows;
+		float2 colum_row = float2(_LightingColums , _LightingRows);
+		float2 total_row = float2(totalFrames , _LightingRows);
+		float clampResult42_g12 = clamp(0.0f,0.0001f,totalFrames - 1.0f);
+		float temp_output_35_0_g12 = fractional(( _LightingSpeed * FrameTime * UNITY_PI + clampResult42_g12 )/ totalFrames);
+		float2 appendResult29_g12 = float2(temp_output_35_0_g12 , 1.0f - temp_output_35_0_g12);
+		float2 flipbookuv = (UV0.xy / colum_row) + floor(total_row * appendResult29_g12) / colum_row;
+		lowp float3 combined_color = sample(_LightingTex, flipbookuv).r * _LightingIntensity * _AddColor.rgb;
+
+		pixel(float4(combined_color, 1.0f));
+	}
+}

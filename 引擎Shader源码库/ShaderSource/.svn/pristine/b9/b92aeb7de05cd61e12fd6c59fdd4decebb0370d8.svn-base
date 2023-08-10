@@ -1,0 +1,45 @@
+["Invert"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+	technique = "Invert"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	varying mediump float2 v_texture0: TEXTURE0;
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["Intensity"]
+	uniform float Intensity: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "4.0"
+		init = "1.0"
+	>;
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(v_texture0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		lowp float4 org_clr = sample(Tex0, v_texture0);
+		pixel(float4(Intensity) - org_clr);
+	}
+	
+	
+}

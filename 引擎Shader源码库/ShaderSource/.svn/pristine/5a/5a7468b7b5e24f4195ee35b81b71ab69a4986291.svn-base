@@ -1,0 +1,136 @@
+pipeline
+<
+	technique = "Merge"
+>
+{
+
+	["混合颜色因子"]
+	 uniform float blend_k
+    <
+    	artist = "1"
+    	init = "0.80"
+    >;    
+  
+	["曝光"]
+	uniform float ArtistAdaptFactor
+	<
+		artist = "1"
+		min = "0.0"
+		max = "4.0"
+		uistep = "0.01"
+		init = "0.8"
+	>;
+
+	uniform float4 ScreenSize: VIEWPORT_SIZE;
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_t0: TEXTURE0;
+	varying mediump float2 v_t0;
+	uniform mediump float4 u_rt: RT_SIZE;
+	//uniform lowp float u_adapt_factor:ADAPT_FACTOR;
+
+	["是否开启后处理描边"]
+	uniform lowp float enable_hero_outline
+	<
+		init = "0.0"
+		min = "0.0"
+		max = "1.0"
+		artist = "1"
+	>;       
+    
+	uniform sampler Tex0
+	<
+		export = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+    
+	uniform sampler Tex1
+	<
+		export = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;    
+
+	function hdr_tonemap_aces
+			in (highp float3 color, mediump float adapted_lum)
+			out(highp float3 color_out)
+	{
+		float A = 2.51f;
+		float B = 0.03f;
+		float C = 2.43f;
+		float D = 0.59f;
+		float E = 0.14f;
+
+		highp float3 adapt_color = color * adapted_lum;
+		out(color_out, (adapt_color * (A * adapt_color + float3(B))) / (adapt_color * (C * adapt_color + float3(D)) + float3(E)));
+	};
+
+	vertex vs_main
+	{
+		// macro(NEOX_EDITOR) out (float4 position){
+		// 	branch ("1"){
+		// 		out(position, a_position + float4(-u_rt.z, u_rt.w, 0.0f, 0.0f));
+		// 	}
+		// 	branch("0"){
+		// 		out(position, a_position);
+		// 	}
+		// };
+		vertex(a_position);
+		out(v_t0, a_t0.xy);
+            
+    }
+
+	pixel ps_main
+	{
+		float4 tex_color = sample(Tex0, v_t0);
+        
+		// macro(NEOX_EDITOR) out(float adpat_factor)
+		// {
+		// 	branch("1")
+		// 	{
+		// 		out(adpat_factor, ArtistAdaptFactor);
+		// 	}
+		// 	branch("0")
+		// 	{
+		// 		out(adpat_factor, u_adapt_factor);
+		// 	}
+		// };
+		condition(enable_hero_outline) out(float3 color_rgb)
+		{
+			branch("%0% > 0.5f")
+			{
+                float4 outline_color = sample(Tex1, v_t0);
+                out(color_rgb,lerp(tex_color.rgb, outline_color.rgb, float3(outline_color.a*blend_k))*4.0f);      
+			}
+			default
+			{
+                out(color_rgb,tex_color.rgb*4.0f);    
+			}
+		};         
+        
+		float3 color_in = color_rgb * color_rgb;        
+        
+		// macro(USE_HIEND_TONEMAP) out(float3 color_out)
+		// {
+		// 	branch("0")
+		// 	{
+				function hdr_tonemap_aces(color_in, 0.5f) out(float3 color_out_);
+			// }
+		// 	branch("1")
+		// 	{
+		// 		function hdr_hiend_tonemap(color_in, u_adapt_factor) out(float3 color_out_);
+		// 		out(color_out, color_out_);
+		// 	}
+		// };        
+       
+		pixel(float4(sqrt(color_out_),tex_color.w));
+       
+	}
+}

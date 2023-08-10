@@ -1,0 +1,409 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+
+	["打开聚光灯效果"]
+	eitheror OPEN_SPOT;
+	macro(OPEN_SPOT)
+	<
+		customizable = "0"
+		default = "0"
+	>;
+
+	["亮部不受聚光灯影响"]
+	eitheror NONE_SPOT;
+	macro(NONE_SPOT)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	
+	["屏幕空间溶解"]
+	eitheror SCREEN_DISSOLVE;
+	macro(SCREEN_DISSOLVE)
+	<
+		customizable = "1"
+		default = "0"
+	>;	
+
+	["世界空间溶解"]
+	eitheror WORLD_DISSOLVE;
+	macro(WORLD_DISSOLVE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["特写黑化"]
+	eitheror WORLD_DARK;
+	macro(WORLD_DARK)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["阴影浓度"]
+	uniform lowp float shadow_density
+	<
+		init = "0.5"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+
+	["阴影透明度"]
+	uniform lowp float shadow_alpha
+	<
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"	
+		uigroup ="投影"
+		artist = "1"
+		uistep = "0.0001"
+	>;
+
+	["阴影颜色"]
+	uniform lowp float4 shadow_color
+	<
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+		uigroup ="投影"
+		artist = "1"
+	>;
+
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["溶解贴图"]
+	uniform sampler DissolveMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		path = "fx\\texture\\alpha\\clouds.png"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["阴影贴图"]
+	uniform highp samplershadow SMAP : SHADOW
+	<
+		artist = "1"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+		addressu = "linear" 
+		addressv = "linear" 
+	>;
+
+
+	["溶解贴图平铺"]
+	uniform float dissolve_tilling
+	<
+		artist = "1"
+		min = "0"
+		max = "5"
+		uistep = "1"
+		init = "1"
+	>;
+
+	["溶解边缘宽度"]
+	uniform float change_line_scale
+	<
+		artist = "1"
+		min = "0"
+		max = "1"
+		uistep = "1"
+		init = "0.04"
+	>;
+
+	["溶解边缘颜色"]
+	uniform float4 dissolve_line
+	<
+		artist = "1"
+		color = "1"
+		init = "(0.0627,0.1412,0.4039,1)"
+	>;
+
+	["溶解边缘亮度"]
+	uniform float changeline_brightness
+	<
+		artist = "1"
+		color = "1"
+		init = "2"
+	>;
+
+	["变身程度"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "变身"
+		uistep = "1.0"
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+// uniform变量
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float4 shadow_blendall:SHADOW_BLEND_ALL;
+	uniform mediump float frame_time: FRAME_TIME;
+
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform lowp float HeightFogDensity: HEIGHT_FOG_DENSITY; 
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+		artist = "0"
+	>;	
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform lowp float4 ambient_color : AMBIENT;
+
+
+    ["计算shadowmap的uv，depth和factor(VS中处理)"]
+    function calc_shadow_info_inner in(
+        highp float4 pos_world, // 世界空间的坐标
+        highp float3 normal_world, //世界空间的法线方向
+        highp float4x4 light_view_proj, //光源的view proj矩阵
+        highp float3 light_dir // 光源的方向(世界空间)
+    ) out(
+        highp float2 uv_out, // shadow map的uv
+        highp float depth_out, //在光源空间的深度
+        highp float factor_out // 阴影因子
+    )
+    {
+        ["计算在光源空间下的正规化空间"]
+        highp float4 light_space_pos = transform(pos_world, light_view_proj);
+        highp float3 light_space_norm = light_space_pos.xyz / float3(light_space_pos.w);
+        
+        // 算出了深度
+        out(depth_out, light_space_norm.z);
+        
+        ["GL下，纹理原点在左下角，否则在左上角"]
+        macro(SYSTEM_UV_ORIGIN_LEFT_BOTTOM) out(highp float2 bias)
+        {
+            // 在左下角
+            branch("1")
+            {
+                out(bias, float2(0.5f, 0.5f));
+            }
+            // 在左上角
+            branch("0")
+            {
+                out(bias, float2(0.5f, -0.5f));
+            }
+        };
+        
+        // 算出lightmap的uv值
+        out(uv_out, light_space_norm.xy * bias + float2(0.5f, 0.5f));
+        
+        // 算阴影因子
+        out(factor_out, saturate(dot(-normal_world, normalize(light_dir))));
+    };
+
+	
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+
+	// varying变量
+	varying mediump float4 UV0;
+	varying lowp float fog_distance;
+	varying lowp float fog_height_factor;
+	varying mediump float4 v_light_proj_pos;
+	varying highp float4 v_screen_pos;
+
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+		mediump float4 pos_world = transform(a_position, world);
+
+	    vertex(pos);
+
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+
+
+		// 在vertex中计算高度雾
+		macro(FOG_ENABLE) {
+			branch ("1") {
+
+				mediump float height = pos_world.y;
+
+				function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor1);
+
+				mediump float distance = pos.z;
+				out(fog_distance , distance);
+				out(fog_height_factor, 1.0f - fog_height_factor1);
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(SCREEN_DISSOLVE) {
+			branch ("1") {
+				out(v_screen_pos, pos);
+			}
+			branch ("0") {
+
+			}
+		};
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color1 = sample(Tex0, UV0.xy);
+
+	    ["采样溶解"]
+	    macro(SCREEN_DISSOLVE) out(lowp float4 diffuse_map_color, lowp float dissolve_alpha1) {
+	    	branch ("1") {
+	    		lowp float4 dissolve_map_color1 = sample(DissolveMap, v_screen_pos.xy/v_screen_pos.w * dissolve_tilling * 0.5f + float2(0.5f));
+	    		lowp float changevalue1 = smoothstep(ChangeAmount,ChangeAmount + change_line_scale,dissolve_map_color1.r);
+				lowp float changevalue2 = 1.0f-smoothstep(ChangeAmount - change_line_scale,ChangeAmount,dissolve_map_color1.r);
+				lowp float changeline = saturate(1.0f - changevalue1 - changevalue2);
+				out(diffuse_map_color, float4(diffuse_map_color1.xyz + changeline * dissolve_line.rgb * changeline_brightness, diffuse_map_color1.a));
+				out(dissolve_alpha1, changevalue1);
+	    	}
+	    	branch ("0") {
+	    		out(diffuse_map_color, diffuse_map_color1);
+				out(dissolve_alpha1, 1.0f);
+	    	}
+	    };
+
+		lowp float diffuse_lum = (diffuse_map_color.x + diffuse_map_color.y + diffuse_map_color.z)/3.0f;
+
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w * dissolve_alpha1);
+			}
+			branch("0") {
+				out(alpha, diffuse_map_color1.a * dissolve_alpha1);
+			}
+	    };
+	    
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+    	macro(WORLD_DARK) out(float3 ambient_color1) {
+			branch ("1") {
+				out(ambient_color1, lerp(ambient_color.rgb, float3(0.0f), float3(ChangeAmount)));
+			}
+			branch ("0") {
+				out(ambient_color1, ambient_color.rgb);
+			}
+		};
+
+	    macro(OPEN_SPOT) out(lowp float3 mix_spot) {
+	    	branch ("1") {
+	    		macro(NONE_SPOT) out(lowp float3 mix_spot_) {
+	    			branch ("1") {
+	    				out(mix_spot_, lerp(diffuse_map_color.rgb * ambient_color.rgb, diffuse_map_color.rgb, float3(diffuse_map_color.r)));
+	    			}
+	    			branch("0"){
+	    				out(mix_spot_, diffuse_map_color.rgb * ambient_color.rgb);
+	    			}
+	    		};
+	    		out(mix_spot, mix_spot_);
+	    	}
+	    	branch("0"){
+	    		out(mix_spot, diffuse_map_color.rgb);
+	    	}
+	    };
+
+		//lowp float diffuse_illum = 0.3f * diffuse_map_color.r + 0.59f * diffuse_map_color.g + 0.11f * diffuse_map_color.b;
+		//lowp float final_shadow = step(1.0f, diffuse_illum); // 判断烘焙的投影是否比角色投影深，取更深的值
+		lowp float shadow_lerp = lerp(shadow_alpha, 1.0f, 1.0f);
+		lowp float3 shadow_color_lerp = lerp(mix_spot.rgb, shadow_color.rgb, float3(shadow_density));
+		lowp float3 shadow_blend_ = lerp(shadow_color_lerp * shadow_lerp * ambient_color.rgb, mix_spot.rgb, float3(1.0f));
+		lowp float4 shadow_blend = float4(shadow_blend_, diffuse_map_color.a);
+
+	    macro(FOG_ENABLE) out(mediump float3 final_result) {
+			branch ("1") {
+
+				// 在pixel中计算线性雾（地表顶点较少防止过渡畸变）
+				function get_fog_mix(u_fog_info.x, u_fog_info.y, fog_distance) out(mediump float fog_linear_factor);
+				// mediump float fog_linear_factor = fog_linear_factor11 ;
+				mediump float fog_factor = u_fog_color.a * max(fog_height_factor, fog_linear_factor);
+				out(final_result, lerp(shadow_blend.rgb, u_fog_color.rgb, float3(fog_factor)));
+
+				// out(final_result, float3(fog_factor));
+			}
+			branch("0")
+			{
+				out(final_result, shadow_blend.rgb);
+			}
+		};
+
+
+
+		pixel(float4(final_result.xyz, alpha * AlphaMtl));
+	}
+}

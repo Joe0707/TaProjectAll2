@@ -1,0 +1,114 @@
+["轮廓勾边"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+>
+{
+	macro(GPU_SKIN_ENABLE)
+	<
+		default = "0"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	macro(SKIN_VEC_PER_BONE)
+	<
+		default = "SKIN_VEC_PER_BONE_QUAT"
+		customizable = "0"
+		cache = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+	
+	uniform highp float4x4 bias_matrix: OTHER0;
+	
+	// c++用
+	["rotate_height"]
+	uniform float rotate_height: OTHER1
+	<
+		artist = "1"
+		init = "0.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+	
+	["rot_bias0"]
+	uniform float rot_bias0: OTHER2
+	<
+		artist = "1"
+		init = "20.0"
+		min = "0.8"
+		max = "20.0"
+	>;
+	
+	["emphasize_color0"]
+	uniform lowp float4 emphasize_color0: OTHER3
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,1.0,0.0,1.0"
+	>;
+	
+	["rot_bias1"]
+	uniform float rot_bias1: OTHER4
+	<
+		artist = "1"
+		init = "20.0"
+		min = "0.8"
+		max = "10.0"
+	>;
+	
+	["emphasize_color1"]
+	uniform lowp float4 emphasize_color1: OTHER5
+	<
+		artist = "1"
+		color = "1"
+		init = "0.0,0.0,0.0,1.0"
+	>;
+	
+	// py用
+	uniform float4 root_bone_pos: OTHER6
+	<
+		init = "0.0,0.0,0.0,0.0"
+	>;
+	
+	// 真正渲染用
+	uniform float4 emphasize_color: OTHER7
+	<
+		color = "1"
+		init = "0.0,0.0,0.0,1.0"
+	>;
+	
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+	>;
+	
+	vertex
+	{
+		// 为了在nfx中导出数据的临时变量
+		float a = rotate_height;
+		float b = rot_bias0;
+		float4 c = emphasize_color0;
+		float d = rot_bias1;
+		float4 e = emphasize_color1;
+		float4 f = root_bone_pos;
+		
+		// 真正的渲染代码
+		vertex(transform(a_position, bias_matrix));
+	}
+	
+	pixel
+	{
+		pixel(float4(emphasize_color.xyz, 1.0f));
+	}
+	
+}

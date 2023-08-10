@@ -1,0 +1,272 @@
+["stereo imaging shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{	
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	["光晕贴图"]
+	uniform sampler glowtex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	["矩阵贴图"]
+	uniform sampler _MainTex2
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;	
+
+	["点光贴图"]
+	uniform sampler pointtex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["遮罩贴图"]
+	uniform sampler masktex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["扫描线速度"]
+	uniform lowp float scans_speed
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	["扫描线区域起始"]
+	uniform lowp float scans_area1
+	<
+		artist = "1" 
+		init = "0.0"
+		uistep = "1.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+
+	["扫描线区域结束"]
+	uniform lowp float scans_area2
+	<
+		artist = "1" 
+		init = "1.0"
+		uistep = "1.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+
+	["光晕强度"]
+	uniform lowp float glow_inten
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+	["光晕强度2"]
+	uniform lowp float point_inten
+	<
+		artist = "1" 
+		init = "1.0"
+		uistep = "1.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["矩阵速度"]
+	uniform lowp float _MatrixSpeed
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+	["矩阵大小"]
+	uniform lowp float _MatrixSize
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+	["偏移程度"]
+	uniform lowp float _Distort
+	<
+		artist = "1" 
+		init = "1.0"
+		uistep = "1.0"
+		min = "-1.0"
+		max = "1.0"
+	>;
+	["矩阵颜色"]
+	uniform lowp float4 _MatrixColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float4 v_screen_uv;
+	// varying mediump float v_char_height; 
+	varying mediump float4 PosWorld;	
+	varying mediump float4 pos_local;
+	
+	varying mediump float4 v_light_proj_pos;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform mediump float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	uniform float alphaRef : ALPHA_REF
+	<
+		init = "0.0"
+	>;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+
+	function Luminance in (mediump float3 LinearColor) out (mediump float illum)
+	{
+		out(illum, dot(LinearColor, float3(0.3f, 0.59f, 0.11f)));
+	};
+
+	vertex {
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				//function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				// out(vec, pos1);
+				// out(nor, nor1);
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		
+		highp float4 position = vec;
+		highp float4 normal = nor;
+		
+
+		//mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+
+		// 计算顶点位置
+		highp float4 screen_pos = float4(transform(position, wvp));
+		vertex(screen_pos);
+		out(UV0, float4(texcoord0.xy, 0.0f, 0.0f));
+		out(v_screen_uv, screen_pos);
+	}
+	pixel {
+		// 采样贴图
+		lowp float4 point_map_color = sample(pointtex, UV0.xy);
+		lowp float4 mask_map_color = sample(masktex, UV0.xy);
+		highp float2 screen_uv = 0.5f * v_screen_uv.xy/v_screen_uv.w + float2(0.5f);
+		highp float scans = clamp(0.35f + 0.35f * sin(scans_speed*FrameTime + screen_uv.y * rtSize.y * 1.5f), 0.0f, 1.0f);
+		lowp float x = lerp(0.8f,1.5f,pow(scans, 1.7f));
+
+		lowp float t = FrameTime * _MatrixSpeed;
+		highp float2 screen_uv_1 = UV0.xy * _MatrixSize + float2(t, 0.0f); 
+		lowp float4 mx_ = sample(_MainTex2 , screen_uv_1);	
+
+		highp float2 screen_uv_mx1 = 0.8f * _MatrixSize * float2(UV0.x + t*0.5f, UV0.y); 
+		highp float2 screen_uv_mx2 = 0.8f * _MatrixSize * float2(screen_uv_mx1.x + t*0.5f, screen_uv_mx1.y); 
+		highp float2 screen_uv_mx3 = 0.8f * _MatrixSize * float2(screen_uv_mx1.x + t*0.5f, screen_uv_mx1.y); 
+		lowp float4 mx_1 = sample(_MainTex2 , screen_uv_mx1);
+		lowp float4 mx_2 = sample(_MainTex2 , screen_uv_mx2);
+		lowp float4 mx_3 = sample(_MainTex2 , screen_uv_mx3);
+
+		lowp float mx = mx_.r + mx_1.r + mx_2.g + mx_3.b;
+
+		lowp float4 diffuse_map_color_ = sample(Tex0, UV0.xy);	
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 diffuse_map_color)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(diffuse_map_color, float4(diffuse_map_color_.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(diffuse_map_color, diffuse_map_color_);
+			}
+		};
+
+		function Luminance(diffuse_map_color.rgb) out (lowp float diffuse_illum);
+		lowp float scans_area = smoothstep(scans_area1, scans_area2, 1.0f - diffuse_illum);
+
+		lowp float4 glow_map_color = sample(glowtex, UV0.xy + float2(mx_.r,0.0f) * mask_map_color.b * _Distort * 0.1f);
+		lowp float3 final1 = diffuse_map_color.rgb * lerp(1.0f,x,scans_area) + glow_map_color.rgb * glow_inten * clamp(sin(3.14f *  FrameTime) + 0.2f, 0.8f,1.0f);
+		lowp float3 final2 = final1 + mask_map_color.g *_MatrixColor.rgb * mx - final1 * mask_map_color.g * _MatrixColor.rgb * mx;
+		lowp float3 final3 = lerp(final2,max(final2, point_map_color.rgb * 2.0f - float3(1.0f)), float3(point_inten));
+	
+		function Luminance(glow_map_color.rgb * glow_inten) out (lowp float glow_illum);
+		lowp float final_alpha1 = diffuse_map_color.a + saturate(mask_map_color.r * mx - 0.1f) + glow_illum;
+		lowp float final_alpha2 = final_alpha1;
+		pixel(float4(final3,final_alpha2));
+	}
+}

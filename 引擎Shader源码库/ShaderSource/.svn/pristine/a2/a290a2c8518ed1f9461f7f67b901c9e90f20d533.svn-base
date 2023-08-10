@@ -1,0 +1,267 @@
+["顶点偏移特效"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	cull = "none"
+>
+{	
+	["启用BLOOM"]
+	eitheror BLOOM_ENABLE;
+	macro(BLOOM_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["单独渲染"]
+	eitheror RENDER_SEPARATE;
+	macro(RENDER_SEPARATE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否乘顶点色"]
+	eitheror VCOLOR_ENABLE;
+	macro(VCOLOR_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	// attribute
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点？
+	>;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_normal:NORMAL;
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["颜色贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+
+	>;
+	
+	["ramp"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+	
+	["UV范围，超出范围变为透明"]
+	uniform float4 texuv_clamp
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 1.0, 1.0)"
+	>;
+
+
+	["波动频率"]
+	uniform float frequency
+	<
+		artist = "1"
+		min = "0.0"
+		max = "2.0"
+		init = "1.0"
+	>;
+
+	["波动幅度"]
+	uniform float amplitude
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "1.0"
+	>;
+
+	["波动尺度"]
+	uniform float wave_size
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "1.0"
+	>;
+
+	["位移偏移"]
+	uniform float displace_offset
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+
+	["ramp缩放"]
+	uniform float ramp_scale
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+
+	["ramp偏移"]
+	uniform float ramp_offset
+	<
+		artist = "1"
+		init = "-0.5"
+	>;
+
+	["消散"]
+	uniform float dissolve
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+
+	["消散硬度"]
+	uniform float dissolve_hardness
+	<
+		artist = "1"
+		init = "10.0"
+	>;
+	
+	uniform mediump float Time: FRAME_TIME;
+	// varying
+	varying mediump float4 v_texture0;
+
+	varying mediump float4 weight;
+
+	varying lowp float4 Color;
+
+	["R通道因子"]
+	uniform float modul_r
+	<
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["G通道因子"]
+	uniform float modul_g
+	<
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["B通道因子"]
+	uniform float modul_b
+	<
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["A通道因子"]
+	uniform float modul_a
+	<
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;
+	["颜色整体缩放"]
+	uniform float color_scale
+	<
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+	>;
+
+	function point_noise in(mediump float3 p, highp float time) out(mediump float3 noise) {
+		mediump float3 p2 = (p + float3(time)) * float3(1.0f, 1.5f, 2.0f);
+		out(noise, sin(p2));
+	};
+
+	vertex
+	{
+		highp float4 position = a_position;
+
+		mediump float4 np = position / wave_size;
+		highp float t = Time * frequency;
+		mediump float3 p2 = np.xyz - np.yzx;
+		
+		function point_noise (p2, t) out (mediump float3 p_noise);
+		mediump float3 noise = p_noise + float3(1.0f);
+		mediump float sum_noise = noise.x + noise.y + noise.z;
+
+		// Output noise to PS
+		out(weight, float4(noise / sum_noise, sum_noise / 6.0f));
+
+		// Move vertices based on noise
+		mediump float4 pos = float4(position.xyz + ((sum_noise - 3.0f + displace_offset) * a_normal.xyz * amplitude), position.w);
+		
+		// Calculate other stuff
+		vertex(transform(pos, wvp));
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 0.0f) * texTrans0);
+		
+		macro(VCOLOR_ENABLE){
+			branch ("1") {
+				out(Color, a_diffuse);
+			}
+			branch("0"){
+				
+			}
+		};
+	}
+
+	pixel
+	{	
+		lowp float4 texColor0 = sample (Tex0, v_texture0.xy);
+		mediump float level = dot(weight.xyz, texColor0.xyz) + weight.w;
+		lowp float4 texColor1 = sample(Tex1, float2(level, 0.5f) * ramp_scale + float2(ramp_offset));
+
+		lowp float3 res_color = texColor1.xyz;
+		lowp float res_alpha = (level - dissolve) * dissolve_hardness;
+
+		lowp float4 _result = float4(res_color, res_alpha); 
+
+		macro(VCOLOR_ENABLE) out(lowp float4 result) {
+			branch ("1") {
+				out(result, _result * Color);
+			}
+			branch("0"){
+				out(result, _result);
+			}
+		};
+		
+        macro(BLOOM_ENABLE) out (mediump float4 final_result)
+        {
+        	branch("1"){
+        		mediump float3 color = result.xyz * 0.25f * float3(modul_r, modul_g, modul_b) * color_scale;
+        		mediump float a = result.a * modul_a * color_scale;
+        		out(final_result, float4(color, a));
+        	}
+        	branch("0")
+        	{
+        		out(final_result, result);
+        	}
+        };
+		pixel(final_result);
+	}
+}

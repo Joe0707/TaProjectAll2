@@ -1,0 +1,208 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuzhuoliang" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+	stencilenable = "1"
+	stencilmask = "0"
+	stencilwritemask = "255"
+	stencilref = "0"
+	stencilfunc= "1"
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+>
+{
+// 宏
+  
+	// ["是否溶解"]
+	// eitheror DISSOLVE_EFFECT;
+	// macro(DISSOLVE_EFFECT)
+	// <  
+	// 	default = "0"
+	// 	customizable = "0"
+	// >;
+
+	// ["是否灵魂状态"]
+	// eitheror GHOST_EFFECT;
+	// macro(GHOST_EFFECT)
+	// <  
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+	// ["是否冰冻"]
+	// eitheror FROZENE_EFFECT;
+	// macro(FROZENE_EFFECT)
+	// <  
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+	
+	// ["是否燃烧"]
+	// eitheror FIRE_EFFECT;
+	// macro(FIRE_EFFECT)
+	// <  
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+	// ["是否金身"]
+	// eitheror GOLD_EFFECT;
+	// macro(GOLD_EFFECT)
+	// <  
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+	
+	// ["是否叠加为ADD模式"]
+	// eitheror ADD_MODE;
+	// macro(ADD_MODE)
+	// <  
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+	// ["是否石化"]
+	// eitheror PETRIFY_EFFECT;
+	// macro(PETRIFY_EFFECT)
+	// <
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["Flowmap贴图"]
+	uniform sampler FlowMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["PeriodSec"]
+	uniform lowp float PeriodSec
+	<
+		artist = "1"
+	>;
+
+	["Speed"]
+	uniform lowp float Speed
+	<
+		artist = "1"
+	>;
+
+	["uv_speed"]
+	uniform lowp float2 uv_speed
+	<
+		artist = "1"
+	>;
+
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	// uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV_anim;
+	varying mediump float2 UV1;
+	
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		out(UV_anim, texcoord0.xy + uv_speed * frame_time);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+		vertex(pos);
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		//lowp float height_fac = v_height_fac;
+
+		["读取flowmap"]
+		lowp float HalfPeriod = PeriodSec * 0.5f;
+		lowp float4 flowmap_color = sample(FlowMap, UV0.xy);
+		lowp float2 Flow_dir = (flowmap_color.rg - float2(0.5f)) * 2.0f;
+		lowp float fmod1 = fmod(frame_time, PeriodSec);
+		lowp float fmod2 = fmod(frame_time + HalfPeriod,PeriodSec);
+		lowp float2 NewUV1 = fmod1 * Flow_dir * Speed + UV_anim;
+		lowp float4 combiend_flow1 = sample(Tex0, NewUV1);
+		lowp float2 NewUV2 = fmod2 * Flow_dir * Speed + UV_anim;
+		lowp float4 combiend_flow2 = sample(Tex0, NewUV2);
+		lowp float flow_lerp = abs(HalfPeriod - fmod1) / HalfPeriod;
+		lowp float3 combiend_flow = lerp(combiend_flow1.rgb,combiend_flow2.rgb, float3(flow_lerp));
+
+		lowp float3 final_diffuse = lerp(diffuse_map_color.rgb, combiend_flow,  float3(flowmap_color.b));
+
+		// lowp float final_alpha = combine_dissolve.a * AlphaMtl;
+		pixel(float4(final_diffuse.rgb , AlphaMtl));
+	}
+}

@@ -1,0 +1,444 @@
+["场景玻璃"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	// ["是否接受迷雾"]
+	// eitheror FOW_ENABLE;
+	// macro(FOW_ENABLE)
+	// <
+	// 	customizable = "1"
+	// 	default = "0"
+	// >;
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["开启倒影"]
+	eitheror MIRROR_ENABLE;
+	macro(MIRROR_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["反射图"]
+	eitheror ENV_TEX;
+	macro(ENV_TEX)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+// 贴图
+	uniform mediump float2 scene_size
+    <
+    	init = "(1280.0, 1280.0)"
+    >;
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["分开的alpha贴图"]
+    uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+    <
+    >;
+
+	["反射图"]
+	uniform sampler ReflectMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	uniform sampler TexReflection
+	<
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+
+	// ["迷雾纹理"]
+	// uniform sampler view_texture: FOW
+	// <
+	// 	artist = "0"
+	// 	mag = "linear"
+	// 	min = "linear"
+	// 	mip = "linear"
+	// >;
+
+	["迷雾颜色"]
+	uniform mediump float4 fow_color
+	<
+		init = "(0.0, 0.168, 0.298, 0.619)" // 0.5176
+		artist = "1"
+		color = "1"
+	>;	
+	["自发光颜色"]
+	uniform mediump float4 EmissColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+	["自发光强度"]
+	uniform mediump float EmissIntensity
+	<
+		artist = "1"
+		uistep = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "1.0"
+	>;
+	["自发光alpha通道power"]
+	uniform mediump float EmissPower
+	<
+		artist = "1" 
+		uistep = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "1.0"
+	>;
+
+
+	["反射图uv平移x"]
+	uniform lowp float reflect_uv_adjust_x
+	<
+		uigroup = "反射"
+		artist = "1" 
+		min = "0.0" 
+		max = "1.0" 
+		init = "0"
+	>;
+	
+	["反射图uv平移y"]
+	uniform lowp float reflect_uv_adjust_y
+	<
+		uigroup = "反射"
+		artist = "1" 
+		min = "0.0" 
+		max = "1.0" 
+		init = "0"
+	>;
+	["反射图uv缩放"]
+	uniform mediump float reflect_uv_scale
+	<
+		uigroup = "反射"
+		artist = "1" 
+		min = "0.0" 
+		max = "1.0" 
+		init = "1.8"
+	>;
+
+	["镜面反射颜色"]
+	uniform mediump float4 MirrorColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+		uigroup = "镜面反射"
+	>;
+	["反射开始范围"]
+    uniform float nov_factor1
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.1"
+		uigroup = "镜面反射"
+    >;
+    ["反射结束范围"]
+    uniform float nov_factor2
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "1.0"
+		uigroup = "镜面反射"
+    >;
+    ["反射图强度"]
+	uniform mediump float ReflectIntensity
+	<
+		artist = "1"
+		uistep = "1"
+		min = "0.0" 
+		max = "10.0"
+		init = "1.0"
+		uigroup = "镜面反射"
+	>;
+	["镜子强度"]
+	uniform float reflect_mirror_percent
+	<
+		artist = "1"
+		init = "1.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "5.0" 
+		uigroup = "镜面反射"
+	>;
+	["镜子视觉偏移量"]
+	uniform float reflect_mirror_bias
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "1"
+        min = "0.0" 
+		max = "0.5" 
+		uigroup = "镜面反射"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying highp float4 PosWorld;
+	varying mediump float4 v_screen_pos;
+	varying lowp float3 NormalWorld;
+
+	varying mediump float4 fow_uv;
+	varying mediump float2 v_screen_uv;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	
+	uniform lowp float4 u_fog_color: FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform mediump float4 cam_pos : CAMERA_POSITION;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	vertex
+	{
+		["wvp变换"]
+
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		out(v_screen_pos, pos);	
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;		
+		mediump float4 pos_world = position * world;		
+		out(PosWorld, pos_world);
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(float3(0.0f, 1.0f, 0.0f), worldMat)));
+		out(NormalWorld, world_normal);
+
+		macro(TRANS_ENABLE) out(mediump float height) {
+			branch ("1") {
+				out(height, -pos_world.y);
+			}
+			branch ("0") {
+				out(height, pos_world.y);
+			}
+		};
+
+		macro(FOG_ENABLE) out(mediump float fog_height_factor1, mediump float fog_distance_) {
+			branch ("1") {
+				
+				macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance1)
+				{
+					branch("1")
+					{
+						["GL渲染系统下"]
+						// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+						out(fog_distance1, pos.w * ((pos.z/pos.w) *0.5f + 0.5f));
+					}
+					branch("0")
+					{
+						["Dx和Metal渲染系统下"]
+						out(fog_distance1, pos.z);
+					}
+				};
+				function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor_);
+				out(fog_height_factor1, fog_height_factor_);
+				out(fog_distance_, fog_distance1);
+			}
+			branch ("0") {
+				out(fog_height_factor1, 0.0f);
+				out(fog_distance_, 0.0f);
+			}
+		};
+		mediump float4 uv0 = float4(texcoord0.xy, fog_distance_, 1.0f - fog_height_factor1);
+		out(UV0, uv0);
+
+		// macro(FOW_ENABLE) {
+		// 	branch ("1") {
+		// 		mediump float2 _fow_uv = float2(pos_world.x / scene_size.x + 0.5f, pos_world.z / scene_size.y + 0.5f);
+  //               macro(TRANS_ENABLE) out(lowp float trans_factor) {
+  //                   branch ("1") {
+  //                       out(trans_factor, -1.0f);
+  //                   }
+  //                   branch ("0") {
+  //                       out(trans_factor, 1.0f);
+  //                   }
+  //               };
+  //               lowp float fog_linear_factor = 0.0f; 
+		//         out(fow_uv, float4(_fow_uv, fog_linear_factor, 0.0f));
+		// 	}
+		// 	branch ("0") {
+		// 	}
+		// };
+	}
+
+	pixel
+	{
+		mediump float2 uv01 = UV0.xy;
+		mediump float fog_distance = UV0.z;
+		mediump float fog_height_factor = UV0.w;
+
+		lowp float3 normal_world = normalize(NormalWorld);
+		lowp float3 view_dir = normalize(cam_pos.xyz - PosWorld.xyz);
+		lowp float NdotV = saturate(dot(view_dir, normal_world));
+		lowp float NdotV2 = 1.0f - smoothstep(nov_factor1,nov_factor2,NdotV);
+
+		lowp float4 diffuse_map_color = sample(Tex0, uv01);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+		highp float3 pscreen = v_screen_pos.xyz/v_screen_pos.w;
+		float2 screen_uv_temp = pscreen.xy * 0.5f + float2(0.5f);
+
+		["反射图计算"]
+		macro(ENV_TEX) out(mediump float3 ibl_spec)
+		{
+			branch("0")
+			{
+				out(ibl_spec, float3(0.0f));
+			}
+			branch("1")
+			{	
+				highp float3 refl_vec = normalize((reflect(-view_dir, normal_world)));
+				highp float2 refl_uv = refl_vec.xz * oneminus(max(0.0f, refl_vec.y)) * 0.49f + float2(0.5f);
+				mediump float4 env_spec = sample(ReflectMap, refl_uv);
+
+				// lowp float3 NaV = (view_dir + normal_world + float3(1.0f)) * 0.5f;
+				// lowp float2 reflect_uv = NaV.rg;
+				// lowp float4 env_spec = sample(ReflectMap, reflect_uv);
+				out(ibl_spec, float3(env_spec));
+			}
+		};
+
+		["镜子计算"]
+		macro(SYSTEM_UV_ORIGIN_LEFT_BOTTOM) out(highp float2 mirror_uv)
+		{
+			branch("1")
+			{
+				out(mirror_uv, float2(screen_uv_temp.x, screen_uv_temp.y));
+			}
+			branch("0")
+			{
+				out(mirror_uv, float2(screen_uv_temp.x, 1.0f - screen_uv_temp.y));
+			}
+		};
+
+		["镜子计算"]
+		macro(MIRROR_ENABLE) out(mediump float4 mirror_color)
+		{
+			branch("0")
+			{
+				out(mirror_color, float4(0.0f));
+			}
+			branch("1")
+			{	
+				lowp float4 mirrorcolor = sample(TexReflection, mirror_uv + float2(NdotV * reflect_mirror_bias));
+				out(mirror_color, float4(mirrorcolor));
+			}
+		};
+
+		lowp float3 _reflect_color = (ibl_spec * ReflectIntensity + mirror_color.rgb * reflect_mirror_percent * mirror_color.a) * MirrorColor.rgb;
+		lowp float reflect_alpha = dot(_reflect_color.rgb,float3(0.3f, 0.59f, 0.11f));
+		lowp float3 _emiss_color = diffuse_map_color.rgb * float3(EmissIntensity);
+		lowp float3 combined_color = _emiss_color * EmissColor.rgb + _reflect_color * NdotV2;
+
+		// macro(FOW_ENABLE) out(mediump float3 final_result) {
+		// 	branch ("1") {
+		// 		// 参数
+		//         lowp float fow_sample = sample(view_texture, fow_uv.xy).x;
+		//         lowp float fow1 = oneminus(fow_sample);
+		//         lowp float fow = smoothstep(0.231f, 0.769f, fow1);
+		//         lowp float fow_thick = fow * fow_color.a;
+		//         lowp float3 combine_height_fog = lerp(combined_color.rgb, float3(0.0f, 0.168f, 0.298f) * float3(0.0f, 0.168f, 0.298f), float3(lerp(0.65f, 1.0f, 0.5f))); // 50~100作为参数不错
+
+		// 		out(final_result, lerp(combined_color, combine_height_fog,  float3(fow_thick)));
+		// 	}
+		// 	branch("0")
+		// 	{
+		// 		out(final_result, combined_color);
+		// 	}
+		// };
+		float3 final_result = combined_color;
+		
+		macro(FOG_ENABLE) out(mediump float3 final_color_with_fog) {
+			branch ("1") {
+				function get_fog_mix(u_fog_info.x, u_fog_info.y, fog_distance) out(mediump float fog_linear_factor);
+				mediump float fog_factor = u_fog_color.a * max(fog_height_factor,fog_linear_factor);
+				out(final_color_with_fog, lerp(final_result, u_fog_color.rgb, float3(fog_factor)));
+        	}
+			branch ("0") {
+				out(final_color_with_fog, final_result);
+			}
+		};
+		lowp float finalalpha = max(saturate(pow(alpha * EmissIntensity,EmissPower)),reflect_alpha * NdotV2);
+		pixel(float4(final_color_with_fog,finalalpha));
+	}
+}

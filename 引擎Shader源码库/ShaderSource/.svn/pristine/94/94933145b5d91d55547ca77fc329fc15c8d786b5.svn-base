@@ -1,0 +1,175 @@
+["vegetation"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{	
+	["颜色贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["高光贴图"]
+	uniform sampler SpecularMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["风的方向"]
+	uniform float4 WindDirection
+	<
+		artist = "1"
+		init = "(1,0,0,0)"
+	>;
+
+	["微风频率"]
+	uniform float WindSpeed
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "1.5"
+	>;
+
+	["微风强度"]
+	uniform float noise_amp
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "1.5"
+	>;
+	
+	["位置变化因子"]
+	uniform float pos_rate
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "1.5"
+	>;
+
+	["微风周期"]
+	uniform float time_period0
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "6.0"
+	>;
+
+	["碰撞摆动强度"]
+	uniform float big_wind_speed
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "1.0"
+	>;
+
+	["碰撞摆动周期"]
+	uniform float bigwind_period
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "6.0"
+		min = "0.0"
+		init = "0.15"
+	>;
+
+	["碰撞衰减速度"]
+	uniform float bigwind_rate
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "20.0"
+		min = "0.0"
+		init = "0.7"
+	>;
+
+	["散射"]
+	uniform float transmission_fac
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "20.0"
+		min = "0.0"
+		init = "0.7"
+	>;
+
+	["自发光因子"]
+	uniform float emissive_val
+	<
+		artist = "1"
+		uistep = "0.01"
+		max = "20.0"
+		min = "0.0"
+		init = "0.4"
+	>;
+	uniform float u_frametime : FRAME_TIME;
+	uniform float4x4 u_world : WORLD;	
+	uniform float4x4 u_wvp : WORLD_VIEW_PROJECTION;
+
+
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;// uv1
+	attribute float4 a_texture1 : TEXTURE1;// uv2
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+	attribute float4 a_normal : NORMAL;// 顶点法线
+		uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	varying float2 v_uv0;
+
+
+	vertex {
+		// lowp float strong_period = strong_period * sin(u_frametime/bigwind_period);
+		// lowp float strong_decrease = exp(-u_frametime * bigwind_rate);
+		// lowp float3 strong_fac = strong_period * strong_decrease * hit_dir;
+
+		// 以下为自然摆
+		// highp float3x3 worldMat = float3x3(u_world);
+		// highp float4 PosWorld = float4(normalize(transform(a_position.xyz, worldMat)), 1.0f);
+
+
+		highp float3 temp8 = sin(u_frametime * WindSpeed * normalize(WindDirection.rgb) * 0.5f + a_position.xyz / pos_rate * normalize(WindDirection.rgb) / time_period0);
+		highp float temp9 = length(temp8);
+		highp float3 temp10 = temp8 + float3(temp9);
+		highp float temp11 = length(WindDirection.rgb);
+		highp float3 temp12 = temp10 * temp11;
+		highp float3 temp13 = noise_amp * temp12;
+		// highp float3 temp18 = vs_general.Color.a * temp13;
+		highp float4 pos1 = float4(a_position.xyz + temp13,1.0f);
+		highp float4 PosWorld = transform(pos1,u_wvp);
+		vertex(PosWorld);
+
+		out(v_uv0,a_texture0.xy);
+	}
+	
+	pixel {
+		lowp float4 diffuse_map_color = sample(Tex0, v_uv0.xy);
+		pixel(float4(diffuse_map_color.xyz, diffuse_map_color.a * AlphaMtl));
+	}
+}

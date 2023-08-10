@@ -1,0 +1,88 @@
+["shadow"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+
+// 贴图	
+	
+// 调整参数
+	
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+
+	
+// varying变量
+	varying float4 v_position;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	uniform mediump float4x4 wv  : WORLD_VIEW;
+	uniform mediump float4 CameraZPlanes : CAMERA_INFO;
+	
+	vertex
+	{
+		float4 pos_in = a_position;
+		["是否支持GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out(float4 pos_out)
+		{
+			branch("1")
+			{
+				function get_skin_pos(a_blendweight, uint4(a_blendindices), pos_in, u_bone_vec)
+					out(float4 pos_out1);
+				out(pos_out, pos_out1);
+			}
+			branch("0")
+			{
+				out(pos_out, pos_in);
+			}
+		};
+
+		vertex(transform(pos_out, wvp));
+		
+		macro(SHADOW_MAP_ESM) {
+			branch("1") {
+				out(v_position, transform(pos_out, wvp));
+			}
+			branch("0") {
+			}
+		};
+	}
+
+	pixel
+	{
+		macro(SHADOW_MAP_ESM) out(highp float4 final_color) {
+			branch("1") {
+				highp float Near = -1.0f * CameraZPlanes.w/CameraZPlanes.z;//1.0; // camera z near
+				highp float Far = CameraZPlanes.z * Near/(CameraZPlanes.z - 1.0f);//3000.0; // camera z far
+				highp float LinearDepthConstant = 1.0f / (Far - Near);
+
+				highp float linearDepth = length(v_position) * LinearDepthConstant;
+				
+				// mediump float depth = 1.0f / max(0.0f, min(150.0f, v_position.z) - 0.0f);
+				// mediump float depth = 1.0f / v_position.z;
+				// mediump float depth = 1.0f / v_position.z / 500.0f;
+				mediump float depth = v_position.z;
+				
+				out(final_color, float4(v_position.z, fmod(v_position.z * 256.0f, 1.0f), fmod(v_position.z * 256.0f * 256.0f, 1.0f), fmod(v_position.z * 256.0f * 256.0f * 256.0f, 1.0f)));
+				// out(final_color, float4(0.5f));
+			}
+			branch("0") {
+				out(final_color, float4(1.0f));
+			}
+		};
+		
+		pixel(final_color);
+	}
+}

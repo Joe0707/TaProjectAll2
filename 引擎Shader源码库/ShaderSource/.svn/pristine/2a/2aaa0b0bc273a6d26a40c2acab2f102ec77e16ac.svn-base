@@ -1,0 +1,111 @@
+	
+["溶解材质"]
+pipeline
+<
+	version = "1.0.0"
+	author = "zhangliang"
+	company = "Netease"
+	technique = "TShader"
+	cull = "none"
+>
+
+
+{
+
+attribute float4 position: POSITION
+<
+	instance = "0" // 逐实例还是逐顶点
+>;
+attribute float4 texcoord0 : TEXTURE0;
+attribute float4 diffuse: DIFFUSE;
+
+uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0;
+
+
+	
+	["当前Alpha"]
+	uniform float high_alpha: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "2.0"
+		init = "1.0"
+		uistep = "0.01"
+	>;
+	["边缘硬度"]
+	uniform float hardness: OTHER1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "5.0"
+		uistep = "0.1"
+	>;
+	["边缘增强"]
+	uniform float enhance: OTHER2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.0"
+		uistep = "0.1"
+	>;
+	["diffuse tex"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+	>;
+
+	varying mediump float4 v_uv0 : TEXTURE0;
+	varying mediump float2 v_raw_uv0 : TEXTURE_RAW0;
+	varying mediump float4 v_color   : DIFFUSE;
+
+	uniform sampler tex_sepalpha: DIFFUSE_ALPHA
+	<
+		addressu = "repeat"
+		addressv = "clamp"
+		lodbias = "-0.5"
+	>;
+	uniform float u_alpha_mtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	
+	vertex
+	{
+		mediump float4 tex0_tmp = float4(texcoord0.xy, 1.0f, 0.0f);
+		mediump float4 uv0 = transform(tex0_tmp, u_texture_trans0);
+
+		// output
+		vertex(transform(position, wvp));
+		out(v_uv0, uv0);
+		out(v_color, diffuse);
+	}
+
+	pixel
+	{	
+		mediump float2 uv0 = v_uv0.xy;
+		
+		lowp float4 diffuse_tex = sample(Tex0, uv0);
+		["Diffuse贴图的RGB"]
+		lowp float3 tex0_color = diffuse_tex.xyz;
+		lowp float temp_alpha = diffuse_tex.w;
+
+		["判断diffuse的alpha是否存放于另一张贴图，得到diffuse贴图的alpha通道"]
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float diffuse_alpha)
+		{
+			branch("1")
+			{
+				lowp float4 separate_color = sample(tex_sepalpha, uv0);
+				out(diffuse_alpha, separate_color.w);
+			}
+			branch("0") { out(diffuse_alpha, temp_alpha);}
+		};
+
+		mediump float dissove = (diffuse_alpha - high_alpha) * hardness;
+		mediump float edge = saturate(oneminus(abs(dissove)));
+
+		pixel(float4(tex0_color * v_color.rgb + tex0_color * edge * enhance, saturate(dissove) * u_alpha_mtl));
+	}
+}

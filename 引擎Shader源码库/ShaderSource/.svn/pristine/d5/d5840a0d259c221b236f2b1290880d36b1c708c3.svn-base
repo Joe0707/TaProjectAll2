@@ -1,0 +1,48 @@
+["dof景深效果"]
+pipeline
+<
+  author = "gaohan"
+  company = "netease"
+  category = "dof_mobile"
+	technique = "DownSample"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+
+  uniform sampler tex0
+  <
+    export = "0"
+  >;
+
+	uniform float pixelSize: OTHER0
+	<
+		init = "0.005"
+	>;
+
+  varying mediump float2 TexCoord0;
+  varying mediump float2 TexCoord1;
+  varying mediump float2 TexCoord2;
+  varying mediump float2 TexCoord3;
+  varying mediump float2 TexCoord4;
+
+  vertex
+  {
+		vertex(position);
+    out(TexCoord0, texcoord0.xy);
+    out(TexCoord1, texcoord0.xy + float2(0.0f, pixelSize));
+    out(TexCoord2, texcoord0.xy + float2(0.0f, -pixelSize));
+    out(TexCoord3, texcoord0.xy + float2(0.0f, pixelSize * 2.0f));
+    out(TexCoord4, texcoord0.xy + float2(0.0f, -pixelSize * 2.0f));
+  }
+
+  pixel
+  {
+    lowp float4 color = sample(tex0, TexCoord0) * 0.38774f
+      + sample(tex0, TexCoord1) * 0.24477f
+      + sample(tex0, TexCoord2) * 0.24477f
+      + sample(tex0, TexCoord3) * 0.06136f
+      + sample(tex0, TexCoord4) * 0.06136f;
+    pixel(float4(color.xyz, 1.0f));
+  }
+}

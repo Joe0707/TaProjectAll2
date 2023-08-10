@@ -1,0 +1,47 @@
+["后处理扭曲效果"]
+pipeline
+<
+	author = "zyp"
+	company = "netease"
+	category = "postprocess"
+>
+{
+	uniform sampler tex0
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	uniform sampler tex1
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;	
+	
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+	
+	varying mediump float2 TexCoord0;
+	
+	vertex
+	{
+		vertex(float4(position.xyz, 1.0f));
+		out(TexCoord0, texcoord0.xy);
+	}
+
+	pixel
+	{
+		// lowp float2 distort = (sample(tex0, TexCoord0).xy - 0.5f) * 0.02f;
+		lowp float4 temp = sample(tex0, TexCoord0);
+		lowp float2 distort = (temp.xy - float2(0.5f)) * float2(0.02f);
+		lowp float4 result = sample(tex1, (TexCoord0 - distort));
+		
+		// lowp float4 result = sample(tex0, TexCoord0);
+
+		pixel(result);
+	}
+}

@@ -1,0 +1,96 @@
+pipeline
+<
+  author = "gaohan"
+  company = "netease"
+  category = "dof_mobile"
+	technique = "BlurBlend"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+
+  uniform sampler tex0
+  <
+    export = "0"
+  >;
+  uniform sampler tex1
+  <
+    export = "0"
+  >;
+  uniform sampler tex2
+  <
+    export = "0"
+  >;
+
+	uniform float pixelSize: OTHER0
+	<
+		init = "0.005"
+	>;
+
+	uniform float nearPlane: OTHER1
+	<
+		init = "10.0"
+	>;
+	uniform float farPlane: OTHER2
+	<
+		init = "10000.0"
+	>;
+	uniform float focusDist: OTHER3
+	<
+		init = "1000.0"
+	>;
+	uniform float focusRange: OTHER4
+	<
+		init = "200.0"
+	>;
+	
+
+	uniform float4 ViewportSize : VIEWPORT_SIZE;
+	uniform mediump float4 _ZBufferParams: ZBUFFER_PARAMS;
+	
+  varying mediump float2 TexCoord0;
+  varying mediump float2 TexCoord1;
+  varying mediump float2 TexCoord2;
+  varying mediump float2 TexCoord3;
+  varying mediump float2 TexCoord4;
+
+  vertex
+  {
+	vertex(position);
+	mediump float pixelSizeX = pixelSize * ViewportSize.y / ViewportSize.x;
+    out(TexCoord0, texcoord0.xy);
+    out(TexCoord1, texcoord0.xy + float2(pixelSizeX, pixelSize));
+    out(TexCoord2, texcoord0.xy + float2(-pixelSizeX, -pixelSize));
+    out(TexCoord3, texcoord0.xy + float2(pixelSizeX, -pixelSize));
+    out(TexCoord4, texcoord0.xy + float2(-pixelSizeX, pixelSize));
+  }
+
+  pixel
+  {
+    lowp float4 orginColor = sample(tex0, TexCoord0);
+    // lowp float4 color = sample(tex1, TexCoord0) * 0.2270270270f
+      // + sample(tex1, TexCoord1) * 0.3162162162f
+      // + sample(tex1, TexCoord2) * 0.3162162162f
+      // + sample(tex1, TexCoord3) * 0.0702702703f
+      // + sample(tex1, TexCoord4) * 0.0702702703f;
+	  
+	lowp float4 color = sample(tex1, TexCoord1) * 0.25f
+      + sample(tex1, TexCoord2) * 0.25f
+      + sample(tex1, TexCoord3) * 0.25f
+      + sample(tex1, TexCoord4) * 0.25f;
+  
+    float4 tex2_depth = sample(tex2, TexCoord0);
+    highp float depth = tex2_depth.x * 2.0f - 1.0f;
+    // highp float real_depth = nearPlane * farPlane / (farPlane + nearPlane - depth * (farPlane - nearPlane));
+	mediump float real_depth = farPlane / (_ZBufferParams.x * tex2_depth.x + _ZBufferParams.y);
+    // float  deltaDist = abs(focusDist - real_depth);
+	
+	float  deltaDist = (real_depth - focusDist);
+	float blendFactor = deltaDist / focusRange;
+	float real_factor = clamp(blendFactor, 0.0f, 1.0f);
+	
+	// float real_factor = step(focusDist, real_depth);
+    float3 result = orginColor.xyz * float3(1.0f - real_factor) + color.xyz * float3(real_factor);
+    pixel(float4(result, 1.0f));
+  }
+}

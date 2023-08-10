@@ -1,0 +1,1099 @@
+["场景水"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+  //   ["雾效"]
+  //   eitheror FOG_EFFECT;
+  //   macro(FOG_EFFECT)
+  //   <
+		// customizable = "0"
+		// default = "1"
+  //   >;
+	// ["是否接受迷雾"]
+	// eitheror FOW_ENABLE;
+	// macro(FOW_ENABLE)
+	// <
+	// 	customizable = "1"
+	// 	default = "0"
+	// >;
+
+	["是否双阵营"]
+	eitheror TWOGROUP_ENABLE;
+	macro(TWOGROUP_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+    ["是否开启高度混合"]
+    eitheror HEIGHTLERP_ENABLE;
+    macro(HEIGHTLERP_ENABLE)
+    <
+        customizable = "1"
+        default = "0"
+    >;
+
+    ["开启焦散效果"]
+    eitheror CAUSTICS_ENABLE;
+    macro(CAUSTICS_ENABLE)
+    <
+        customizable = "1"
+        default = "1"
+    >;
+
+	["开启空间撕裂"]
+	eitheror FX_ENABLE;
+	macro(FX_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启区域变色"]
+	eitheror CHANGE_COLOR_ENABLE;
+	macro(CHANGE_COLOR_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+
+	["反向变色区域"]
+	eitheror INVERT_CHANGE_POS;
+	macro(INVERT_CHANGE_POS)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["绿色区域变色"]
+	eitheror CHANGE_GREEN;
+	macro(CHANGE_GREEN)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["红色区域变色"]
+	eitheror CHANGE_RED;
+	macro(CHANGE_RED)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["蓝色区域变色"]
+	eitheror CHANGE_BLUE;
+	macro(CHANGE_BLUE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["高光"]
+	eitheror HIGHTLIGHT_ON;
+	macro(HIGHTLIGHT_ON)
+	<
+		default = "1"
+	>;
+	["深度变色"]
+	eitheror DEPTH_COLOR;
+	macro(DEPTH_COLOR)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启线性雾"]
+	eitheror FOG_ADDING;
+	macro(FOG_ADDING)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+// 贴图	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["法线贴图"]
+	uniform sampler NormalMap 
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+		path = "shader\\core\\texture\\rain\\water_normal0.png"
+	>;
+	
+	["反射贴图"]
+	uniform sampler TexReflection
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "shader\\core\\texture\\reflect\\sky_ref1.png"
+	>;
+
+	["迷雾纹理"]
+	uniform sampler view_texture: FOW
+	<
+		artist = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+
+	["R(高度图)G(雾气)B(Pattern)"]
+	uniform sampler sfx_composeTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["平行宇宙反射图"]
+	uniform sampler ParallaxMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		path = "scene\\model\\static\\5v5_marvel\\texture\\hedao_reflect.png"
+	>;
+	["流光纹理"]
+	uniform sampler EmissTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		path = "scene\\model\\static\\5v5_marvel\\texture\\hedao_emiss.png"
+	>;
+	["焦散纹理"]
+	uniform sampler causticsTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		// path = "scene\\model\\static\\5v5_marvel\\texture\\hedao_emiss.png"
+	>;
+//参数
+	uniform mediump float2 scene_size
+    <
+    	init = "(1280.0, 1280.0)"
+    >;
+
+	["迷雾颜色"]
+	uniform mediump float4 fow_color
+	<
+		init = "(0.0, 0.168, 0.298, 0.619)" // 0.5176
+		artist = "1"
+		color = "1"
+	>;
+	["水底颜色"]
+	uniform mediump float4 _DepthWaterColor
+	<
+		init = "(0.3, 0.3, 0.4, 1.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+	["法线强度"]
+    uniform float normal_factor
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.79"
+    >;
+
+    ["diffuse tiling"]
+    uniform float diff_tiling
+    <
+        artist = "1"
+        uistep = "1"
+        min = "1.0" 
+		max = "10.0" 
+		init = "1"
+    >;
+
+    ["波纹强度"]
+    uniform float wave_factor
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.05"
+    >;
+
+    ["水颜色强度开始范围"]
+    uniform float nov_factor1
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.13"
+    >;
+
+    ["水颜色强度结束范围"]
+    uniform float nov_factor2
+    <
+        artist = "1"
+        uistep = "1"
+        min = "0.0" 
+		max = "1.0" 
+		init = "0.87"
+    >;
+
+	["UV1 Tiling"]
+    uniform float u_UVTiling1
+    <
+        artist = "1"
+        init = "10"
+    >;
+
+    ["UV2 Tiling"]
+    uniform float u_UVTiling2
+    <
+        artist = "1"
+        init = "12"
+    >;
+
+    ["UV1 Speed U"]
+    uniform float u_uvSpeedU1
+    <
+        artist = "1"
+        init = "0.05"
+    >;
+
+    ["UV1 Speed V"]
+    uniform float u_uvSpeedV1
+    <
+        artist = "1"
+        init = "0.05"
+    >;
+
+    ["UV2 Speed U"]
+    uniform float u_uvSpeedU2
+    <
+        artist = "1"
+        init = "-0.08"
+    >;
+
+    ["UV1 Speed V"]
+    uniform float u_uvSpeedV2
+    <
+        artist = "1"
+        init = "-0.05"
+    >;
+	
+	["透明度"]
+	uniform mediump float water_alpha
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "1.0"
+		init = "1.0"
+	>;
+
+	["反射强度"]
+	uniform mediump float reflect_factor
+	<
+		artist = "1"
+		min = "0.0" 
+		max = "1.0"
+		init = "0.2"
+	>;
+	
+	["水颜色"]
+	uniform mediump float4 WaterColor
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.125, 0.380, 0.294, 1.0)"
+	>;
+
+    ["场景亮度"]
+    uniform lowp float scene_illum : SCENE_ILLUM
+    <
+		init = "1.0"
+		artist = "0"    
+    >; 
+
+	["雾气纹理平铺"]
+	uniform mediump float2 fog_detail_tilling
+	<
+		artist = "1"
+		init = "(0.006,0.006)"
+	>;
+
+	["雾气纹理平移"]
+	uniform mediump float2 fog_detail_speed
+	<
+		artist = "1"
+		init = "(0.2,0.0)"
+	>;
+
+ 	["R染色强度"]
+    uniform lowp float adjust_multi1
+    <
+		init = "0.3"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+ 	["G染色强度"]
+    uniform lowp float adjust_multi2
+    <
+		init = "3"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+ 	["B染色强度"]
+    uniform lowp float adjust_multi3
+    <
+		init = "0.64"
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "0.0"
+    >; 	
+
+    ["R染色偏移"]
+    uniform lowp float adjust_area1 
+    <
+		init = "0.0"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+
+    ["G染色偏移"]
+    uniform lowp float adjust_area2
+    <
+		init = "0.19"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+
+    ["B染色偏移"]
+    uniform lowp float adjust_area3
+    <
+		init = "0.01"
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.6"
+		min = "-0.6"
+    >; 
+	
+	["R变色颜色"]
+	uniform mediump float4 changed_color1
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.145098,0.156863,0.211765,1.000000)" 
+
+		artist = "1"
+		color = "1"
+	>;	
+	["G变色颜色"]
+	uniform mediump float4 changed_color2
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.1059,0.2588,0.3647,1)" 
+
+		artist = "1"
+		color = "1"
+	>;	
+	["B变色颜色"]
+	uniform mediump float4 changed_color3
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(0.286275,0.462745,0.282353,1.000000)" 
+
+		artist = "1"
+		color = "1"
+	>;
+// 河道特效
+	["扩散开始点"]
+	uniform float4 CenterPoint
+	<
+		uigroup = "大龙扩散特效"
+		artist = "0"
+		init = "(-165.0, 0.0, 165.0, 1.0)"
+	>;
+	["扩散波半径(Debug)"]
+	uniform float Radius
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "100"
+		uistep = "0.001"  
+		max = "2050"
+		min = "-1000"
+	>;
+	["消失半径(Debug)"]
+	uniform float DisappearRadius
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "100"
+		uistep = "0.001"  
+		max = "2000"
+		min = "-1000"
+	>;	
+	["扩散纹理Tilling"]
+	uniform float PatternTilling
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "9.0"
+	>;
+	["扩散边缘纹理"]
+	uniform float PatternSpread
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "2.0"
+		uistep = "0.001"  
+		max = "5"
+		min = "-5"
+	>;
+	["拖尾范围(出现)"]
+	uniform float RadiusAtten
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "-3.5"
+		uistep = "0.001"  
+		max = "10"
+		min = "-10"
+	>;
+	["拖尾范围(消失)"]
+	uniform float DisappearRadiusAtten
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "-2.0"
+		uistep = "0.001"  
+		max = "10"
+		min = "-10"
+	>;
+	["拖尾Power"]
+	uniform float RadiusPower
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "1.0"
+		uistep = "0.001"  
+		max = "20"
+		min = "0.1"
+	>;
+	["拖尾亮度"]
+	uniform float RadiusIntensity
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "1.0"
+		uistep = "0.001"  
+		max = "20"
+		min = "0.0"
+	>;
+	["亮边偏移"]
+	uniform float EdgeDistance
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "1.0"
+		uistep = "0.001"  
+		max = "1"
+		min = "-1"
+	>;
+	["亮边宽度"]
+	uniform float EdgeWidth
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.24"
+		uistep = "0.001"  
+		max = "3"
+		min = "0"
+	>;
+	["亮边平滑度"]
+	uniform float EdgeSmoothness
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "2.0"
+	>;
+	["亮边亮度"]
+	uniform float EdgeIntensity
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "1.0"
+	>;
+	["亮边颜色"]
+	uniform mediump float4 EdgeColor
+	<
+		uigroup = "大龙扩散特效"
+		init = "(1.0, 1.0, 1.0,1.0)"
+		artist = "1"
+		color = "1"
+	>;
+	["顶点偏移强度(出现)"]
+	uniform float AppearOffsetIntensity
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.5"
+		uistep = "0.001"  
+		max = "3"
+		min = "-3"
+	>;
+	["顶点偏移强度(消失)"]
+	uniform float DisappearOffsetIntensity
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.75"
+		uistep = "0.001"  
+		max = "3"
+		min = "-3"
+	>;
+	["扩散Debug"]
+	uniform mediump float Debug
+	<
+		artist = "1"
+		uigroup = "大龙扩散特效"
+		init = "0.0"
+		uistep = "0.001"  
+		max = "1.0"
+		min = "0.0"
+	>;
+
+	["倒影渐隐范围"]
+	uniform float HedaoWidth
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		uistep = "0.001"  
+		max = "0.5"
+		min = "-0.5"
+		init = "-0.15"
+	>;
+	["倒影渐隐"]
+	uniform float HedaoSmooth
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "1.16"
+		uistep = "0.001"  
+		max = "2.0"
+		min = "0.0"
+	>;
+	["不稳定区域亮度"]
+	uniform float XukongIntensity
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "1.7"
+		uistep = "0.001"  
+		max = "10.0"
+		min = "0.0"
+	>;
+	["不稳定区域范围"]
+	uniform float XukongWidth
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		uistep = "0.001"  
+		max = "0.5"
+		min = "-0.5"
+		init = "-0.09"
+	>;
+	["不稳定区域渐隐"]
+	uniform float XukongSmooth
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "0.97"
+		uistep = "0.001"  
+		max = "2.0"
+		min = "0.0"
+	>;
+
+	["流光纹理Tilling"]
+	uniform mediump float EmissTilling
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "20.0"
+	>;
+	["流光亮度"]
+	uniform float EmissIntensity
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "1.2"
+		uistep = "0.01"
+		min = "0.0" 
+		max = "5.0" 
+	>;
+	["流光速度"]
+	uniform mediump float EmissSpeed
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "0.2"
+		uistep = "0.01"
+		min = "0.0" 
+		max = "1.0" 
+	>;
+
+	["宇宙反射图Tilling"]
+	uniform mediump float ParallaxMapTilling
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "1.0"
+		uistep = "0.01"
+		min = "0.0" 
+		max = "10.0" 
+	>;
+	["反射天高比(越高越接近1)"]
+	uniform mediump float reflect_height
+	<
+		uigroup = "河道特效"
+		artist = "1" 
+		uistep = "0.01"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.3"
+	>;
+
+	["反射图uv平移x"]
+	uniform lowp float reflect_uv_adjust_x
+	<
+		uigroup = "河道特效"
+		artist = "1" 
+		uistep = "0.01"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.88"
+	>;
+	["反射图uv平移y"]
+	uniform lowp float reflect_uv_adjust_y
+	<
+		uigroup = "河道特效"
+		artist = "1" 
+		uistep = "0.01"
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.69"
+	>;
+	["倒影宇宙波动强度"]
+	uniform mediump float ParallaxOffset
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "0.5"
+		uistep = "0.01"
+		min = "0.0" 
+		max = "1.0" 
+	>;
+	["星星(高亮)提取"]
+	uniform float StarryPower
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "6.1"
+		uistep = "0.001"  
+		max = "10.0"
+		min = "-10.0"
+	>;
+	["星星(高亮)强度"]
+	uniform float StarrtIntensity
+	<
+		artist = "1"
+		uigroup = "河道特效"
+		init = "1.9"
+		uistep = "0.001"  
+		max = "10.0"
+		min = "-10.0"
+	>;
+	["水底扰动"]
+	uniform mediump float underwater_noise
+	<
+		init = "0.01" 
+		artist = "1"
+		uigroup = "折射扰动"
+	>;
+
+	["焦散噪声扰动强度"]
+	uniform mediump float causticsNoise
+	<
+		init = "0.1" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散噪声强度"]
+	uniform mediump float causticsTor
+	<
+		init = "0.1" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散速度"]
+	uniform mediump float2 causticsSpeed
+	<
+		init = "(0.1, 0.1)" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散噪声速度"]
+	uniform mediump float2 causticsNoiseSpeed
+	<
+		init = "(0.1, 0.1)" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散密度(XY)/对比度(Z)/强度(W)"]
+	uniform mediump float4 causticsTiling
+	<
+		init = "(0.041, 0.027, 2.4, 1.0)" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散噪声密度"]
+	uniform mediump float2 causticsNoiseTiling
+	<
+		init = "(0.1, 0.1)" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	// ["焦散对比度"]
+	// uniform mediump float causticsContrast
+	// <
+	// 	init = "1.0" 
+	// 	artist = "1"
+	// 	uigroup = "焦散"
+	// >;
+
+	// ["焦散强度"]
+	// uniform mediump float causticsIntensity
+	// <
+	// 	init = "0.5" 
+	// 	artist = "1"
+	// 	uigroup = "焦散"
+	// >;
+
+	["焦散颜色"]
+	uniform lowp float4 causticsColor
+	<
+		init = "(1.0, 1.0, 0.0, 1.0)" 
+		artist = "1"
+		color = "1"
+		uigroup = "焦散"
+	>;
+
+	["焦散范围系数"]
+	uniform float causticsDepthIndex
+	<
+		init = "2.0" 
+		artist = "1"
+		uigroup = "焦散"
+	>;
+
+	["深度变色位置"]
+	uniform float4 diffDepthPos
+	<
+		init = "(0.4, 0.6, 0.7, 0.9)" 
+		artist = "1"
+		uigroup = "深度色"
+	>;
+
+	["深度色01"]
+	uniform lowp float4 depthColor01
+	<
+		init = "(0.7, 0.6, 0.1, 1.0)" 
+		artist = "1"
+		color = "1"
+		uigroup = "深度色"
+	>;
+
+	["深度色02"]
+	uniform lowp float4 depthColor02
+	<
+		init = "(0.4, 0.2, 0.4, 1.0)" 
+		artist = "1"
+		color = "1"
+		uigroup = "深度色"
+	>;
+/////
+	["雾效修正"]
+	uniform mediump float fog_fix
+	<
+		init = "0.0" 
+		artist = "0"
+	>;
+
+	["雾效近端/远端/最大浓度"]
+	uniform float3 fogFactor
+	<
+		init = "(50.0, 500.0, 0.35)"
+		artist = "1"
+		uigroup = "雾效"
+	>;
+
+	["雾颜色"]
+	uniform float4 fogColor0
+	<
+		init = "(0.7, 0.8, 1.0, 1.0)"
+		artist = "1"
+		uigroup = "雾效"
+		color = "1"
+	>;
+
+	["大龙系数"]
+	uniform lowp float dawn_factor:DAWN_VALUE;
+	["大龙出现"]
+	uniform highp float boss_start:BOSS_START;
+	["大龙消失"]
+	uniform highp float boss_end:BOSS_END;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	//attribute float4 a_tangent : TANGENT;
+	attribute float4 a_color : DIFFUSE;
+	
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying highp float4 PosWorld;
+	varying mediump float4 v_vertical_horizon_uv;
+	varying lowp float3 TangentWorld;
+	varying lowp float3 BinormalWorld;
+	varying lowp float3 NormalWorld;
+
+	varying mediump float v_fog_distance;
+
+	varying mediump float v_cl_changed_sig;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform mediump float4 cam_pos : CAMERA_POSITION;
+
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	["计算河道mask"]
+	function get_hedao_mask in (
+	highp float2 st,
+	highp float pct,
+	highp float Width
+	) out (mediump float hedao_mask) // 计算雾效因子
+	{
+		out(hedao_mask,smoothstep(pct-Width, pct, st.y) - smoothstep(pct, pct+Width, st.y));
+	};
+
+	vertex
+	{
+		["wvp变换"]		
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;		
+		mediump float4 pos_world = position * world;		
+		out(PosWorld, pos_world);
+		float3x3 worldMat = float3x3(world);
+		highp float3 world_normal = float3(normalize(transform(float3(0.0f, 1.0f, 0.0f), worldMat)));
+		out(NormalWorld, world_normal);
+		mediump float3 tangentWorld = float3(normalize(float3(0.0f, 0.0f, 1.0f) * worldMat));
+		mediump float3 binormal_world = cross(world_normal, tangentWorld);
+		out(TangentWorld, tangentWorld);
+		out(BinormalWorld, binormal_world);
+
+
+		highp float4 pos = transform(pos_world, viewProj);
+		vertex(pos);
+
+		float2 nor_uv1 = pos_world.xz * 0.001f * float2(u_UVTiling1) + float2(FrameTime) * float2(u_uvSpeedU1, u_uvSpeedV1);
+		float2 nor_uv2 = pos_world.xz * 0.001f *  float2(u_UVTiling2) + float2(FrameTime) * float2(u_uvSpeedU2, u_uvSpeedV2);
+
+		out(v_vertical_horizon_uv,float4(nor_uv1,nor_uv2));
+		
+		mediump float4 uv0 = float4(texcoord0.xy,0.0f,0.0f);
+		out(UV0, uv0);
+
+		macro(FOG_ADDING) 
+        {
+        	branch ("1") 
+        	{
+        		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance)
+        		{
+        			branch("1")
+        			{
+        				["GL渲染系统下"]
+				// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+        				out(fog_distance, pos.w * ((pos.z/pos.w) *0.5f + 0.5f));
+        			}
+        			branch("0")
+        			{
+        				["Dx和Metal渲染系统下"]
+        				out(fog_distance, pos.z);
+        			}
+        		};
+
+        		out(v_fog_distance, fog_distance);
+        	}
+        	branch ("0") 
+        	{
+        	}
+        };
+
+	}
+
+	pixel
+	{
+		mediump float2 uv01 = UV0.xy;
+		mediump float2 vertical_uv = v_vertical_horizon_uv.xy;
+		mediump float2 horizon_uv = v_vertical_horizon_uv.zw;
+
+		lowp float3 vertex_normal_world = NormalWorld;
+		lowp float4 normal_map_color1 = sample(NormalMap, vertical_uv);
+		lowp float4 normal_map_color2 = sample(NormalMap, horizon_uv);
+		lowp float3 new_binormal = BinormalWorld;		
+		lowp float2 normOff1 = normal_map_color1.xy * 2.0f - float2(1.0f);
+		lowp float2 normOff2 = normal_map_color2.xy * 2.0f - float2(1.0f);
+		lowp float3 normalWorld_inner1 = normalize(TangentWorld * float3(normOff1.x * normal_factor)  + new_binormal * float3(normOff1.y * normal_factor)  + vertex_normal_world);
+		lowp float3 normalWorld_inner2 = normalize(TangentWorld * float3(normOff2.x * normal_factor)  + new_binormal * float3(normOff2.y * normal_factor)  + vertex_normal_world);
+		lowp float3 normalWorld = lerp(normalWorld_inner1 ,normalWorld_inner2, float3(0.5f));
+		lowp float3 view_dir = normalize(cam_pos.xyz - PosWorld.xyz);
+		lowp float3 wave_nor = lerp(vertex_normal_world,normalWorld,float3(wave_factor));
+		lowp float NdotV = saturate(dot(view_dir, wave_nor));
+		lowp float NdotV2 = 1.0f - smoothstep(nov_factor1,nov_factor2,NdotV);
+
+		lowp float3 NaV = (view_dir + normalWorld + float3(1.0f)) * 0.5f;
+		lowp float2 reflect_uv = NaV.rg;
+		lowp float4 reflect_color = sample(TexReflection, reflect_uv);
+
+		macro(HEIGHTLERP_ENABLE) out(lowp float water_mask) {
+			branch ("1") {
+				lowp float height_mask = sample(sfx_composeTex,uv01).r;
+				out(water_mask, (1.0f - height_mask) * (1.0f - dawn_factor));
+			}
+			branch ("0") {
+				out(water_mask, 1.0f * (1.0f - dawn_factor));
+			}
+		};
+
+		float2 refraction0 = (1.0f - dot(normalWorld, view_dir)) * water_mask * normalWorld.xz;
+		float2 diffUV = uv01.xy * diff_tiling + refraction0 * underwater_noise;
+		lowp float4 diffuse_color0 = sample(Tex0, diffUV);
+		mediump float3 land_color1 = diffuse_color0.rgb * lerp(float3(1.0f), _DepthWaterColor.rgb, float3(water_mask));//压暗倒影区域
+		// mediump float3 land_color1 = land_color0.rgb * lerp(float3(1.0f), float3(0.8f, 0.9f, 1.08f), float3(water_mask)); //水色偏蓝
+		mediump float3 fresnel_water_color = lerp(land_color1, WaterColor.xyz, float3(NdotV2 * water_alpha) * water_mask);
+		mediump float3 combined_color = fresnel_water_color + reflect_color.rgb * 0.55f * (reflect_factor + NdotV2) * water_mask;
+
+		lowp float4 color_export = float4(combined_color, 1.0f);
+
+		macro(FOG_ADDING) out(lowp float3 encode_color) 
+		{
+			branch ("1") 
+			{
+				lowp float fogDisFactor = smoothstep(fogFactor.x, fogFactor.y, v_fog_distance);
+				lowp float3 fogAddColor = lerp(color_export.rgb * scene_illum, fogColor0.rgb, float3(fogDisFactor) * fogFactor.z);
+				out(encode_color, fogAddColor);
+			}
+			branch ("0") 
+			{
+				out(encode_color, color_export.rgb * scene_illum);
+			}
+		};
+
+		pixel(float4(encode_color, color_export.a));
+	}
+}

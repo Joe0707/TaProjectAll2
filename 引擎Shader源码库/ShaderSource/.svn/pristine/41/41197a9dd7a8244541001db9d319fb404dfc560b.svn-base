@@ -1,0 +1,799 @@
+["Terrain Pbr Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhang ying peng" 
+	category = "common" 
+	company = "netease"
+	technique="TerrainTech"
+	mipmap = "0"
+>
+{
+  enum TERRAIN_TECH_TYPE
+  {
+    TERRAIN_NONE,
+    TERRAIN_SINGLE_LAYER,
+    TERRAIN_SINGLE_LAYER_LIGHTMAP,
+    TERRAIN_VCOLOR,
+    TERRAIN_VCOLOR_LIGHTMAP,
+    TERRAIN_ALPHAMAP_2,
+    TERRAIN_ALPHAMAP_LIGHTMAP_2,
+    TERRAIN_ALPHAMAP_3,
+    TERRAIN_ALPHAMAP_LIGHTMAP_3,
+    TERRAIN_ALPHAMAP_4,
+    TERRAIN_ALPHAMAP_LIGHTMAP_4
+  };
+
+  // 宏
+	["检查法线"]
+	eitheror CHECK_NORMAL;
+	
+	// ["是否闪电"]
+	// eitheror THUNDER_ENABLE;
+
+	["是否打开光"]
+	eitheror LIGHT_ENABLE;
+	
+	["是否打开高光"]
+	eitheror DIR_LIGHT_ENABLE;
+	
+	eitheror ENABLE_LEVEL_2;
+	
+	eitheror ENABLE_LEVEL_23_NORMAL;
+	
+	eitheror ENABLE_LEVEL_3;
+	
+	["开启法线贴图"]
+	eitheror USE_NORMAL_MAP;
+
+	macro(GAME_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	
+	macro(ENABLE_LEVEL_2)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+	
+	macro(ENABLE_LEVEL_3)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+	
+	macro(ENABLE_LEVEL_23_NORMAL)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+	
+	macro(FOG_ENABLE)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+
+	macro(USE_NORMAL_MAP)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+
+	macro(CHECK_NORMAL)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(LIGHT_ENABLE)
+	<  
+		default = "1"
+	>;
+
+	macro(TERRAIN_TECH_TYPE)
+	<
+		default = "TERRAIN_SINGLE_LAYER"
+	>;
+
+	// macro(THUNDER_ENABLE)
+	// <  
+		// default = "0"
+		// customizable = "1"
+	// >;
+
+	macro(DIR_LIGHT_ENABLE)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+	
+// 贴图
+	uniform sampler terrain0 : DIFFUSE
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+
+	uniform sampler terrain1 : TERRAIN1
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+
+	uniform sampler terrain_blend : TERRAIN_BLEND
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+	uniform sampler terrain2 : TERRAIN2
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+	
+	// samp_blend1
+	uniform sampler samp_blend1
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+	
+	uniform sampler terrain3 : TERRAIN3
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+	
+	uniform sampler samp_blend2
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		export="0"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+	
+	["水法线贴图"]
+	uniform sampler WaterNormalMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		// path = "shader\\core\\texture\\rain\\water_normal0.tga"
+		path = "shader\\core\\texture\\rain\\water_2_nrm.bmp"
+	>;
+	
+	// ["阴影贴图"]
+	// uniform sampler SMAP : SHADOW
+	// <
+		// artist = "0"
+		// mag = "LINEAR"
+		// mip = "LINEAR"
+		// min = "LINEAR"
+		// addressu = "clamp" 
+		// addressv = "clamp" 
+	// >;
+
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 tangent : TANGENT;
+	
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float2 ShadowMapUV;
+	varying highp float4 PosWorld;
+	varying lowp float3 NormalWorld;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform highp float4x4 world : WORLD;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float4 uv_transform;
+	
+	uniform lowp float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform mediump float height_fog_density : HEIGHT_FOG_DENSITY;
+	uniform highp float4x4 proj : PROJECTION;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform lowp float4 scene_ambient : AMBIENT;
+
+	uniform mediump float lm_scale : LIGHTMAP_TINT_FACTOR;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	// uniform lowp float4 ambient_spec : AMBIENT_SPEC;
+	
+	// uniform lowp float rough_scale;
+	// uniform mediump float diffuse_brightness;
+	
+	function Pow5 in (lowp float value) out (lowp float out_value )
+	{
+		lowp float value_square = value * value;
+		out(out_value, value_square * value_square * value);
+	};
+	
+	function FresnelTerm in (lowp float3 F0, lowp float ldoth, lowp float3 F90) out (lowp float3 fresnel_color)
+	{
+		lowp float mldh = 1.0f - ldoth;
+		function Pow5(mldh) out ( lowp float t ); // ala Schlick interpoliation
+		// lowp float t = 0.01f;
+		// out(fresnel_color, F0 + (max(float3(roughness), F0) - F0) * t);
+		out(fresnel_color, (F0 + (F90 - F0) * t) * 0.8f);
+		// out(fresnel_color, float3(ldoth));
+	};
+
+	vertex
+	{
+		highp float4 pos = transform(position, wvp);
+		
+		vertex(pos);
+		
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f);
+		mediump float4 pos_world = position * world;
+		
+		// float3x3 worldNormalMat = float3x3(world);
+		// float3 world_normal = normalize(a_normal.xyz * worldNormalMat);
+		
+		out(PosWorld, pos_world);
+		
+		// macro(LIGHT_ENABLE)
+		// {
+		  // branch("1") {
+					// out(PosWorld, pos_world);
+		  // }
+		  // branch("0") {
+		  // }
+		// };
+		
+		// fog
+		macro(FOG_ENABLE) out(mediump float uvw)
+		{
+			branch("1") {
+				mediump float4 m_fog_begin_in_view = float4(0.0f, 0.0f, FogInfo.x, 1.0f) * proj;
+				mediump float fog_begin_in_view = m_fog_begin_in_view.z;
+				mediump float4 m_fog_end_in_view = float4(0.0f, 0.0f, FogInfo.y, 1.0f) * proj;
+				mediump float fog_end_in_view = m_fog_end_in_view.z;
+				mediump float distance_factor = clamp(smoothstep(fog_begin_in_view, fog_end_in_view, pos.z), 0.0f, 1.0f);
+				
+				mediump float fog_begin_in_height = FogInfo.z;
+				mediump float fog_end_in_height = FogInfo.w;
+				//float height_factor = saturate(smoothstep(fog_begin_in_height, fog_end_in_height, vs_general.PosWorld.y));
+				mediump float height_factor = clamp((pos_world.y - fog_begin_in_height) / (fog_end_in_height - fog_begin_in_height), 0.0f, 1.0f);
+
+				out(uvw, max(height_factor * height_fog_density, distance_factor * FogColor.a));
+				// out(uvw, max(height_factor, distance_factor) * FogColor.a);
+			}
+			branch("0") {
+				out(uvw, 0.0f);
+			}
+		};
+
+		// diffuse
+		mediump float4 uv0 = float4(uvxyz.xyz, uvw);
+		out(UV0, uv0);
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				// lightmap
+				mediump float4 uv1 = float4(texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+				out(UV1, uv1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		// macro(SHADOW_MAP_ENABLE)
+		// {
+			// branch("1") {
+				////shadowmap
+				// function calc_shadow_simple(pos_world, lvp) out (mediump float2 shadow_map_uv);
+
+				// out(ShadowMapUV, shadow_map_uv);
+			// }
+			// branch("0") {
+			// }
+		// };
+	}
+
+	pixel
+	{
+		lowp float4 temp_pos_world = PosWorld;
+
+		lowp float2 rain_uv = float2(0f);
+
+		mediump float2 total_uv = UV0.xy * uv_transform[0];
+		
+		mediump float temp_u = fmod(total_uv.x, 1.0f);
+		
+		lowp float2 tex_uv = float2(lerp(0.005f, 0.995f, temp_u) * 0.5f, total_uv.y);
+		lowp float2 normal_uv = float2(tex_uv.x + 0.5f, tex_uv.y);
+		
+		lowp float3 terrain_map_color0 = sample(terrain0, total_uv).xyz;		
+		
+		macro(ENABLE_LEVEL_2) out (lowp float3 final_terrain_color, lowp float blend_factor0, lowp float blend_factor1)
+		{
+			branch("1") {
+				macro(TERRAIN_TECH_TYPE) out (lowp float3 terrain_map_color1, lowp float3 terrain_map_color2)
+				{
+				  branch("TERRAIN_NONE") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_SINGLE_LAYER") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_SINGLE_LAYER_LIGHTMAP") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_VCOLOR") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_VCOLOR_LIGHTMAP") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_ALPHAMAP_2") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_ALPHAMAP_LIGHTMAP_2") {
+					out(terrain_map_color1, float3(0.0f));
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_ALPHAMAP_3") {
+					out(terrain_map_color1, sample(terrain2, tex_uv).xyz);
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_ALPHAMAP_LIGHTMAP_3") {
+					out(terrain_map_color1, sample(terrain2, tex_uv).xyz);
+					out(terrain_map_color2, float3(0.0f));
+				  }
+				  branch("TERRAIN_ALPHAMAP_4") {
+					out(terrain_map_color1, sample(terrain2, tex_uv).xyz);
+					
+					macro(ENABLE_LEVEL_3) out (lowp float3 inner_terrain_map_color2) {
+						branch("1") {
+							out(inner_terrain_map_color2, sample(terrain3, tex_uv).xyz);
+						}
+						branch("0") {
+							out(inner_terrain_map_color2, float3(0.0f));
+						}
+					};
+					
+					out(terrain_map_color2, inner_terrain_map_color2);
+				  }
+				  branch("TERRAIN_ALPHAMAP_LIGHTMAP_4") {
+					out(terrain_map_color1, sample(terrain2, tex_uv).xyz);
+					
+					macro(ENABLE_LEVEL_3) out (lowp float3 inner_terrain_map_color2) {
+						branch("1") {
+							out(inner_terrain_map_color2, sample(terrain3, tex_uv).xyz);
+						}
+						branch("0") {
+							out(inner_terrain_map_color2, float3(0.0f));
+						}
+					};
+					
+					out(terrain_map_color2, inner_terrain_map_color2);
+				  }
+				};
+				
+				// lowp float3 terrain_map_color1 = sample(terrain2, tex_uv).xyz;
+				// lowp float3 terrain_map_color2 = sample(terrain3, tex_uv).xyz;
+				// lowp float3 terrain_map_color3 = sample(terrain3, tex_uv).xyz;
+				
+				macro(GAME_ENABLE) out(lowp float blend_factor0_inner, lowp float blend_factor1_inner) {
+					branch("1") {
+						lowp float4 blend_factor = sample(terrain_blend, UV0.xy);
+						out(blend_factor0_inner, blend_factor.x);
+						out(blend_factor1_inner, blend_factor.y);
+					}
+					branch("0") {
+						lowp float4 blend_factor0_color = sample(terrain_blend, UV0.xy);
+						lowp float4 blend_factor1_color = sample(samp_blend1, UV0.xy);
+						out(blend_factor0_inner, blend_factor0_color.a);
+						out(blend_factor1_inner, blend_factor1_color.a);
+					}
+				};
+				
+				out(blend_factor0, blend_factor0_inner);
+				out(blend_factor1, blend_factor1_inner);
+				
+				lowp float3 total_terrain_color_01 = lerp(terrain_map_color0, terrain_map_color1, float3(blend_factor0_inner));
+				
+				macro(ENABLE_LEVEL_3) out (lowp float3 final_total_terrain_color) {
+					branch("1") {
+						lowp float3 total_terrain_color_012 = lerp(total_terrain_color_01, terrain_map_color2, float3(blend_factor1_inner));	
+						out(final_total_terrain_color, total_terrain_color_012);
+					}
+					branch("0") {
+						out(final_total_terrain_color, total_terrain_color_01);
+					}
+				};
+				
+				out(final_terrain_color, final_total_terrain_color);
+			}
+			branch("0") {
+				out(blend_factor0, 0.0f);
+				out(blend_factor1, 0.0f);
+				out(final_terrain_color, terrain_map_color0);
+			}
+		};
+		
+		// lowp float day_factor = (diffuse_brightness_inner.x + diffuse_brightness_inner.y + diffuse_brightness_inner.z) * 0.33333f;
+		lowp float day_factor = 1.0f;
+		
+		macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+		{
+		  branch("1") {
+			lowp float4 light_map_color = sample(TexLightmap, UV1.xy);
+			mediump float3 final_lightmap_color_inner = (lm_scale + 1.0f) * light_map_color.xyz * LightMapScale.yzw;
+			out(lightmap_color, final_lightmap_color_inner);
+		  }
+		  branch("0") {
+			out(lightmap_color, float3(1.0f));
+		  }
+		};
+		
+		macro(LIGHT_ENABLE) out (lowp float3 final_cal_color)
+		{		
+			branch("1") {				
+				// lowp float3 src_total_color = final_terrain_color * final_terrain_color;
+				// lowp float3 temp_total_color = final_terrain_color;
+				lowp float3 total_terrain_color = final_terrain_color.xyz * final_terrain_color.xyz;
+				
+				lowp float3 c_lightmap_color = lightmap_color * lightmap_color;
+				
+				macro(USE_NORMAL_MAP) out (lowp float3 normal_world, lowp float roughness)
+				{
+					branch("1") {
+						lowp float3 normal_color0 = sample(terrain1, total_uv).xyz;
+				
+						macro(ENABLE_LEVEL_23_NORMAL) out (lowp float3 final_normal_color1, lowp float3 final_normal_color2)
+						{
+							branch("1") {
+								macro(TERRAIN_TECH_TYPE) out (lowp float3 normal_color1, lowp float3 normal_color2)
+								{
+								  branch("TERRAIN_NONE") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_SINGLE_LAYER") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_SINGLE_LAYER_LIGHTMAP") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_VCOLOR") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_VCOLOR_LIGHTMAP") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_ALPHAMAP_2") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_ALPHAMAP_LIGHTMAP_2") {
+									out(normal_color1, float3(0.5f, 0.5f, 0.1f));
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_ALPHAMAP_3") {
+									out(normal_color1, sample(terrain2, normal_uv).xyz);
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_ALPHAMAP_LIGHTMAP_3") {
+									out(normal_color1, sample(terrain2, normal_uv).xyz);
+									out(normal_color2, float3(0.5f, 0.5f, 0.1f));
+								  }
+								  branch("TERRAIN_ALPHAMAP_4") {
+									out(normal_color1, sample(terrain2, normal_uv).xyz);
+									// out(normal_color2, sample(terrain3, normal_uv).xyz);
+									
+									macro(ENABLE_LEVEL_3) out (lowp float3 inner_normal_color2) {
+										branch("1") {
+											out(inner_normal_color2, sample(terrain3, normal_uv).xyz);
+										}
+										branch("0") {
+											out(inner_normal_color2, float3(0.5f, 0.5f, 0.1f));
+										}
+									};
+									
+									out(normal_color2, inner_normal_color2);
+								  }
+								  branch("TERRAIN_ALPHAMAP_LIGHTMAP_4") {
+									out(normal_color1, sample(terrain2, normal_uv).xyz);
+									// out(normal_color2, sample(terrain3, normal_uv).xyz);
+									
+									macro(ENABLE_LEVEL_3) out (lowp float3 inner_normal_color2) {
+										branch("1") {
+											out(inner_normal_color2, sample(terrain3, normal_uv).xyz);
+										}
+										branch("0") {
+											out(inner_normal_color2, float3(0.5f, 0.5f, 0.1f));
+										}
+									};
+									
+									out(normal_color2, inner_normal_color2);
+								  }
+								};
+								
+								out(final_normal_color1, normal_color1);
+								out(final_normal_color2, normal_color2);
+							}	
+							branch("0") {
+								out(final_normal_color1, float3(0.5f, 0.5f, 0.1f));
+								out(final_normal_color2, float3(0.5f, 0.5f, 0.1f));
+							}
+						};
+						
+						// lowp float3 normal_color1 = sample(terrain2, normal_uv).xyz;
+						// lowp float3 normal_color2 = sample(terrain3, normal_uv).xyz;
+						// lowp float3 normal_color3 = sample(terrain3, normal_uv).xyz;		
+						lowp float3 total_normal_01 = lerp(normal_color0, final_normal_color1, float3(blend_factor0));
+						lowp float3 total_normal_012 = lerp(total_normal_01, final_normal_color2, float3(blend_factor1));
+						// lowp float3 total_normal_0123 = lerp(total_normal_012, normal_color3, float3(blend_factor2));
+						lowp float3 total_normal = total_normal_012;
+						lowp float2 normal_off = total_normal.xy * 2.0f - float2(1.0f) + rain_uv.xy;
+						
+						// out(total_terrain_color, total_terrain_color_0123);
+						// out(normal_world, normalize(float3(normal_off.x, 1.0f, normal_off.y)));				
+						// out(roughness, 1.0f - total_normal.z);
+						
+						out(normal_world, normalize(float3(normal_off.x, 1.0f, normal_off.y)));
+						// out(roughness, (1.0f - total_normal.z * 0.7f) * rough_scale_inner);
+						out(roughness, 1.0f - total_normal.z * 0.7f);
+						// out(roughness, 0.0f);
+						
+						// lowp float3 normal_world = normalize(float3(normal_off.x, 1.0f, normal_off.y));
+						// lowp float roughness = (1.0f - total_normal.z) * uv_transform[1] * 0.08f;
+					}
+					branch("0") {
+						out(normal_world, float3(0.0f, 1.0f, 0.0f));
+						// out(roughness, 0.65f * rough_scale_inner);
+						out(roughness, 0.65f);
+						// out(roughness, 0.0f);
+					}
+				};
+				
+				lowp float metal = 0.05f;
+				lowp float non_metal = 0.95f;
+				
+				lowp float3 spec_color = lerp(total_terrain_color.xyz, float3(0.03f), float3(non_metal));
+				lowp float3 non_metal_diffuse = non_metal * total_terrain_color;
+				
+				lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+				lowp float gxx_rough = lerp(0.1f, 0.85f, roughness);
+				lowp float gxx_alpha = gxx_rough * gxx_rough + 0.005f;
+				lowp float alphaSqr = gxx_alpha * gxx_alpha;
+				
+				// 点光
+				mediump float4 point_light_attrs_3 = PointLightAttrs[3];
+				mediump float3 point_light_orgin_dir = PosWorld.xyz - point_light_attrs_3.xyz;
+				mediump float dist = length(point_light_orgin_dir);
+				
+				// condition(dist - point_light_attrs_3.w) out (lowp float3 final_point_light_color) {
+					// branch("%0% > 0.0")
+					// {
+						// out(final_point_light_color, float3(0.0f));
+					// }
+					// default
+					// {
+				mediump float4 point_light_attrs_1 = PointLightAttrs[1];
+				lowp float4 point_light_attrs_4 = PointLightAttrs[4];
+				mediump float3 light_color = point_light_attrs_1.xyz;
+				
+				lowp float3 light_dir = normalize(point_light_orgin_dir);
+				
+				float3 H = normalize(view_dir - light_dir);
+				float NdotH = saturate(dot(normal_world, H));
+				lowp float NdotL = max(0.0f, dot(-light_dir, normal_world));
+				// float NdotV = saturate(dot(view_dir, normal_world));
+				// lowp float NdotN = max(0.0f, dot(normal_world, NormalWorld));
+				
+				mediump float denom = NdotH * NdotH * (alphaSqr - 1.0f) + 1.0f;
+				mediump float brdf = alphaSqr / (denom * denom);
+				
+				//float light_atten = (clamp(900.0 / (dist * dist + 1.0), 0.05 , 0.25) - 0.05) * 5.0;
+				mediump float range_factor = clamp((point_light_attrs_3.w - dist) / point_light_attrs_3.w, 0.0f, 1.0f);
+				lowp float light_atten = min(1.0f, 6000.0f / (dist * dist + 1.0f) * range_factor);
+				
+				lowp float3 point_diffuse = (point_light_attrs_4.r + (1.0f - min((c_lightmap_color.x + c_lightmap_color.y + c_lightmap_color.z) * 0.3333f, 1.0f)) ) * non_metal_diffuse;
+				
+				// lowp float3 point_diffuse = point_light_attrs_4.r * NdotL * non_metal_diffuse;
+				
+				// out (final_point_light_color, diffuse_brightness_inner.a * light_atten * light_color * (point_diffuse + brdf * spec_color * 0.3f));
+				lowp float3 final_point_light_color = NdotL * light_atten * light_color * (point_diffuse + brdf * spec_color * 0.4f);
+					// }
+				// };
+				
+				macro(DIR_LIGHT_ENABLE) out(lowp float3 dir_color) {
+					branch("1") {
+						macro(GAME_ENABLE) out(mediump float4 dir_light_attr_3) {
+							branch("1") {
+								out(dir_light_attr_3, ShadowLightAttr[3]);
+							}
+							branch("0") {
+								out(dir_light_attr_3, DirLightAttr[3]);
+							}
+						};
+
+						macro(GAME_ENABLE) out(mediump float4 dir_light_attr_1) {
+							branch("1") {
+								out(dir_light_attr_1, ShadowLightAttr[1]);
+							}
+							branch("0") {
+								out(dir_light_attr_1, DirLightAttr[1]);
+							}
+						};
+						//方向光
+						lowp float3 dir_light_color = dir_light_attr_1.xyz;
+						lowp float3 dir_light_dir = normalize(dir_light_attr_3.xyz);
+						lowp float3 dirH = normalize(view_dir - dir_light_dir);
+						lowp float dirNdotH = max(0.0f, dot(normal_world, dirH));
+						lowp float dirNdotL = max(0.0f, dot(normal_world, -dir_light_dir));
+						mediump float dir_denom = dirNdotH * dirNdotH * (alphaSqr - 1.0f) + 1.0f;
+						mediump float dir_D = alphaSqr / (dir_denom * dir_denom);
+						
+						float NdotV = saturate(dot(view_dir, normal_world));
+						
+						// lowp float3 F0 = spec_color;
+						
+						// lowp float3 F90 = max(float3((1.0f - roughness) * 0.5f), F0);
+						
+						// function FresnelTerm(F0, NdotV, F90) out (lowp float3 dir_F);
+						
+						//环境高光
+						lowp float3 ambient_light_dir = float3(0f,1f,0f);
+						lowp float3 ambientH = normalize(view_dir + ambient_light_dir);
+						lowp float ambientNdotH = clamp(dot(normal_world, ambientH), 0.0f, 1.0f);
+						mediump float ambient_denom = ambientNdotH * ambientNdotH * (alphaSqr - 1.0f) + 1.0f;
+						mediump float ambient_D = alphaSqr / (ambient_denom * ambient_denom);
+						// mediump float3 ambient_spec_color = ambient_D * ambient_spec.xyz;
+						
+						out(dir_color, (dirNdotL * dir_D * 0.5f * dir_light_color) * spec_color + max(0f, dirNdotL + 0.9f * (1f - max(0f, -dir_light_dir.y))) * non_metal_diffuse);
+					}
+					branch("0") {
+						out(dir_color, total_terrain_color * 0.15f);
+					}
+				};
+				
+				lowp float3 final_color_m = dir_color / day_factor;
+				// lowp float3 final_color_m_c = sqrt(final_color_m * lightmap_color * lightmap_color);
+				// lowp float3 final_color_nom_c = sqrt(final_color_nom);
+				
+				lowp float3 final_color = sqrt(final_color_m * c_lightmap_color + final_point_light_color + scene_ambient.xyz * total_terrain_color);
+				
+				out (final_cal_color, final_color);
+				// out (final_cal_color, float3(1.0f - roughness));
+				// out (final_cal_color, normal_world * 0.5f + float3(0.5f));
+			}
+			branch("0") {				
+				out (final_cal_color, final_terrain_color * 1.15f * lightmap_color);
+			}
+		};
+		
+		macro(GAME_ENABLE) out(mediump float3 final_fog_color)
+		{
+			branch("1") {
+				macro(FOG_ENABLE) out(mediump float3 final_fog_color_inner)
+				{
+					branch("1") {
+						lowp float fog_factor = UV0.w;
+						lowp float3 fog_result = final_cal_color * (1.0f - fog_factor) + FogColor.xyz * fog_factor;
+						out(final_fog_color_inner, fog_result);
+					}
+					branch("0") {
+						out(final_fog_color_inner, final_cal_color);
+					}
+				};
+				out(final_fog_color, final_fog_color_inner);
+			}
+			branch("0") {
+				macro(FOG_ENABLE) out(mediump float3 final_fog_color_inner)
+				{
+					branch("1") {
+						highp float temp = length(UV0.w * FogColor.xyz);
+						highp float fogFactor = step(temp, sqrt(3.0f) - 0.0001f) * UV0.w;
+						lowp float3 fog_result = final_cal_color * (1.0f - fogFactor) + FogColor.xyz * fogFactor;
+						out(final_fog_color_inner, fog_result);
+					}
+					branch("0") {
+						out(final_fog_color_inner, final_cal_color);
+					}
+				};
+				out(final_fog_color, final_fog_color_inner);
+			}
+		};
+
+		// macro(SHADOW_MAP_ENABLE) out(mediump float3 final_shadow_color)
+		// {
+			// branch("1") {
+				// function calc_shadow_simple_ps(SMAP, ShadowMapUV.xy) out (lowp float shadow_color);
+				// out(final_shadow_color, final_fog_color * shadow_color);
+			// }
+			// branch("0") {
+				// out(final_shadow_color, final_fog_color.xyz);
+			// }
+		// };
+		
+		// lowp float3 final_final_color = min(float3(1.0f), final_fog_color.xyz) * 0.94f;
+
+		macro(NEOX_DEBUG_MODE) out(lowp float3 final_debug_color)
+		{
+			branch("NEOX_DEBUG_MODE_NONE") {
+				out(final_debug_color, final_fog_color);
+			}
+			branch("NEOX_DEBUG_MODE_MTL") {
+				out(final_debug_color, sqrt(final_cal_color.xyz));
+			}
+			branch("NEOX_DEBUG_MODE_LIT") {
+				out(final_debug_color, lightmap_color);
+			}
+		};
+
+		pixel(float4(final_debug_color, 1.0f));
+	}
+}

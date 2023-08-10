@@ -1,0 +1,1637 @@
+["terrain shader for DM62"]
+pipeline
+<
+	version = "1.0.0"
+	author = "fanyu"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{	
+	include(shader\\including\\pbr_include_function.spzs)
+	["二层混合"]
+	eitheror SECOND_TEX;
+	macro(SECOND_TEX)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["三层混合"]
+	eitheror THIRD_TEX;
+	macro(THIRD_TEX)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["四层混合(三层没开时别勾选)"]
+	eitheror FOURTH_TEX;
+	macro(FOURTH_TEX)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["五层混合"]
+	eitheror FIFTH_TEX;
+	macro(FIFTH_TEX)
+	<
+		customizable = "1"
+		default = "0"
+	>;	
+
+	["六层混合"]
+	eitheror SIXTH_TEX;
+	macro(SIXTH_TEX)
+	<
+		customizable = "1"
+		default = "0"
+	>;	
+
+	["是否高级混合"]
+	eitheror BLEND_ENABLE;
+	macro(BLEND_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+
+	["第一层为模型贴图"]
+	eitheror MODELTEX_ENABLE;
+	macro(MODELTEX_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["高度图"]
+	eitheror HEIGHT_MAP_ENABLE;
+	macro(HEIGHT_MAP_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;			
+
+
+	["接受点光"]
+	eitheror POINT_LIGHT_ENABLE;
+	macro(POINT_LIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["开启环境反射(ENVIR_ENABLE)"]
+	eitheror ENVIR_ENABLE;
+	macro(ENVIR_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启法线贴图(USE_NORMAL_MAP)"]
+	eitheror USE_NORMAL_MAP;
+	macro(USE_NORMAL_MAP)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	// attribute
+	attribute float4 a_position: POSITION;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;// uv1
+	attribute float4 a_texture1 : TEXTURE1;// uv2
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+	attribute float4 a_normal : NORMAL;// 顶点法线
+	attribute float4 tangent : TANGENT;// 顶点切线
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	// uniform
+	/*
+	m_str2sem_map["InstPrsLm"] = SEMANTIC_TYPE_INST_PRS_LM;
+	m_str2sem_map["InstFakeLm"] = SEMANTIC_TYPE_INST_FAKE_LM;
+	m_str2sem_map["InstPrs"] = SEMANTIC_TYPE_INST_PRS;
+	*/
+	uniform highp float4[120] instData:INST_PRS_LM;
+
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 proj: PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+	uniform mediump float4[6] DynamicGiCube : DYNAMIC_GI;
+
+	["shadow"]
+	varying highp float4 pos_light_proj;
+	varying mediump float2 shadowmap_uv;
+
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float4 shadow_blendall:SHADOW_BLEND_ALL;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	
+	["影子颜色"]
+	uniform mediump float4 u_shadow_color
+	<
+		artist = "1"
+		color = "1"
+//		init = "(0.176, 0.325, 0.384)"
+		init = "(0.55, 0.98, 1.0)"
+	>;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+
+
+	["混合贴图1"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;
+
+	["混合贴图2"]
+	uniform sampler Tex1
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;
+
+	["混合贴图3"]
+	uniform sampler Tex2
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;
+
+	["混合贴图4"]
+	uniform sampler Tex3
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;	
+
+	["混合贴图5"]
+	uniform sampler Tex4
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;	
+
+	["混合贴图6"]
+	uniform sampler Tex5
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;	
+
+
+	["法线贴图1"]
+	uniform sampler SamplerNormalMap1
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;
+
+	// ["法线贴图2"]
+	// uniform sampler SamplerNormalMap2
+	// <
+	// 	artist = "1"
+	// 	mag = "linear"
+	// 	mip = "linear"
+	// 	min = "linear"
+	// 	lodbias = "-1.0"
+	// >;
+
+	// ["法线贴图3"]
+	// uniform sampler SamplerNormalMap3
+	// <
+	// 	artist = "1"
+	// 	mag = "linear"
+	// 	mip = "linear"
+	// 	min = "linear"
+	// 	lodbias = "-1.0"
+	// >;	
+
+
+	// ["法线贴图4"]
+	// uniform sampler SamplerNormalMap4
+	// <
+	// 	artist = "1"
+	// 	mag = "linear"
+	// 	mip = "linear"
+	// 	min = "linear"
+	// 	lodbias = "-1.0"
+	// >;	
+
+	["高度贴图(R第一张/G第二张/B第三张)"]
+	uniform sampler TexHeight
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+	>;
+
+
+
+	["混合比例贴图"]
+	uniform sampler TexBlendMap
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	["6层混合比例贴图"]
+	uniform sampler TexBlendMap1
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	["cubemap贴图"]
+	uniform sampler SamplerCubeMap
+	<
+		artist = "1"
+		addressu = "clamp"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		thumbnail = "0"
+	>;
+
+
+
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["迷雾纹理"]
+	uniform sampler view_texture: FOW
+	<
+		artist = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+
+    // ——————————————————  混合 ——————————————————
+
+    ["一层uv缩放"]
+	uniform lowp float uv_tiling_1
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;
+
+    ["二层uv缩放"]
+	uniform lowp float uv_tiling_2
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;    
+
+    ["三层uv缩放"]
+	uniform lowp float uv_tiling_3
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;    
+
+    ["四层uv缩放"]
+	uniform lowp float uv_tiling_4
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;    
+
+    ["五层uv缩放"]
+	uniform lowp float uv_tiling_5
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;   
+
+    ["六层uv缩放"]
+	uniform lowp float uv_tiling_6
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;   
+
+     ["一层边缘硬度"]
+	uniform lowp float height_low_1
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;   
+
+
+     ["二层边缘硬度"]
+	uniform lowp float height_low_2
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;   
+    
+     ["三层边缘硬度"]
+	uniform lowp float height_low_3
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;      
+    
+     ["四层边缘硬度"]
+	uniform lowp float height_low_4
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >; 
+
+     ["五层边缘硬度"]
+	uniform lowp float height_low_5
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >; 
+
+
+     ["边缘颜色浓度"]
+	uniform lowp float edge_width
+    <
+        artist = "1"
+        init = "0.0"
+        uistep = "0.001"
+        uigroup = "边缘颜色"
+        min = "0.0"
+        max = "5.0"
+    >; 
+
+    
+     ["一层边缘颜色"]
+	uniform lowp float4 edge_color0
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+     ["二层边缘颜色"]
+	uniform lowp float4 edge_color1
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+     ["三层边缘颜色"]
+	uniform lowp float4 edge_color2
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+    ["四层边缘颜色"]
+	uniform lowp float4 edge_color3
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+
+     ["五层边缘颜色"]
+	uniform lowp float4 edge_color4
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+
+     ["六层边缘颜色"]
+	uniform lowp float4 edge_color5
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >;    
+
+   // ——————————————————  手动高度值 —————————————————— 
+     ["一层高度值"]
+	uniform lowp float manual_h1
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["二层高度值"]
+	uniform lowp float manual_h2
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["三层高度值"]
+	uniform lowp float manual_h3
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["四层高度值"]
+	uniform lowp float manual_h4
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+    ["五层高度值"]
+	uniform lowp float manual_h5
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+    ["六层高度值"]
+	uniform lowp float manual_h6
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["亮度阈值"]
+	uniform lowp float highlight_range
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >;  
+
+
+    //——————————————————  PBR —————————————————— 
+	["一层金属度"]
+	uniform mediump float metal_1
+	<
+		uigroup = "0 PBR"
+		artist = "0" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.04"
+		uistep = "0.001"
+	>;
+
+	["二层金属度"]
+	uniform mediump float metal_2
+	<
+		uigroup = "0 PBR"
+		artist = "0" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.04"
+		uistep = "0.001"
+	>;
+
+	["三层金属度"]
+	uniform mediump float metal_3
+	<
+		uigroup = "0 PBR"
+		artist = "0" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.04"
+		uistep = "0.001"
+	>;
+
+	["四层金属度"]
+	uniform mediump float metal_4
+	<
+		uigroup = "0 PBR"
+		artist = "0" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.04"
+		uistep = "0.001"
+	>;	
+		
+	["一层粗糙度"]
+	uniform mediump float rough_1
+	<
+		uigroup = "0 PBR"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.1"
+		uistep = "0.001"
+	>;
+
+	["四层粗糙度"]
+	uniform mediump float rough_4
+	<
+		uigroup = "0 PBR"
+		artist = "1" 
+		color = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.1"
+		uistep = "0.001"
+	>;	
+
+	["金属度缩放"]
+	uniform mediump float metal_multi
+	<
+		uigroup = "0 PBR"
+		artist = "1" 
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "2.0"
+	>;
+	["光滑度缩放"]
+	uniform mediump float rough_multi
+	<
+		uigroup = "0 PBR"
+		artist = "1" 
+		init = "1.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "2.0"
+	>;
+
+	["反射强度(envir_brightness)"]
+	uniform mediump float envir_brightness
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+
+	["反射强度(spec_intensity)"]
+	uniform mediump float spec_intensity
+	<
+		artist = "1" 
+		uigroup = "2 动态光"
+		min = "0.0" 
+		max = "10.0" 
+		init = "1.0"
+	>;
+
+	["暗部颜色"]
+	uniform mediump float4 dark_color
+	<
+		uigroup = "基础"
+		artist = "1" 
+		color = "1"
+		init = "(0.15,0.15,0.15,0.15)"
+	>;		
+
+
+	["旋转cubemap-X"]
+	uniform mediump float nx_offset
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+		uigroup = "1 环境光"
+	>;
+
+	["旋转cubemap-Y"]
+	uniform mediump float ny_offset
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+		uigroup = "1 环境光"
+	>;
+
+	["旋转cubemap-Z"]
+	uniform mediump float nz_offset
+	<
+		uigroup = "1 PBR"
+		artist = "1" 
+		init = "0.0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+		uigroup = "1 环境光"
+	>;
+
+    // ——————————————————  其他 —————————————————— 
+
+
+	uniform mediump float2 scene_size
+    <
+    	init = "(1628.0, 1628.0)"
+    >;
+
+	// varying
+	// 漫反射贴图的uv
+	varying mediump float4 v_texture0;
+	varying mediump float2 v_texture0_tiled;
+	// lightmap uv
+	varying mediump float2 v_texture1;
+	//varying mediump float2 v_texture2; // 顶点色
+
+	varying mediump float4 v_PosWorld;
+	//varying mediump float2 fow_uv;
+
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+
+	uniform lowp float4 ambient_color : AMBIENT;
+
+	//varying lowp float4 v_diffuse;
+
+
+	// ——————————————————  函数 —————————————————— 
+
+	// 地形混合函数（高度图混合）
+	function Blend_color_height in (lowp float3 color0, lowp float3 color1, float height0, float height1, float factor, float height_low, float edge_width, float3 edge_color0, float3 edge_color1) out (mediump float3 finalBlendColor)
+	{
+		lowp float fac0 = 1.0f-factor;
+		lowp float fac1 = factor;
+		// ver 1.2
+		lowp float depth = height_low;
+		lowp float ma = max(fac0 + height0, fac1 + height1) - depth;
+		lowp float b1 = max(fac0 + height0 - ma, 0.0f);
+		lowp float b2 = max(fac1 + height1 - ma, 0.0f);
+		lowp float edge_adjust0 = clamp(fac1 * edge_width, 0.0f, 1.0f);
+		lowp float edge_adjust1 = clamp(fac0 * edge_width, 0.0f, 1.0f);
+		lowp float3 color0_blend = lerp(color0, color0 * edge_color0, float3(edge_adjust0));
+		lowp float3 color1_blend = lerp(color1, color1 * edge_color1, float3(edge_adjust1));
+		lowp float3 finalBlendColor_ = (color0_blend * b1 + color1_blend * b2)/(b1 + b2);
+		out(finalBlendColor, finalBlendColor_);
+	};
+
+	// 地形法线混合函数（高度图混合）
+	function Blend_normal_height in (lowp float3 color0, lowp float3 color1, float height0, float height1, float factor, float height_low) out (mediump float3 finalBlendColor)
+	{
+		lowp float fac0 = 1.0f-factor;
+		lowp float fac1 = factor;
+		// ver 1.2
+		lowp float depth = height_low;
+		lowp float ma = max(fac0 + height0, fac1 + height1) - depth;
+		lowp float b1 = max(fac0 + height0 - ma, 0.0f);
+		lowp float b2 = max(fac1 + height1 - ma, 0.0f);
+		lowp float3 finalBlendColor_ = (color0 * b1 + color1 * b2)/(b1 + b2);
+		out(finalBlendColor, finalBlendColor_);
+	};
+
+	// 地形粗糙度&金属度混合函数（高度图混合）
+	function Blend_rough_height in (lowp float color0, lowp float color1, float height0, float height1, float factor, float height_low) out (mediump float finalBlendColor)
+	{
+		lowp float fac0 = 1.0f-factor;
+		lowp float fac1 = factor;
+		// ver 1.2
+		lowp float depth = height_low;
+		lowp float ma = max(fac0 + height0, fac1 + height1) - depth;
+		lowp float b1 = max(fac0 + height0 - ma, 0.0f);
+		lowp float b2 = max(fac1 + height1 - ma, 0.0f);
+		lowp float finalBlendColor_ = (color0 * b1 + color1 * b2)/(b1 + b2);
+		out(finalBlendColor, finalBlendColor_);
+	};	
+
+
+
+	// 地形混合函数（普通混合）
+	function Blend_color in (lowp float3 color0, lowp float3 color1, float factor) out (mediump float3 finalBlendColor)
+	{
+		out(finalBlendColor, lerp(color0, color1, float3(factor)));
+	};
+
+	// 用于采样两张贴图并在一起的横长方形贴图
+	function getSplitUV in (lowp float2 uv_raw, lowp float tiling) out(lowp float4 uv_out)
+	{
+		lowp float uv_gap = 1.0f/32.0f;
+		lowp float2 uv_lerp = float2(uv_gap) + fmod(uv_raw.xy, float2(1.0f)); 
+		//lowp float u_transform = fmod(uv_lerp.x, 1.0f - uv_gap) * 0.5f;
+		lowp float u_transform = lerp(0.005f, 0.995f, fmod(uv_raw.x * tiling, 1.0f)) * 0.5f;
+		//lowp float v_transform = fmod(uv_lerp.y, 1.0f - uv_gap);
+		lowp float v_transform = uv_raw.y * tiling;
+		lowp float2 uv_diffuse = float2(u_transform, v_transform);
+		lowp float2 uv_normal = float2(u_transform + 0.5f, v_transform);
+		out(uv_out, float4(uv_diffuse, uv_normal));
+	};
+
+
+
+	vertex
+	{
+
+		// GPU蒙皮
+		macro(GPU_SKIN_ENABLE) out (highp float4 pos_local,highp float4 nor_local)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(pos_local, pos1);
+				out(nor_local, nor1);
+			}
+			branch("0") 
+			{
+				out(pos_local, a_position);
+				out(nor_local, a_normal);
+			}
+		};
+		highp float4 position = pos_local;
+
+
+		// 计算空间坐标
+		mediump float4 pos_world = transform(position, world);
+		mediump float4  final_position = transform(position, wvp);
+		mediump float4 final_pos_world = pos_world;
+		out(v_PosWorld, final_pos_world);
+
+
+		// lightmap uv
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float4 tmp_texture_1 = transform(float4(a_texture1.xy, 1.0f, 0.0f), lightmapTrans);
+				out(v_texture1, tmp_texture_1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		//mediump float4 pos_world_view = view;
+		
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 1.0f));
+		//out(v_texture0_tiled, a_texture0.xy * uv_tiling_1);
+		out(v_texture0_tiled, pos_world.xz);
+
+
+
+		// ——————————————————  法线计算 ——————————————————
+		mediump float3 world_normal = float3(normalize(transform(nor_local.xyz, float3x3(world))));
+		out(v_NormalWorld, world_normal);
+
+		macro(USE_NORMAL_MAP) {
+			branch ("1") {
+				mediump float3 tangentWorld = float3(normalize(tangent.xyz * float3x3(world)));
+				// 通过uv空间来判断是否是镜像模型，如果是镜像模型则反转法线
+				mediump float test_sign = float(sign(step(length(tangent.xyz), 1.0f) - 0.5f));
+				mediump float3 binormal_world = cross(world_normal, tangentWorld) * test_sign;
+				//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+				
+				out(v_TangentWorld, tangentWorld);
+				out(v_BinormalWorld, binormal_world);
+			}
+			branch("0"){}
+		};
+
+
+		vertex(final_position);
+
+	}
+
+	pixel
+	{	
+
+		// ——————————————————  LIGHTMAP ——————————————————
+        macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+        {
+            branch("1") {
+                // lightmap已经是线性的了
+                 lowp float4 _lightmap_color = sample(TexLightmap, v_texture1.xy);
+                //lowp float4 light_color = DirLightAttr[1];
+                lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz);
+
+            }
+            branch("0") {
+                out(lightmap_color, float3(u_fog_color.rgb));
+            }
+        };
+
+
+        // 
+
+
+		// ——————————————————  采样 ——————————————————
+
+        // uV采样
+        lowp float2 UV0_ori = v_texture0.xy;
+        lowp float2 UV0_tiled = v_texture0_tiled / 100.0f;
+
+        macro(MODELTEX_ENABLE) out(lowp float2 UV0) {
+        	branch ("1") {
+        		out(UV0, UV0_ori);
+        	}
+        	branch("0"){
+        		out(UV0, UV0_ori);
+        	}
+        };
+
+		// 混合比例贴图采样 
+		lowp float4 blend_tex = sample(TexBlendMap, UV0_ori);
+		lowp float4 blend_tex1 = sample(TexBlendMap1, UV0_ori);
+
+		// 法线贴图采样
+		macro(MODELTEX_ENABLE) out(lowp float3 tex_1, lowp float3 normal_1){
+			branch ("1") {
+				function gamma_2_linear_4(sample(Tex0, UV0_ori)) out(lowp float4 tex_1_1);
+				//lowp float4 normal_1_1 = sample(SamplerNormalMap1, UV0);
+				out(tex_1, tex_1_1.rgb);
+				out(normal_1, float3(0.5f, 0.5f, 1.0f));
+			}
+			branch ("0"){
+				function getSplitUV(UV0 , uv_tiling_1) out (lowp float4 uv_split_1);
+				function gamma_2_linear_4(sample(Tex0, uv_split_1.xy)) out(lowp float4 tex_1_);
+				lowp float4 normal_1_ = sample(Tex0, uv_split_1.zw);
+				out(tex_1, tex_1_.rgb);
+				out(normal_1, normal_1_.xyz);
+			}
+		};
+
+
+		macro(SECOND_TEX) out(lowp float3 tex_2, lowp float3 normal_2) {
+			branch ("1"){
+				function getSplitUV(UV0 , uv_tiling_2) out (lowp float4 uv_split_2);
+				function gamma_2_linear_4(sample(Tex1, uv_split_2.xy)) out(lowp float4 tex_2_);
+				lowp float4 normal_2_ = sample(Tex1, uv_split_2.zw);
+				out(tex_2, tex_2_.rgb);
+				out(normal_2, normal_2_.xyz);
+			}
+			branch("0"){
+				out(tex_2, float3(0.0f));
+			}
+		};
+
+		macro (THIRD_TEX) out (lowp float3 tex_3, lowp float3 normal_3)
+		{
+			branch("1"){
+				function getSplitUV(UV0 , uv_tiling_3) out (lowp float4 uv_split_3);
+				function gamma_2_linear_4(sample(Tex2, uv_split_3.xy)) out(lowp float4 tex_3_);
+				lowp float4 normal_3_ = sample(Tex2, uv_split_3.zw);
+				out(tex_3, tex_3_.rgb);
+				out(normal_3, normal_3_.xyz);
+			}
+			branch("0"){
+				out(tex_3, float3(0.0f));
+			}
+		};
+		macro (FOURTH_TEX) out (lowp float3 tex_4, lowp float3 normal_4)
+		{
+			branch("1"){
+				function getSplitUV(UV0 , uv_tiling_4) out (lowp float4 uv_split_4);
+				function gamma_2_linear_4(sample(Tex3, uv_split_4.xy)) out(lowp float4 tex_4_);
+
+				lowp float4 normal_4_ = sample(Tex3, uv_split_4.zw);
+				//lowp float4 normal_4_ = float4(0.5f,0.5f,rough_4, 1.0f);
+				out(tex_4, tex_4_.rgb);
+				out(normal_4, normal_4_.xyz);
+			}
+			branch("0"){
+				out(tex_4, float3(0.0f));
+			}
+		};	
+
+		macro (FIFTH_TEX) out (lowp float3 tex_5, lowp float3 normal_5)
+		{
+			branch("1"){
+				function getSplitUV(UV0 , uv_tiling_5) out (lowp float4 uv_split_5);
+				function gamma_2_linear_4(sample(Tex4, uv_split_5.xy)) out(lowp float4 tex_5_);
+
+				lowp float4 normal_5_ = sample(Tex4, uv_split_5.zw);
+				//lowp float4 normal_4_ = float4(0.5f,0.5f,rough_4, 1.0f);
+				out(tex_5, tex_5_.rgb);
+				out(normal_5, normal_5_.xyz);
+			}
+			branch("0"){
+				out(tex_5, float3(0.0f));
+			}
+		};
+
+		macro (SIXTH_TEX) out (lowp float3 tex_6, lowp float3 normal_6)
+		{
+			branch("1"){
+				function getSplitUV(UV0 , uv_tiling_6) out (lowp float4 uv_split_6);
+				function gamma_2_linear_4(sample(Tex5, uv_split_6.xy)) out(lowp float4 tex_6_);
+
+				lowp float4 normal_6_ = sample(Tex5, uv_split_6.zw);
+				//lowp float4 normal_4_ = float4(0.5f,0.5f,rough_4, 1.0f);
+				out(tex_6, tex_6_.rgb);
+				out(normal_6, normal_6_.xyz);
+			}
+			branch("0"){
+				out(tex_6, float3(0.0f));
+			}
+		};		
+
+
+		// 金属度 & 粗糙度采样
+
+		macro(MODELTEX_ENABLE) out(lowp float roughness_1, lowp float metalness_1) {
+			branch ("1") {
+				out(roughness_1, rough_1);
+				out(metalness_1, 0.04f);
+			}
+			branch ("0"){
+				out(roughness_1, 1.0f - normal_1.b);
+				out(metalness_1, metal_1);
+			}
+		};
+
+		macro(SECOND_TEX) out(lowp float roughness_2, lowp float metalness_2) {
+			branch ("1") {
+				lowp float roughness_2_ = 1.0f - normal_2.b;
+				lowp float metalness_2_ = 0.04f;
+				out(roughness_2, roughness_2_);
+				out(metalness_2, metalness_2_);	
+			}
+			branch("0"){
+				out(roughness_2, 0.0f);
+				out(metalness_2, 0.0f);	
+			}
+		};
+		macro(THIRD_TEX) out(lowp float roughness_3, lowp float metalness_3) {
+			branch ("1") {
+				lowp float roughness_3_ = 1.0f - normal_3.b;
+				lowp float metalness_3_ = 0.04f;	
+				out(roughness_3, roughness_3_);
+				out(metalness_3, metalness_3_);	
+			}
+			branch("0"){
+				out(roughness_3, 0.0f);
+				out(metalness_3, 0.0f);	
+			}
+		};
+		macro(FOURTH_TEX) out(lowp float roughness_4, lowp float metalness_4) {
+			branch ("1") {
+				lowp float roughness_4_ = 1.0f - normal_4.b;
+				lowp float metalness_4_ = 0.04f;	
+				out(roughness_4, roughness_4_);
+				out(metalness_4, metalness_4_);	
+			}
+			branch("0"){
+				out(roughness_4, 0.0f);
+				out(metalness_4, 0.0f);	
+			}
+		};
+
+		macro(FIFTH_TEX) out(lowp float roughness_5, lowp float metalness_5) {
+			branch ("1") {
+				lowp float roughness_5_ = 1.0f - normal_5.b;
+				lowp float metalness_5_ = 0.04f;	
+				out(roughness_5, roughness_5_);
+				out(metalness_5, metalness_5_);	
+			}
+			branch("0"){
+				out(roughness_5, 0.0f);
+				out(metalness_5, 0.0f);	
+			}
+		};
+
+		macro(SIXTH_TEX) out(lowp float roughness_6, lowp float metalness_6) {
+			branch ("1") {
+				lowp float roughness_6_ = 1.0f - normal_6.b;
+				lowp float metalness_6_ = 0.04f;	
+				out(roughness_6, roughness_6_);
+				out(metalness_6, metalness_6_);	
+			}
+			branch("0"){
+				out(roughness_6, 0.0f);
+				out(metalness_6, 0.0f);	
+			}
+		};
+
+
+		// ——————————————————  diffuse混合 ——————————————————
+		macro (BLEND_ENABLE) out (
+			lowp float3 diffuse_blend, 
+			lowp float3 normal_blend, 
+			lowp float rough_blend,
+			lowp float metal_blend
+		){
+			/////////////////////////////////
+			// 普通混合
+			branch("0"){
+				macro(SECOND_TEX) out(lowp float3 blend_2) {
+					branch ("1") {
+						function Blend_color(tex_1.rgb, tex_2.rgb, blend_tex.r) out(lowp float3 blend_2_);
+						out(blend_2, blend_2_);
+					}
+					branch("0"){
+						out(blend_2, tex_1.rgb);
+					}
+				};
+
+				macro (THIRD_TEX) out (lowp float3 blend_3){
+					branch("1"){
+						function Blend_color(blend_2, tex_3.rgb, blend_tex.g) out(lowp float3 blend_3_);
+						out(blend_3, blend_3_);
+					}
+					branch("0"){
+						out(blend_3, blend_2);
+					}
+				};
+
+				macro (FOURTH_TEX) out (lowp float3 blend_4)
+				{
+					branch("1"){
+						function Blend_color(blend_3, tex_4.rgb, blend_tex.b) out(lowp float3 blend_4_);
+						out(blend_4, blend_4_);
+					}
+					branch("0"){
+						out(blend_4, blend_3);
+					}
+				};
+
+				macro (FIFTH_TEX) out (lowp float3 blend_5)
+				{
+					branch("1"){
+						function Blend_color(blend_4, tex_5.rgb, blend_tex.b) out(lowp float3 blend_5_);
+						out(blend_5, blend_5_);
+					}
+					branch("0"){
+						out(blend_5, blend_4);
+					}
+				};
+
+				macro (SIXTH_TEX) out (lowp float3 blend_6)
+				{
+					branch("1"){
+						function Blend_color(blend_5, tex_6.rgb, blend_tex.b) out(lowp float3 blend_6_);
+						out(blend_6, blend_6_);
+					}
+					branch("0"){
+						out(blend_6, blend_5);
+					}
+				};
+
+
+				out(diffuse_blend, blend_6);
+			}
+
+			///////////////////////////////////
+			// 高度图混合
+			branch("1"){
+				macro(HEIGHT_MAP_ENABLE) out(lowp float height_1, lowp float height_2, lowp float height_3, lowp float height_4, lowp float height_5, lowp float height_6) {
+					branch ("1") {
+						lowp float4 tex_height = sample(TexHeight, UV0 * uv_tiling_1);
+						lowp float4 tex_height2 = sample(TexHeight, UV0 * uv_tiling_2);
+						lowp float4 tex_height3 = sample(TexHeight, UV0 * uv_tiling_3);
+						lowp float4 tex_height4 = sample(TexHeight, UV0 * uv_tiling_4);
+						lowp float4 tex_height5 = sample(TexHeight, UV0 * uv_tiling_5);
+						lowp float4 tex_height6 = sample(TexHeight, UV0 * uv_tiling_6);
+						out(height_1, tex_height.r);
+						out(height_2, tex_height2.g);
+						out(height_3, tex_height3.b);
+						out(height_4, tex_height4.a);
+						out(height_5, 0.5f); // 4张以上没有高度图
+						out(height_6, 0.5f); // 4张以上没有高度图
+					}
+					branch("0"){
+						//lowp float highlight_range = 0.5f;
+						lowp float shadow_range = 0.0f;
+						out(height_1, (tex_1.b)/clamp((manual_h1 - shadow_range), 0.0f, 1.0f));
+						out(height_2, (tex_2.b)/clamp((manual_h2 - shadow_range), 0.0f, 1.0f));
+						out(height_3, (tex_3.b)/clamp((manual_h3 - shadow_range), 0.0f, 1.0f));
+						out(height_4, (tex_4.b)/clamp((manual_h4 - shadow_range), 0.0f, 1.0f));
+						out(height_5, (tex_5.b)/clamp((manual_h5 - shadow_range), 0.0f, 1.0f));
+						out(height_6, (tex_6.b)/clamp((manual_h6 - shadow_range), 0.0f, 1.0f));
+
+						// out(height_1, step(manual_h1, tex_1.b) + 0.0299f * tex_1.r - 0.0587f * tex_1.g);
+						// out(height_2, step(manual_h2, tex_2.b) + 0.0299f * tex_2.r - 0.0587f * tex_2.g);
+						// out(height_3, step(manual_h3, tex_3.b) + 0.0299f * tex_3.r - 0.0587f * tex_3.g);
+						// out(height_4, step(manual_h4, tex_4.b) + 0.0299f * tex_4.r - 0.0587f * tex_4.g);
+
+					}
+				};
+
+				macro (SECOND_TEX) out (lowp float3 blend_2, lowp float height_mix_2)
+				{
+					branch("1"){
+						lowp float height_mix_2_ = lerp(height_1, height_2, blend_tex.r);
+						function Blend_color_height(
+							tex_1.rgb, tex_2.rgb, height_1, height_2, blend_tex.r, height_low_1, edge_width, edge_color0.rgb, edge_color1.rgb) 
+						out (lowp float3 blend_2_);
+						out(blend_2, blend_2_);
+						out(height_mix_2, height_mix_2_);
+					}
+					branch("0"){
+						out(blend_2, tex_1.rgb);
+						out(height_mix_2, height_1);
+					}
+				};
+				
+				macro (THIRD_TEX) out (lowp float3 blend_3, lowp float height_mix_3)
+				{
+					branch("1"){
+						lowp float height_mix_3_ = lerp(height_mix_2, height_3, blend_tex.g);
+						function Blend_color_height(
+							blend_2.rgb, tex_3.rgb, height_mix_2, height_3, blend_tex.g, height_low_2, edge_width, edge_color1.rgb, edge_color2.rgb) 
+						out (lowp float3 blend_3_);
+						out(blend_3, blend_3_);
+						out(height_mix_3, height_mix_3_);
+					}
+					branch("0"){
+						out(blend_3, blend_2);
+						out(height_mix_3, height_mix_2);
+					}
+				};
+
+				macro (FOURTH_TEX) out (lowp float3 blend_4, lowp float height_mix_4)
+				{
+					branch("1"){
+						lowp float height_mix_4_ = lerp(height_mix_3, height_4, blend_tex.b);
+						function Blend_color_height(
+							blend_3.rgb, tex_4.rgb, height_mix_3, height_4, blend_tex.b, height_low_3, edge_width, edge_color2.rgb, edge_color3.rgb) 
+						out (lowp float3 blend_4_);
+						out(blend_4, blend_4_);
+						out(height_mix_4, height_mix_4_);
+					}
+					branch("0"){
+						out(blend_4, blend_3);
+						out(height_mix_4, height_mix_3);
+					}
+				};
+
+				// 五六层开始使用第二张混合比例贴图
+				macro (FIFTH_TEX) out (lowp float3 blend_5, lowp float height_mix_5)
+				{
+					branch("1"){
+						lowp float height_mix_5_ = lerp(height_mix_4, height_5, blend_tex.a);
+						function Blend_color_height(
+							blend_4.rgb, tex_5.rgb, height_mix_4, height_5, blend_tex.a, height_low_4, edge_width, edge_color3.rgb, edge_color4.rgb) 
+						out (lowp float3 blend_5_);
+						out(blend_5, blend_5_);
+						out(height_mix_5, height_mix_5_);
+					}
+					branch("0"){
+						out(blend_5, blend_4);
+						out(height_mix_5, height_mix_4);
+					}
+				};
+
+				macro (SIXTH_TEX) out (lowp float3 blend_6)
+				{
+					branch("1"){
+						function Blend_color_height(
+							blend_5.rgb, tex_6.rgb, height_mix_5, height_6, blend_tex1.r, height_low_5, edge_width, edge_color4.rgb, edge_color5.rgb) 
+						out (lowp float3 blend_6_);
+						out(blend_6, blend_6_);
+					}
+					branch("0"){
+						out(blend_6, blend_5);
+					}
+				};
+
+
+
+				out(diffuse_blend, blend_6);
+
+
+
+				// ——————————————————  法线混合 ——————————————————
+				macro(USE_NORMAL_MAP) out(lowp float3 normal_blend_){
+					branch ("1") {
+
+						macro(SECOND_TEX) out(lowp float3 nor_blend_2) {
+							branch("1"){
+								function Blend_normal_height(
+									normal_1.xyz, normal_2.xyz, height_1, height_2, blend_tex.r, height_low_1) out (lowp float3 nor_blend_2_);
+								out(nor_blend_2, nor_blend_2_);
+							}
+							branch("0"){
+								out(nor_blend_2, normal_1.xyz);
+							}
+						};
+
+						macro(THIRD_TEX) out(lowp float3 nor_blend_3) {
+							branch ("1") {
+								function Blend_normal_height(
+									nor_blend_2.xyz, normal_3.xyz, height_mix_2, height_3, blend_tex.g, height_low_2) out (lowp float3 nor_blend_3_);
+								out(nor_blend_3, nor_blend_3_);
+							}
+							branch("0"){
+								out(nor_blend_3, nor_blend_2);
+							}
+						};
+
+						macro(FOURTH_TEX) out(lowp float3 nor_blend_4) {
+							branch ("1") {
+								function Blend_normal_height(
+									nor_blend_3.xyz, normal_4.xyz, height_mix_3, height_4, blend_tex.b, height_low_3) out (lowp float3 nor_blend_4_);
+								out(nor_blend_4, nor_blend_4_);
+							}
+							branch("0"){
+								out(nor_blend_4, nor_blend_3);
+							}
+						};
+
+						macro(FIFTH_TEX) out(lowp float3 nor_blend_5) {
+							branch ("1") {
+								function Blend_normal_height(
+									nor_blend_4.xyz, normal_5.xyz, height_mix_4, height_5, blend_tex.a, height_low_4) out (lowp float3 nor_blend_5_);
+								out(nor_blend_5, nor_blend_5_);
+							}
+							branch("0"){
+								out(nor_blend_5, nor_blend_4);
+							}
+						};
+
+						macro(SIXTH_TEX) out(lowp float3 nor_blend_6) {
+							branch ("1") {
+								function Blend_normal_height(
+									nor_blend_5.xyz, normal_6.xyz, height_mix_5, height_6, blend_tex1.r, height_low_5) out (lowp float3 nor_blend_6_);
+								out(nor_blend_6, nor_blend_6_);
+							}
+							branch("0"){
+								out(nor_blend_6, nor_blend_5);
+							}
+						};
+
+						out(normal_blend_, nor_blend_6);
+					}
+					branch("0"){
+						out(normal_blend_, float3(0.0f));
+					}
+				};
+
+				out(normal_blend, normal_blend_);
+
+				// ——————————————————  粗糙度&金属度混合 ——————————————————
+
+				macro(SECOND_TEX) out(lowp float rough_blend_2, lowp float metal_blend_2) {
+					branch("1"){
+						function Blend_rough_height(
+							roughness_1, roughness_2, height_1, height_2, blend_tex.r, height_low_1) out (lowp float rough_blend_2_);
+						function Blend_rough_height(
+							metalness_1, metalness_2, height_1, height_2, blend_tex.r, height_low_1) out (lowp float metal_blend_2_);
+						out(rough_blend_2, rough_blend_2_);
+						out(metal_blend_2, metal_blend_2_);
+					}
+					branch("0"){
+						out(rough_blend_2, roughness_1);
+						out(metal_blend_2, metalness_1);
+					}
+				};
+				macro(THIRD_TEX) out(lowp float rough_blend_3, lowp float metal_blend_3) {
+					branch ("1") {
+						function Blend_rough_height(
+							rough_blend_2, roughness_3, height_mix_2, height_3, blend_tex.g, height_low_2) out (lowp float rough_blend_3_);
+						function Blend_rough_height(
+							metal_blend_2, metalness_3, height_mix_2, height_3, blend_tex.g, height_low_2) out (lowp float metal_blend_3_);
+						out(rough_blend_3, rough_blend_3_);
+						out(metal_blend_3, metal_blend_3_);
+					}
+						branch("0"){
+							out(rough_blend_3, rough_blend_2);
+							out(metal_blend_3, metal_blend_2);
+					}
+				};
+
+				macro(FOURTH_TEX) out(lowp float rough_blend_4, lowp float metal_blend_4) {
+					branch ("1") {
+						function Blend_rough_height(
+							rough_blend_3, roughness_4, height_mix_3, height_4, blend_tex.b, height_low_3) out (lowp float rough_blend_4_);
+						function Blend_rough_height(
+							metal_blend_3, metalness_4, height_mix_3, height_4, blend_tex.b, height_low_3) out (lowp float metal_blend_4_);
+						out(rough_blend_4, rough_blend_4_);
+						out(metal_blend_4, metal_blend_4_);
+					}
+					branch("0"){
+						out(rough_blend_4, rough_blend_3);
+						out(metal_blend_4, metal_blend_3);
+					}
+				};
+
+				macro(FIFTH_TEX) out(lowp float rough_blend_5, lowp float metal_blend_5) {
+					branch ("1") {
+						function Blend_rough_height(
+							rough_blend_4, roughness_5, height_mix_4, height_5, blend_tex.a, height_low_4) out (lowp float rough_blend_5_);
+						function Blend_rough_height(
+							metal_blend_4, metalness_5, height_mix_4, height_5, blend_tex.a, height_low_4) out (lowp float metal_blend_5_);
+						out(rough_blend_5, rough_blend_5_);
+						out(metal_blend_5, metal_blend_5_);
+					}
+					branch("0"){
+						out(rough_blend_5, rough_blend_4);
+						out(metal_blend_5, metal_blend_4);
+					}
+				};
+
+				macro(SIXTH_TEX) out(lowp float rough_blend_6, lowp float metal_blend_6) {
+					branch ("1") {
+						function Blend_rough_height(
+							rough_blend_5, roughness_6, height_mix_5, height_6, blend_tex1.r, height_low_5) out (lowp float rough_blend_6_);
+						function Blend_rough_height(
+							metal_blend_5, metalness_6, height_mix_5, height_6, blend_tex1.r, height_low_5) out (lowp float metal_blend_6_);
+						out(rough_blend_6, rough_blend_6_);
+						out(metal_blend_6, metal_blend_6_);
+					}
+					branch("0"){
+						out(rough_blend_6, rough_blend_5);
+						out(metal_blend_6, metal_blend_5);
+					}
+				};				
+
+				out(rough_blend , rough_blend_6 * rough_multi);
+				out(metal_blend , metal_blend_6 * metal_multi);
+
+			}
+		};
+
+		// ——————————————————  法线贴图计算 ——————————————————
+		mediump float3 vertex_normal_world = v_NormalWorld;
+		macro(USE_NORMAL_MAP) out(mediump float3 NormalWorld) {
+			branch ("1") {
+				mediump float3 TangentWorld = v_TangentWorld;
+				mediump float3 BinormalWorld = v_BinormalWorld;
+				
+				lowp float2 normOff = normal_blend.xy * 2.0f - float2(1.0f);
+				lowp float3 normalWorld_inner = normalize(TangentWorld * float3(normOff.x) + BinormalWorld * float3(normOff.y)+ vertex_normal_world);
+
+				out(NormalWorld, normalWorld_inner);
+			}
+			branch("0"){
+				out(NormalWorld, vertex_normal_world);
+			}
+		};
+
+		////////////////////////////////////////////////////////////
+		// PBR计算
+		////////////////////////////////////////////////////////////
+
+
+
+		// ——————————————————★★★ 光照设置 ★★★——————————————————
+		mediump float4 PosWorld = v_PosWorld;
+		macro(POINT_LIGHT_ENABLE) out(mediump float3 gi_color, mediump float3 light_dir) {
+			branch ("1") {
+				// 点光颜色
+				lowp float4 light_color = ShadowLightAttr[1];
+				mediump float4 dir_vector = ShadowLightAttr[3];
+				lowp float light_range = dir_vector.w;
+				mediump float3 light_dir_ = PosWorld.xyz - dir_vector.xyz; 
+				out(light_dir, normalize(light_dir_)); 
+				lowp float dist = length(light_dir_);
+				lowp float point_light_fac = clamp((light_range - dist) / light_range, 0.0f, 1.0f);
+				out(gi_color, lerp(float3(0.0f), light_color.rgb, float3(point_light_fac * point_light_fac)));
+			}
+			branch ("0"){
+				//平行光颜色
+				lowp float4 light_color = ShadowLightAttr[1]; 
+				out(gi_color, light_color.xyz); 
+
+				// 光源方向
+				mediump float4 light_dir_ = ShadowLightAttr[3];
+				out(light_dir, normalize(light_dir_.xyz));
+				//mediump float3 light_dir = u_light_scale * normalize(float3(u_light_pos_x, u_light_pos_y, u_light_pos_z));
+			}
+
+		};
+
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float3 H = normalize(view_dir - light_dir);	
+		lowp float NdotL = clamp(dot(NormalWorld, -light_dir), 0.0f, 1.0f);
+		lowp float NdotH = clamp(dot(NormalWorld, H), 0.0f, 1.0f);
+		lowp float NdotV = clamp(dot(view_dir, NormalWorld), 0.0f, 1.0f);
+
+		// ——————————————————★★★ DIFFUSE ★★★—————————————————— 
+		
+		lowp float3 NdotL_adjust = lerp(dark_color.rgb, float3(1.0f), float3(NdotL));
+		mediump float3 diffuse_result = diffuse_blend * (1.0f - metal_blend) * NdotL_adjust * gi_color;
+
+
+		// ——————————————————★★★ SPECULAR ★★★——————————————————
+
+		lowp float3 spec_color = lerp(float3(0.04f), diffuse_blend, float3(metal_blend));
+		// D
+		lowp float alpha = rough_blend * rough_blend + 0.005f;
+		mediump float denom = NdotH * NdotH * (alpha * alpha - 1.0f) + 1.0f;
+		lowp float D = (alpha/denom) * (alpha/denom) * 0.31830988618379067153776752674503f;
+
+		// G
+		lowp float LdotH = saturate(dot(-light_dir, H));
+		lowp float G = 1.0f/(4.0f * LdotH * LdotH * (rough_blend + 0.5f));
+
+		// F 
+		function F_Schlick(spec_color,NdotV) out (lowp float3 F);
+
+		mediump float3 specular_result = D * G  * spec_color * spec_intensity;
+
+		// ——————————————————★★★ IBL ★★★——————————————————
+
+		mediump float3 normal_ibl = float3(NormalWorld.x + nx_offset, NormalWorld.y + ny_offset, NormalWorld.z + nz_offset);
+		lowp float NdotV_ibl = clamp(dot(normal_ibl, view_dir), 0.0f, 1.0f);
+		highp float3 R = reflect(-view_dir, normal_ibl);
+		function GetEnvirmentColor_prefiltered (SamplerCubeMap, rough_blend, R, NdotV_ibl, 1.0f) out (mediump float3 envir);
+
+		function EnvBRDFApprox(spec_color, rough_blend, NdotV, 1.0f) out (mediump float3 env_brdf);
+							
+		mediump float3 ibl_result = env_brdf * envir * envir_brightness;
+
+		// PBR总计算
+		mediump float3 pbr_color = diffuse_result + specular_result + ibl_result; 
+
+
+		// 混合lightmap
+		mediump float3 light_diffuse = pbr_color * lightmap_color.rgb;
+
+
+
+
+		// ——————————————————  Gamma —————————————————— 
+		// function linear_2_gamma_3(final_result) out(mediump float3 gamma_color);
+		lowp float4 encode_color = float4(light_diffuse, 1.0f);
+		macro(NEOX_DEBUG_MODE) out(mediump float4 pixel_color)
+        {
+            branch("NEOX_DEBUG_MODE_NONE") {
+                out(pixel_color, encode_color);
+            }
+            branch("NEOX_DEBUG_MODE_MTL") {
+                out(pixel_color, float4(diffuse_blend, 1.0f));
+            }
+            branch("NEOX_DEBUG_MODE_LIT") {
+                out(pixel_color, float4(lightmap_color, 1.0f));
+            }
+        };
+
+		// ——————————————————  Gamma —————————————————— 
+		function linear_2_gamma_4(pixel_color) out(mediump float4 gamma_color);
+
+		// 迷雾处理
+		pixel(gamma_color);
+	}
+}

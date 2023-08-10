@@ -1,0 +1,370 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+	["雾效"]
+	eitheror SCENE_FOG;
+	macro(SCENE_FOG)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	["FX_ENABLE"]
+	eitheror FX_ENABLE;
+	macro(FX_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["composemask贴图"]
+	uniform sampler _ComposeMask
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["_ChangeAmount"]
+	uniform mediump float _ChangeAmount
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "3.0"
+		min = "-0.5"
+		init = "0.0"
+	>;
+	["_ChangeOffset"]
+	uniform mediump float _ChangeOffset
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.5"
+		min = "-0.5"
+		init = "-0.2"
+	>;
+	["_ChangeEdgeSmooth"]
+	uniform mediump float _ChangeEdgeSmooth
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.3"
+		min = "0.001"
+		init = "0.05"
+	>;
+	["_ChangeAlphaSmooth"]
+	uniform mediump float _ChangeAlphaSmooth
+	<
+		uistep = "0.001"
+		artist = "1"    
+		max = "0.3"
+		min = "0.001"
+		init = "0.176"
+	>;
+	["_Width"]
+	uniform mediump float _Width
+	<
+		artist = "1"    
+		init = "1.0"
+	>;
+	["_EdgeDistance"]
+	uniform mediump float _EdgeDistance
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+	["_EdgeHardness"]
+	uniform mediump float _EdgeHardness
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"  
+		max = "0.99"
+		min = "0.0"
+	>;
+	["_EdgeIntensity"]
+	uniform mediump float _EdgeIntensity
+	<
+		artist = "1"    
+		init = "2.0"
+	>;
+	["_Width1"]
+	uniform mediump float _Width1
+	<
+		artist = "1"    
+		init = "7.0"
+	>;
+	["_EdgeDistance1"]
+	uniform mediump float _EdgeDistance1
+	<
+		artist = "1"    
+		init = "-10.0"
+	>;
+	["_EdgeHardness1"]
+	uniform mediump float _EdgeHardness1
+	<
+		artist = "1"    
+		init = "0.2"
+		uistep = "0.001"  
+		max = "0.99"
+		min = "0.0"
+	>;
+	["_EdgeIntensity1"]
+	uniform mediump float _EdgeIntensity1
+	<
+		artist = "1"    
+		init = "3.0"
+	>;
+	["_EmissAdd"]
+	uniform mediump float _EmissAdd
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"  
+		max = "1.0"
+		min = "0.0"
+	>;
+	["_EmissColor"]
+	uniform mediump float4 _EmissColor
+	<
+		init = "(0.1372549,0.3686275,0.6901961,0.0)"
+		artist = "1"
+		color = "1"
+	>;
+
+	["_PatternFactor"]
+	uniform mediump float _PatternFactor
+	<
+		artist = "1"    
+		init = "1.0"
+	>;
+	["_PatternFactor2"]
+	uniform mediump float _PatternFactor2
+	<
+		artist = "1"    
+		init = "0.1"
+	>;
+	["_SineSpeed"]
+	uniform mediump float _SineSpeed
+	<
+		artist = "1"    
+		init = "150.0"
+	>;
+	["_BlinkFreq"]
+	uniform mediump float _BlinkFreq
+	<
+		artist = "1"    
+		init = "0.75"
+		uistep = "0.001"  
+		max = "1.0"
+		min = "0.0"
+	>;
+	["_BlinkScale"]
+	uniform mediump float _BlinkScale
+	<
+		artist = "1"    
+		init = "2.0"
+	>;
+
+	["_EmissAdjust"]
+	uniform mediump float _EmissAdjust
+	<
+		artist = "1"    
+		init = "0.6"
+	>;
+	["_Luminance"]
+	uniform mediump float _Luminance
+	<
+		artist = "1"    
+		init = "0.3"
+	>;
+	["_DeSaturate"]
+	uniform mediump float _DeSaturate
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+
+	["_FadeStart"]
+	uniform mediump float _FadeStart
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"
+		max = "2.0"
+		min = "-2.0"
+	>;
+	["_FadeEnd"]
+	uniform mediump float _FadeEnd
+	<
+		artist = "1"    
+		init = "0.0"
+		uistep = "0.001"
+		max = "2.0"
+		min = "-2.0"
+	>;
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform lowp float HeightFogDensity: HEIGHT_FOG_DENSITY; 
+	uniform highp float frame_time : FRAME_TIME;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying lowp float fog_distance;
+	varying lowp float fog_height_factor;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+	    vertex(pos);
+
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+
+
+		// // 在vertex中计算高度雾
+		// macro(SCENE_FOG) {
+		// 	branch ("1") {
+		// 		mediump float4 pos_world = transform(a_position, world);
+		// 		mediump float height = pos_world.y;
+
+		// 		function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor1);
+
+		// 		mediump float distance = pos.z;
+		// 		out(fog_distance , distance);
+		// 		out(fog_height_factor, 1.0f - fog_height_factor1);
+		// 	}
+		// 	branch ("0") {
+		// 	}
+		// };
+	}
+
+	pixel
+	{
+		// lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		lowp float4 diffuse_color = sample(Tex0,UV0.xy);
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_color.a);
+			}
+	    };
+
+	    lowp float fade_alpha = alpha * smoothstep(_FadeStart,_FadeEnd,UV0.y);
+	    macro(FX_ENABLE) out(mediump float3 fx_color,lowp float fx_alpha){
+	    	branch("1")
+	    	{
+	    		lowp float4 composemask_value = sample(_ComposeMask, UV0.xy);
+				lowp float DepthMask = composemask_value.r;
+				lowp float PatternMask = composemask_value.g;
+				lowp float EmissMask = composemask_value.b + _EmissAdd;
+				mediump float change_factor = DepthMask + PatternMask * _PatternFactor2;
+				mediump float edge_factor_ =  abs(_EdgeDistance - ((((PatternMask * _PatternFactor) + change_factor) - _ChangeAmount) / _ChangeEdgeSmooth)) / ( _Width + _ChangeAmount );
+				mediump float edge_factor = smoothstep(1.0f, _EdgeHardness,edge_factor_) * _EdgeIntensity;
+				highp float mulTime = frame_time * _SineSpeed;
+				float BlinkFactor = ((step(sin(mulTime),_BlinkFreq) - 0.5f) * _BlinkScale) * (1.0f - saturate(_ChangeAmount)) * edge_factor;
+				mediump float edge_factor1_ = abs(_EdgeDistance1 - ((change_factor - _ChangeAmount ) / _ChangeEdgeSmooth)) / _Width1;
+				mediump float edge_factor1 = smoothstep( 1.0f , _EdgeHardness1 , edge_factor1_) * EmissMask * _EdgeIntensity1;
+				mediump float3 emiss_color = _EmissColor.xyz * (edge_factor + BlinkFactor + edge_factor1);
+
+				mediump float emiss_desaturate = dot(emiss_color, float3(0.299f, 0.587f, 0.114f));
+				mediump float3 emiss_desaturate_color = lerp( emiss_color, float3(emiss_desaturate), float3(_EmissAdjust));
+				mediump float3 combined_color = diffuse_color.xyz * _Luminance + emiss_desaturate_color;
+				mediump float combined_desaturate = dot(combined_color, float3(0.299f, 0.587f, 0.114f));
+				mediump float3 output_color = lerp(combined_color, float3(combined_desaturate),float3(_DeSaturate));
+
+				lowp float clampResult173 = saturate(saturate(edge_factor) + edge_factor1);
+				lowp float clampResult159 = saturate((change_factor - _ChangeAmount - _ChangeOffset) / _ChangeAlphaSmooth);
+				lowp float clampResult107 = saturate((1.0f - clampResult159));
+				lowp float clampResult175 = saturate(clampResult173 + clampResult107 * fade_alpha);
+				lowp float output_aplha = alpha * clampResult175;
+				out(fx_color,output_color);
+				out(fx_alpha,output_aplha);
+	    	}
+	    	branch("0")
+	    	{
+	    		out(fx_color,diffuse_color.xyz);
+				out(fx_alpha,fade_alpha);
+	    	}
+		};
+
+	    macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(fx_alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		pixel(float4(fx_color, fx_alpha * AlphaMtl));
+	}
+}

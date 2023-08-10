@@ -1,0 +1,234 @@
+["depth test"]
+pipeline
+<
+	version = "1.0.0"
+	author = "Xinyue Modified"
+	company = "Netease"
+	technique = "TOneTexSoft"
+	alphablend = "true"
+	zwritable = "0"
+	cull = "none"
+>
+{
+	attribute float4 a_position: POSITION;
+    attribute float4 a_diffuse: DIFFUSE;
+    attribute float4 a_texcoord0: TEXTURE0;
+	attribute float4 a_posxy: TEXTURE1;
+	attribute float4 a_posz_size: TEXTURE2;
+
+
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0;
+	uniform highp float4x4 u_wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 u_world: WORLD; 
+	uniform highp float4x4 u_view: VIEW;
+	uniform highp float4x4 u_wv: WORLD_VIEW;
+	uniform highp float4x4 u_inv_world: INV_WORLD;
+	uniform highp float4x4 u_inv_proj: INV_PROJECTION;
+	uniform highp float4x4 u_inv_view: INV_VIEW;
+	uniform highp float4 u_camera_info: CAMERA_INFO;
+
+    varying highp float4 v_pos;
+	varying highp float4 v_point_color;
+	varying highp float4 v_tex0; 
+	//varying highp float4 v_inv_proj;
+	varying highp float4 v_viewpos		;
+	varying highp float4 v_centerviewpos;
+	varying highp float v_size			;
+	varying highp float4 v_wvp_pos		;
+
+    uniform lowp float edge
+    <
+		init = "1.0"
+    >;
+    uniform lowp float4 blend_color
+    <
+    	init = "(1.0, 1.0, 1.0, 1.0)"
+    >;
+    uniform highp float4 texuv_clamp
+    <
+       init = "(0.0, 0.0, 1.0, 1.0)"
+    >;
+    uniform mediump float4 blend_op
+	<
+		init = "(5.0, 2.0, 1.0, 0)"
+	>;
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;	
+	
+    ["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+	    export = "0"
+		mip = "LINEAR"
+		min = "LINEAR"
+		mag = "LINEAR"
+		// addressu = "clamp"
+		// addressv = "clamp"
+	>;
+
+	["深度贴图"]
+	uniform highp sampler DepthMap : DEPTH_BUFFER
+	<
+		mag = "POINT"
+		min = "POINT"
+		mip = "POINT"
+		// addressu = "clamp"
+		// addressv = "clamp"
+		
+	>;
+
+    varying lowp float4 Color;
+	
+	function RaySphereIntersect in (
+		highp float3 currentPoint, //ro
+		highp float3 centerPoint, //sSO
+		highp float radius
+		) out (
+		highp float tnear, 
+		highp float tfar, 
+		float res
+		) 
+	{
+        highp float3 delta = currentPoint - centerPoint;
+		highp float lenlen = dot(delta.xy, delta.xy);
+    	highp float dis = radius*radius - lenlen;
+		condition(dis) out(float temp_res, float tnear_temp, float tfar_temp)
+	 	{
+	 		branch("%0% <= 0.0")
+	 		{
+	 			out(temp_res, -1.0f);
+	 			out(tnear_temp, 0.0f);
+				out(tfar_temp, 0.0f);
+			}
+			default
+			{
+                out(temp_res, 1.0f);
+				highp float halfdist = sqrt(dis);
+				highp float tnear0 = centerPoint.z - halfdist;//sO.z 
+				highp float tfar0 = centerPoint.z + halfdist;
+				out(tnear_temp, tnear0);
+				out(tfar_temp, tfar0);
+			}
+    	};
+    	out(res, temp_res);
+	 	out(tnear, tnear_temp);
+		out(tfar, tfar_temp);
+	};
+
+	function GetAlphaMul in (
+		highp float depth, 
+		highp float4 viewpos, 
+		highp float4 centerviewpos, 
+		highp float size,
+		highp float4 wvp_pos,
+		highp float4 CameraZPlanes
+		) out (
+		highp float alpha_mul,
+		float result
+		)
+	{
+		function RaySphereIntersect(viewpos.xyz, centerviewpos.xyz, size) out (highp float near, highp float far, float res);
+	    condition(res) out(float mul_res)
+	    {
+            branch("%0% <= 0.0")
+			{
+                out(mul_res, -1.0f);
+			}
+	    	default
+			{
+                out(mul_res, 1.0f);
+			}
+
+	    };
+	    out(result, mul_res);
+
+		float pos_view_z = CameraZPlanes.w / (depth - CameraZPlanes.z);
+		condition(pos_view_z, far) out(float mul_alpha_degree)
+		{
+			branch("%0% < %1%")
+			{
+			 	float alpha_degree = (pos_view_z - viewpos.z)/(far-viewpos.z);
+			 	out(mul_alpha_degree, alpha_degree);
+			}
+			default
+			{
+			 	out(mul_alpha_degree, 1.0f);
+			}
+         };
+        out(alpha_mul, mul_alpha_degree);
+	};
+
+	vertex
+	{
+		//投影坐标
+		highp float4 test_pos = a_position;// + float4(0.0f,0.0f,30.0f,0.0f);
+		highp float4 proj_position = transform(test_pos, u_wvp);
+		//uv动画
+        mediump float4 uv0 = transform(float4(a_texcoord0.xy, 1.0f, 0.0f), u_texture_trans0);
+        out(v_tex0, uv0);
+        out(v_point_color, a_diffuse);
+
+        highp float4 viewpos = transform(a_position, u_wv);
+        out(v_viewpos, viewpos);
+        highp float4 p1 =  float4(a_posxy.x, a_posxy.y, a_posz_size.x, 1.0f);
+        highp float4 mid_pos = transform(transform(p1, u_inv_world), u_wv);
+        
+        out(v_centerviewpos,mid_pos);
+        out(v_size, abs(a_posz_size.y));
+		out(v_wvp_pos, proj_position);
+		vertex(proj_position);
+	}
+
+	pixel
+	{
+		//新UV
+		float2 new_texcoord = v_wvp_pos.xy/v_wvp_pos.w* 0.5f + float2(0.5f,0.5f);
+		//["把深度色解析为深度"]
+		
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(highp float depth2)
+		{
+			branch("1")
+			{
+				//["GL渲染系统下"]
+				//游戏
+				float2 texcoord = float2(new_texcoord.x, new_texcoord.y);
+				float4 depth_buffer = sample(DepthMap, texcoord);
+				float depth1 = depth_buffer.z * 2.0f - 1.0f;
+				out(depth2, depth1);
+			}
+			branch("0")
+			{
+				//["Dx和Metal渲染系统下"]
+				//编辑器
+				float2 texcoord = float2(new_texcoord.x, 1.0f - new_texcoord.y);
+				float4 depth_buffer = sample(DepthMap, texcoord);
+				out(depth2, depth_buffer.z);
+			}
+		};
+		float2 texcoord = float2(new_texcoord.x, 1.0f - new_texcoord.y);
+		float4 depth_buffer = sample(DepthMap, texcoord.xy);
+   
+		function GetAlphaMul (depth2, v_viewpos, v_centerviewpos, v_size, v_wvp_pos, u_camera_info) out (highp float alpha_mul,float result);
+
+		mediump float2 uv0 = v_tex0.xy;
+        lowp float4 tex_color = sample(Tex0, uv0);
+        lowp float4 blend_tex_color =  tex_color;
+
+		lowp float4 color_temp = blend_tex_color * v_point_color;
+		lowp float fade = saturate(alpha_mul/edge);
+		lowp float4 color_final = color_temp * fade;
+
+		float my_alpha = float(result);
+		macro(ALPHA_TEST_ENABLE)
+		{
+			branch("1") { 
+				alphatest("<")(my_alpha, 0.0f); 
+
+			}
+			branch("0") {
+			 }
+		};
+		pixel(color_final);
+	}
+}

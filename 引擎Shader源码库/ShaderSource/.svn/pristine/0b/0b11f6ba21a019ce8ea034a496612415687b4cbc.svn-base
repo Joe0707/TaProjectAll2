@@ -1,0 +1,41 @@
+["变灰"]
+pipeline
+<
+
+	company = "netease"
+	category = "postprocess"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	varying mediump float2 v_texture0: TEXTURE0;
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	["灰度的程度因子"]
+	uniform float gray_factor: OTHER0
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+	
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(v_texture0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		float4 color = sample(Tex0, v_texture0);
+		float gray_tmp = dot( color.xyz, float3(0.299f, 0.587f, 0.114f));
+		float3 result = lerp(float3(gray_tmp), color.xyz, float3(gray_factor));
+		pixel(float4(result, 1.0f));
+	}
+}

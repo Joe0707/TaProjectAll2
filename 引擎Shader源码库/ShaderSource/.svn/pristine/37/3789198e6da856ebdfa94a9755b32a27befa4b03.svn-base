@@ -1,0 +1,44 @@
+pipeline
+<
+	author = "zhangliang" 
+	category = "postprocess"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	uniform float4 ViewportSize : VIEWPORT_SIZE;
+	
+	varying mediump float2 TexCoord0;
+	varying mediump float2 TexCoord1;
+	varying mediump float2 TexCoord2;
+	varying mediump float2 TexCoord3;
+
+	vertex vs_main
+	{
+		mediump float2 half_pixel = float2(0.5f / ViewportSize.x, 0.5f / ViewportSize.y);
+		out(TexCoord0, a_texture0.xy + half_pixel * float2(-0.5f, -0.5f));
+		out(TexCoord1, a_texture0.xy + half_pixel * float2(-0.5f, 0.5f));
+		out(TexCoord2, a_texture0.xy + half_pixel * float2(0.5f, -0.5f));
+		out(TexCoord3, a_texture0.xy + half_pixel * float2(0.5f, 0.5f));
+		vertex(a_position);
+	}
+	
+	pixel ps_main
+	{
+		lowp float4 average = (sample(Tex0, TexCoord0) + sample(Tex0, TexCoord1) + sample(Tex0, TexCoord2) + sample(Tex0, TexCoord3)) * 0.25f ;
+		
+		// Tweak here to adjust highlight extraction
+		// Here is an possible alternation:
+		// float illum = dot( average.xyz, float3(0.299f, 0.587f, 0.114f));
+		// float illum2 = dot( average.xyz, float3(0.333f, 0.333f, 0.333f));
+		// pixel(float4((average.xyz - float3(0.2f)) * (illum / illum2), 1.0f));
+		
+		pixel(float4(average.xyz, 1.0f));
+	}
+}

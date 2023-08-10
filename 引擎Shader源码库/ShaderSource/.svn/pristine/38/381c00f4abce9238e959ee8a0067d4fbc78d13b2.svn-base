@@ -1,0 +1,365 @@
+["场景 PBR Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhang ying peng" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["编辑器"]
+	macro(EDITOR)
+	<
+		default = "0"
+	>;
+
+	["雾效"]
+	macro(FOG_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;	
+	
+	["lightmap亮度"]
+	uniform mediump float lightmap_brightness
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_texcoord0 : TEXTURE0;
+	attribute float4 a_texcoord1 : TEXTURE1;
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+// varying变量
+	varying mediump float3 UV0;
+	varying mediump float2 UV1;
+	varying mediump float4 v_fog_factor_info;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float lm_scale : LIGHTMAP_TINT_FACTOR;	
+	uniform mediump float FrameTime: FRAME_TIME;	
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,0.0)"
+	>;
+	uniform mediump float4 u_fog_info : FOG_INFO; 
+
+	uniform lowp float alphaRef : ALPHA_REF;
+// function
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	mediump float fog_begin, // 雾的起始位置, view空间
+	mediump float fog_end, // 雾的结束位置, view空间
+	mediump float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, max(0.0f,smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	mediump float fog_height_begin, // 雾的起始位置，世界空间
+	mediump float fog_height_end, // 雾的结束位置，世界空间
+	mediump float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		mediump float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = max(0.0f, fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+	vertex
+	{
+		highp float4 position = a_position;
+
+		// 世界空间坐标
+		macro(EDITOR) out(mediump float4 pos_world){
+			branch("1")
+			{
+				out(pos_world, transform(position, world));
+			}
+			branch("0"){
+				macro(INSTANCE_TYPE) out(mediump float4 _pos_world)
+				{
+		            branch("INSTANCE_TYPE_PRS")
+		            {
+		                float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                float4 world_pos = transform(position, instWorldMat);
+
+		            	macro(TRANS_ENABLE) out(float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+		            
+		            branch("INSTANCE_TYPE_PRS_LM")
+		            {
+		                mediump float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                mediump float4 world_pos = transform(position, instWorldMat);
+		                
+		            	macro(TRANS_ENABLE) out(mediump float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+
+		            branch("INSTANCE_TYPE_NONE")
+		            {
+		            	// 未合批的在引擎中已经转了world了
+		            	out(_pos_world, transform(position, world));
+		            }
+				};
+				out(pos_world,  _pos_world);
+			}
+		};
+
+		highp float4 final_position = transform(pos_world, viewProj);
+		
+		vertex(final_position);
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				macro(EDITOR) out(mediump float4 tmp_texture_1)
+				{
+					branch("1"){
+						out(tmp_texture_1, transform(float4(a_texcoord1.xy, 1.0f, 0.0f), lightmapTrans));
+					}
+					branch("0"){
+						macro(INSTANCE_TYPE) out(mediump float4 _tmp_texture_1)
+						{
+						    branch("INSTANCE_TYPE_PRS_LM")
+						    {
+						    	/*
+								float4x4 instLightmapTrans = float4x4(float4(texcoord4.x, 0.0f, 0.0f, 0.0f),
+																      float4(0.0f, texcoord4.y, 0.0f, 0.0f),
+																      float4(texcoord4.z, texcoord4.w, 1.0f, 0.0f),
+																      float4(0.0f, 0.0f, 0.0f, 1.0f));
+
+								*/
+								float4 trans = float4(a_texcoord1.x * texcoord4.x + texcoord4.z, a_texcoord1.y * texcoord4.y + texcoord4.w, 1.0f, 1.0f);
+								out(_tmp_texture_1, trans);
+						    }	
+
+						    branch("INSTANCE_TYPE_NONE")
+						    {
+								out(_tmp_texture_1, transform(float4(a_texcoord1.xy, 1.0f, 0.0f), lightmapTrans));
+						    }
+						    branch("INSTANCE_TYPE_PRS")
+						    {
+								out(_tmp_texture_1, transform(float4(a_texcoord1.xy, 1.0f, 0.0f), lightmapTrans));
+						    }
+						};
+						out(tmp_texture_1, _tmp_texture_1);
+					}
+				};
+				out(UV1, tmp_texture_1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		macro(TRANS_ENABLE) out(mediump float height) {
+			branch ("1") {
+				out(height, -pos_world.y);
+			}
+			branch ("0") {
+				out(height, pos_world.y);
+			}
+		};
+
+		macro(FOG_ENABLE) out(mediump float fog_height_factor1, mediump float fog_linear_factor_) {
+			branch ("1") {
+				
+				macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance1)
+				{
+					branch("1")
+					{
+						["GL渲染系统下"]
+						// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+						//out(fog_distance1, final_position.w * ((final_position.z/final_position.w) *0.5f + 0.5f)); //4##
+						out(fog_distance1, (final_position.z + final_position.w)* 0.5f);
+					}
+					branch("0")
+					{
+						["Dx和Metal渲染系统下"]
+						out(fog_distance1, final_position.z);
+					}
+				};
+				function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor_);
+				function get_fog_mix(u_fog_info.x, u_fog_info.y, fog_distance1) out(mediump float fog_linear_factor);
+				out(fog_height_factor1, fog_height_factor_);
+				out(fog_linear_factor_, fog_linear_factor);
+			}
+			branch ("0") {
+				out(fog_height_factor1, 0.0f);
+				out(fog_linear_factor_, 0.0f);
+			}
+		};
+		mediump float fog_linear_factor = fog_linear_factor_;
+		mediump float fog_height_factor = 1.0f - fog_height_factor1;
+		float fog_factor = u_fog_color.a * max(fog_height_factor,fog_linear_factor);  
+		out(UV0, float3(a_texcoord0.xy, fog_factor));
+	}
+
+	pixel
+	{
+		//mediump float fog_linear_factor = UV0.z;
+		mediump float fog_factor = UV0.z;
+		// lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 diffuse_map_color)
+		{
+			branch("1")
+			{
+				lowp float _alpha = sample(sepAlphaTex, UV0.xy).w;
+				macro(ALPHA_TEST_ENABLE) out(lowp float tmp)
+				{
+					branch("1") {
+						alphatest("<")(_alpha, alphaRef);  
+						
+					}
+					branch("0") { 
+						
+					}
+				};
+				lowp float4 diffuse_tex_ = sample(Tex0, UV0.xy);  
+				out(diffuse_map_color, float4(diffuse_tex_.xyz, _alpha));
+			}
+			branch("0") {
+				lowp float4 diffuse_tex_ = sample(Tex0, UV0.xy);
+				macro(ALPHA_TEST_ENABLE)
+				{
+					branch("1") {
+						alphatest("<")(diffuse_tex_.w, alphaRef);
+					}
+					branch("0") {
+					}
+				};
+				out(diffuse_map_color, diffuse_tex_);
+			}
+		};
+		lowp float alpha = diffuse_map_color.a;
+		
+        macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+        {
+            branch("1") {
+            	lowp float4 _lightmap_color = sample(TexLightmap, UV1.xy);
+                // 不再对lightmap染色
+                // lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+                lowp float3 light_map_color_gamma = _lightmap_color.xyz * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz * diffuse_map_color.rgb);
+            }
+            branch("0") {
+                out(lightmap_color, diffuse_map_color.rgb);
+            }
+        };
+
+		// mediump float3 color_diffuse_lightmap = diffuse_map_color.rgb * diffuse_map_color.rgb * lightmap_color.xyz;
+		mediump float3 color_diffuse_lightmap = lightmap_color.xyz;
+
+		// macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		// {
+		//   branch("1") {
+		// 	lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+		// 	out(alpha, separateColor.w);
+		//   }
+		//   branch("0") {
+		// 	out(alpha, diffuse_map_color.a);
+		//   }
+		// };
+		
+		macro(FOG_ENABLE) out(mediump float3 final_color_with_fog) {
+			branch ("1") {
+				out(final_color_with_fog, lerp(color_diffuse_lightmap, u_fog_color.rgb, float3(fog_factor)));
+        	}
+			branch ("0") {
+				out(final_color_with_fog, color_diffuse_lightmap);
+			}
+		};
+
+		pixel(float4(final_color_with_fog, alpha * AlphaMtl));
+	}
+}

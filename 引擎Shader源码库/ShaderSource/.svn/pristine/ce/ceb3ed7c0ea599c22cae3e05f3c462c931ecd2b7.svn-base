@@ -1,0 +1,137 @@
+["refraction"]
+pipeline
+<
+	version = "1.0.0"
+	author = "lulu"
+	company = "Netease"
+	technique = "TShader"
+	rendertarget = "Distortion"
+	alphablend = "true"
+>
+{
+	// Vertex Attributes
+	attribute float4 a_position: POSITION
+	<
+		instance = "0"
+	>;
+
+	attribute float2 a_texcoord0: TEXTURE0;
+
+	// Varying Variables
+	varying mediump float2 v_uv0 : TEXTURE0;
+	varying highp float4 v_screen_pos : TEXTURE2;
+
+	// Uniform Variables
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0;
+	uniform highp float4x4 u_wvp: WORLD_VIEW_PROJECTION;
+
+	["diffuse tex"]
+	uniform sampler tex: DIFFUSE
+	<
+		export = "0"
+	>;
+
+	["扭曲因子"]
+	uniform float u_strength
+	<
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "1.0"
+        uistep = "0.01"
+	>;
+
+	uniform highp sampler DepthMap : DEPTH_BUFFER
+	<
+		addressu = "clamp"
+		addressv = "clamp"
+		mag = "nearest"
+		min = "nearest"
+		map = "nearest"
+	>;
+
+	["屏幕坐标转换为全屏贴图的uv"]
+	function screen_pos_to_uv
+	in
+	(
+		highp float2 screen_pos
+	)
+	out
+	(
+		mediump float2 uv
+	)
+	{
+		["GL下，纹理原点在左下角，否则在左上角"]
+		macro(SYSTEM_UV_ORIGIN_LEFT_BOTTOM) out(highp float2 scale)
+		{
+			// 在左下角
+			branch("1")
+			{
+				out(scale, float2(0.5f));
+			}
+			// 在左上角
+			branch("0")
+			{
+				out(scale, float2(0.5f, -0.5f));
+			}
+		};
+		out(uv, screen_pos.xy * scale + float2(0.5f));
+	};
+
+
+	["采样深度贴图"]
+	function sample_depth_texture in
+	(
+		sampler samplerTexture,
+		mediump float2 uv0) out
+	(
+		highp float depth
+	)
+	{
+		highp float4 tex = sample(samplerTexture, uv0);
+		highp float depth_tex = tex.x;
+
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(highp float depth_ndc)
+		{
+			branch("1")
+			{
+				out(depth_ndc, depth_tex * 2.0f - 1.0f);
+			}
+			branch("0")
+			{
+				out(depth_ndc, depth_tex);
+			}
+		};
+
+		out(depth, depth_ndc);
+	};
+
+	vertex
+	{
+		//calc position
+		highp float4 proj_position = transform(a_position, u_wvp);
+
+		mediump float4 tex0_tmp = float4(a_texcoord0.xy, 1.0f, 0.0f);
+		mediump float4 uv0 = transform(tex0_tmp, u_texture_trans0);
+
+		// output
+		vertex(proj_position);
+		out(v_uv0, uv0.xy);
+		out(v_screen_pos, proj_position);
+	}
+
+	pixel
+	{
+		lowp float4 tex_color = sample(tex, v_uv0);
+
+		highp float3 screen_pos = v_screen_pos.xyz / v_screen_pos.w;
+
+    	function screen_pos_to_uv(screen_pos.xy) out (mediump float2 depth_uv);
+		// 得到像素点在屏幕空间的深度
+		function sample_depth_texture(DepthMap, depth_uv) out (highp float screen_depth);
+
+		lowp float4 clr = lerp(float4(0.5f, 0.5f, 0.0f, 0.0f), tex_color, float4(step(screen_pos.z, screen_depth) * u_strength));
+
+		pixel(tex_color);
+	}
+}

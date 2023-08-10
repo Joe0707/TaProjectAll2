@@ -1,0 +1,453 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang/xuzhuoliang/fanyu" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+	stencilenable = "1"
+	stencilmask = "0"
+	stencilwritemask = "255"
+	stencilref = "0"
+	stencilfunc= "1"
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+>
+{
+// 宏
+	["开启钻石效果"]
+	eitheror GEM_ENABLE;
+	macro(GEM_ENABLE)
+	<
+		customizable = "0"
+		default = "1"
+	>;
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["雾色"]
+	uniform lowp float4 u_fog_color : FOG_COLOR
+	<
+		color="1"
+		init = "(0.51, 0.71, 0.75, 1.0)"
+	>;
+
+	["雾的其他信息"]
+	uniform highp float4 u_fog_info : FOG_INFO
+	<
+		init = "(1000.0, 1500.0, 1.0, 1.0)"
+	>;
+
+	// ----------------------------钻石属性
+	["本体贴图Tint"]
+	uniform float4 MainTex_Tint
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.54, 0.54, 0.54, 1.0"
+		artist = "1"
+	>;
+	["钻石内部贴图"]
+	uniform sampler InSideTex
+	<
+		artist = "1"
+		uigroup = "gem"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "hero\\hero30_39\\1032_baihuanghou\\1_cycle.png"
+	>;
+	["钻石内部贴图Tilling X"]
+	uniform float InSideTex_tilling_x
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "0.3"
+	>;
+	["钻石内部贴图Tilling Y"]
+	uniform float InSideTex_tilling_y
+	<
+		artist = "1"
+		uigroup = "gem"
+		init = "1"
+	>;
+	["钻石内部贴图Tint"]
+	uniform float4 InSideTex_Tint
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "1.0, 1.0, 1.0, 1.0"
+		artist = "1"
+	>;
+	["钻石内部折射HeightBias"]
+	uniform float _LayerHeightBias
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "0.2"
+		min = "0.0"
+		init = "0.2"
+	>;
+	["钻石内部折射HeightBiasStep"]
+	uniform float _LayerHeightBiasStep
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "0.3"
+		min = "0.0"
+		init = "0.13"
+	>;
+	["钻石内部折射DepthFalloff"]
+	uniform float _LayerDepthFalloff
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+		init = "0.9"
+	>;
+	["钻石反射贴图1"]
+	uniform sampler reflectmap1
+	<
+		artist = "1"
+		uigroup = "gem"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "hero\\hero30_39\\1032_baihuanghou\\refractions.png"
+	>;
+	["钻石反射贴图1Tint"]
+	uniform float4 _ReflectTintColor1
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.15, 0.15, 0.15, 1.0"
+		artist = "1"
+	>;
+	["钻石反射贴图2"]
+	uniform sampler reflectmap2
+	<
+		artist = "1"
+		uigroup = "gem"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+		path = "hero\\hero30_39\\1032_baihuanghou\\1_cycle.jpg"
+	>;
+	["钻石反射贴图2Tint"]
+	uniform float4 _ReflectTintColor2
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.2, 0.2, 0.2, 1.0"
+		artist = "1"
+	>;
+	["_FresnelTightness"]
+	uniform float _FresnelTightness
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "10.0"
+		min = "0.0"
+		init = "4.5"
+	>;
+	["_FresnelColorInside"]
+	uniform float4 _FresnelColorInside
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.51, 0.825, 0.97,1.0"
+		artist = "1"
+	>;
+	["_FresnelColorOutside"]
+	uniform float4 _FresnelColorOutside
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.545, 0.89, 0.945, 1.0"
+		artist = "1"
+	>;
+	["_InnerLightTightness"]
+	uniform float _InnerLightTightness
+	<
+		artist = "1"
+		uigroup = "gem"
+		uistep = "0.01"
+		max = "40.0"
+		min = "0.0"
+		init = "40.0"
+	>;
+	["_InnerLightColorInside"]
+	uniform float4 _InnerLightColorInside
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.0, 0.0, 0.0, 0.5"
+		artist = "1"
+	>;
+	["_InnerLightColorOutside"]
+	uniform float4 _InnerLightColorOutside
+	<
+		color = "1"
+		uigroup = "gem"
+		init = "0.631, 1.0, 0.874, 0.5"
+		artist = "1"
+	>;
+	["_ModelMaxHeight"]
+	uniform float _ModelMaxHeight
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		init = "1.0"
+	>;
+	["_DissolveDirection"]
+	uniform float _DissolveDirection
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		uistep = "0.01"
+		max = "3.0"
+		min = "0.0"
+		init = "0.0"
+	>;
+	["_Precent"]
+	uniform float _Precent
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		uistep = "0.01"
+		max = "1.2"
+		min = "-0.2"
+		init = "0.0"
+	>;
+	["_Softness"]
+	uniform float _Softness
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+		init = "0.1"
+	>;
+	["_NormalBias"]
+	uniform float _NormalBias
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		uistep = "0.01"
+		max = "5.0"
+		min = "-5.0"
+		init = "0.0"
+	>;
+	["_DissolveDir"]
+	uniform float _DissolveDir
+	<
+		artist = "1"
+		uigroup = "gem_dissolve"
+		uistep = "0.01"
+		max = "1"
+		min = "0"
+		init = "0.0"
+	>;
+	["_InnerUVFlow"]
+	uniform float _InnerUVFlow
+	<
+		artist = "1"
+		uigroup = ""
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+		init = "0.16"
+	>;
+	["_ReflectUVFlow"]
+	uniform float _ReflectUVFlow
+	<
+		artist = "1"
+		uigroup = ""
+		uistep = "0.01"
+		max = "1.0"
+		min = "0.0"
+		init = "0.20"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 inv_world : INV_WORLD;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform highp float frame_time : FRAME_TIME;
+
+	// varying变量
+	varying mediump float4 UV0;
+	//gem
+	varying mediump float3 v_worldNormal;
+	varying mediump float3 v_worldViewDir;
+	varying mediump float3 v_worldRefl;
+	varying mediump float3 v_parallax_uv;
+
+
+	function ToRadialCoords in(float3 coords) out (float2 panoramauv)
+    {
+        mediump float3 normalizedCoords = normalize(coords);
+        mediump float latitude = acos(normalizedCoords.y);
+        mediump float longitude = atan2(normalizedCoords.z, normalizedCoords.x);
+        mediump float2 sphereCoords = float2(longitude, latitude) * float2(0.15915494309189533576888376337251f, 0.31830988618379067153776752674503f);
+        out(panoramauv,float2(0.5f,1.0f) - sphereCoords);
+    };
+    function RotateAroundYInDegrees in (float3 vertex, float degrees) out(float3 rotatedVec)
+    {
+        mediump float alpha = degrees * 3.1415926f / 180.0f;
+        mediump float sina = sin(alpha);
+        mediump float cosa = cos(alpha);
+        mediump float2x2 m = float2x2(float2(cosa, -sina),float2(sina, cosa));
+        out(rotatedVec,float3(transform(vertex.xz,m), vertex.y).xzy);
+    };
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		
+		macro(GEM_ENABLE) {
+			branch ("1") {
+				highp float3x3 worldMat = float3x3(world);
+				highp float3 worldNormal = float3(normalize(transform(normal.xyz, worldMat)));
+				highp float3 worldViewDir = normalize(camera_pos.rgb - pos_world.rgb);
+				highp float3 worldRelfDir = reflect(-worldViewDir, worldNormal);
+
+				highp float3 tangent = float3(a_tangent.x,a_tangent.z,a_tangent.y); // 切线修正
+				highp float3 binormal = cross(tangent, normal.xyz);
+				highp float3x3 tbn = float3x3(tangent, binormal,normal.xyz);
+
+				highp float3 campos_local = transform(camera_pos,inv_world).xyz;
+				highp float3 parallaxuv = transform(campos_local - position.xyz,tbn);
+				out(v_worldNormal,worldNormal);
+				out(v_worldViewDir,worldViewDir);
+				out(v_worldRefl,worldRelfDir);
+				out(v_parallax_uv,parallaxuv);
+			}
+			branch ("0") {
+
+			}
+		};
+
+		vertex(pos);
+
+		out(UV0, float4(texcoord0.x, texcoord0.y, 0.0f, 0.0f));
+    }
+
+	pixel
+	{
+		// diffuse
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+		//钻石状态
+		macro(GEM_ENABLE) out(lowp float4 gem_shade_color){
+			branch ("1") {
+			mediump float phong = dot(normalize(v_worldNormal),normalize(v_worldViewDir));
+			mediump float3 parallax_uv = normalize(v_parallax_uv);
+			mediump float inneruvflow = frame_time * _InnerUVFlow;
+			mediump float relfectuvflow = frame_time * _ReflectUVFlow;
+
+			mediump float2 layerParallaxUV = UV0.xy + (parallax_uv.xy * (-_LayerHeightBias)) * alpha;
+
+			lowp float3 colorLayersAccum = sample(Tex0, layerParallaxUV).xyz * MainTex_Tint.xyz;
+			
+			mediump float heightbias2 = -(_LayerHeightBias + _LayerHeightBiasStep);
+			mediump float2 layerBaseUV2 = UV0.xy * float2(InSideTex_tilling_x,InSideTex_tilling_y);
+			mediump float2 layerParallaxUV2 = layerBaseUV2 + parallax_uv.xy * 0.5f + parallax_uv.xy * heightbias2 + float2(inneruvflow);
+
+			lowp float3 colorLayersAccum2 = colorLayersAccum + sample(InSideTex, layerParallaxUV2).xyz * _LayerDepthFalloff * InSideTex_Tint.xyz;
+
+			mediump float fresnel = saturate(pow(1.0f - phong, _FresnelTightness));
+			mediump float3 colorAddFresnel = colorLayersAccum2 + lerp(_FresnelColorInside.xyz, _FresnelColorOutside.xyz, float3(fresnel)) * float3(fresnel);
+
+			function ToRadialCoords (v_worldRefl) out(float2 radialRelUV);
+			lowp float4 reflectCol = sample(reflectmap1, normalize(radialRelUV) + float2(relfectuvflow * 0.5f)) * _ReflectTintColor1 * 2.0f;
+			lowp float3 colorAddRefl = colorAddFresnel + reflectCol.rgb * (1.0f - fresnel);
+
+			mediump float innerLight = pow(phong, _InnerLightTightness);
+			lowp float3 innerLightCol = colorAddRefl + max(float3(0.0f),lerp(_InnerLightColorOutside.rgb, _InnerLightColorInside.rgb, float3(innerLight)) * float3(innerLight));
+
+			out(gem_shade_color,float4(innerLightCol,1.0f));
+			}
+			branch ("0") {
+				out(gem_shade_color,diffuse_map_color);
+			}
+		};
+		lowp float finalalpha = AlphaMtl;
+		pixel(float4(gem_shade_color.rgb, finalalpha));
+	}
+}

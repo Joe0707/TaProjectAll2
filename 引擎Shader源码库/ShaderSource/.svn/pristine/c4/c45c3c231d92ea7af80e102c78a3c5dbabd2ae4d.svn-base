@@ -1,0 +1,651 @@
+﻿["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "mengqingyu" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	//cull = "back"
+>
+{
+// 宏
+  
+	["是否溶解"]
+	eitheror DISSOLVE_EFFECT;
+	macro(DISSOLVE_EFFECT)
+	<  
+		default = "0"
+		customizable = "0"
+	>;
+
+	["是否冰冻"]
+	eitheror FROZENE_EFFECT;
+	macro(FROZENE_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否金身"]
+	eitheror GOLD_EFFECT;
+	macro(GOLD_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否石化"]
+	eitheror PETRIFY_EFFECT;
+	macro(PETRIFY_EFFECT)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否使用MatCap"]
+	eitheror MATCAP_ENABLE;
+	macro(MATCAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["是否流光"]
+	eitheror LIGHTFLOW_ENABLE;
+	macro(LIGHTFLOW_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["使用法线"]
+	eitheror USE_NORMAL;
+	macro(USE_NORMAL)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["手动diffuse颜色"]
+	eitheror NO_DIFFUSE;
+	macro(NO_DIFFUSE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+/*
+	["是否使用MatCap高光通道"]
+	eitheror MATCAP_HIGHLIGHT_ENABLE;
+	macro(MATCAP_HIGHLIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;*/
+    ["是否是液体"]
+	eitheror IS_LIQUID;
+	macro(IS_LIQUID)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+    ["开启液面震荡"]
+	eitheror SHAKE_ENABLE;
+	macro(SHAKE_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	// ["液面是否法线修正"]
+	// eitheror NORMAL_FIX;
+	// macro(NORMAL_FIX)
+	// <
+	// 	customizable = "1"
+	// 	default = "0"
+	// >;
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["MatCap贴图:剪影光(R)/压暗(G)/高光(B)"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		//path = "common\\textures\\envmap\\matcap_test00.png"
+	>;
+
+	["流光贴图"]
+	uniform sampler lightflowMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["法线贴图"]
+	uniform sampler normalMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	uniform highp float frame_time : FRAME_TIME;
+	uniform highp float Hero_Alpha_Random;
+
+	["matcap亮部颜色"]
+	uniform lowp float4 matcap_light_color
+	<
+		color = "1"
+		init = "(1,1,1,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap轮廓颜色"]
+	uniform lowp float4 matcap_rim_color
+	<
+		color = "1"
+		init = "(0,0,0,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap亮部强度"]
+	uniform mediump float matcap_light_intensity
+	<
+
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "9.0"
+		uistep = "0.01"
+	>;
+
+	["matcap暗部颜色"]
+	uniform lowp float4 matcap_dark_color
+	<
+		color = "1"
+		init = "(0.3059,0.2353,0.3765,1)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap暗部强度"]
+	uniform lowp float matcap_dark_intensity
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+
+	["matcap高光颜色"]
+	uniform lowp float4 matcap_highlight_color
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+		artist = "1"
+		uigroup = "MatCap"
+	>;
+
+	["matcap高光强度"]
+	uniform mediump float matcap_highlight_intensity
+	<
+		init = "1.0"
+		artist = "1"
+		uistep = "0.01"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "9.0"
+	>;
+
+	["matcap的rim强度"]
+	uniform mediump float matcap_rim_intensity
+	<
+		init = "1.0"
+		artist = "1"
+		uistep = "0.01"
+		uigroup = "MatCap"
+		min = "0.0"
+		max = "9.0"
+	>;
+
+	["matcap透明度调节"]
+	uniform lowp float matcap_alpha_adjust
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		uistep = "0.01"
+		min = "0.0"
+		max = "3.0"
+	>;
+
+	["matcap影响程度"]
+	uniform lowp float matcap_lerp
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		uistep = "0.01"
+		min = "0.0"
+		max = "1.0"
+	>;
+
+	["内部透明度调节"]
+	uniform lowp float alpha_adjust
+	<
+		init = "1.0"
+		artist = "1"
+		uigroup = "MatCap"
+		uistep = "0.01"
+		min = "0.0"
+		max = "2.0"
+	>;
+
+	["液面高度"]
+	uniform lowp float liqHeight
+	<
+		uigroup = "液面调整"
+		init = "15.0"
+		artist = "1"
+	>;
+
+	["最大震荡强度"]
+	uniform mediump float shakeAmp
+	<
+		uigroup = "液面调整"
+		uistep = "0.001"
+		init = "0.0"
+		max = "30.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["震荡强度调整"]
+	uniform lowp float ShakeAmount
+	<
+		uigroup = "液面调整"
+		uistep = "0.001"
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["顶部法线修正强度"]
+	uniform mediump float upNormalFix
+	<
+		uigroup = "液面调整"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["震荡频率"]
+	uniform mediump float shakeFreq
+	<
+		uigroup = "液面调整"
+		uistep = "0.001"
+		init = "1"
+		max = "20.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["变色高度(到液面)上01"]
+	uniform lowp float liqPos01
+	<
+		uigroup = "液面调整"
+		init = "0.0"
+		artist = "1"
+	>;
+
+	["变色高度(到液面)上02"]
+	uniform lowp float liqPos02
+	<
+		uigroup = "液面调整"
+		init = "0.3"
+		artist = "1"
+	>;
+
+	["变色高度(到液面)下01"]
+	uniform lowp float liqPos03
+	<
+		uigroup = "液面调整"
+		init = "0.6"
+		artist = "1"
+	>;
+
+	["变色高度(到液面)下02"]
+	uniform lowp float liqPos04
+	<
+		uigroup = "液面调整"
+		init = "1.2"
+		artist = "1"
+	>;
+
+	["液体颜色(上)"]
+	uniform lowp float4 liqColor01
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.667,0.145,0.761,1.0)"
+		uigroup = "液面调整"
+		artist = "1"
+	>;
+
+	["液体颜色(中)"]
+	uniform lowp float4 liqColor02
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.2,0.745,0.961,1.0)"
+		uigroup = "液面调整"
+		artist = "1"
+	>;
+
+	["液体颜色(下)"]
+	uniform lowp float4 liqColor03
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.8,0.745,0.1,1.0)"
+		uigroup = "液面调整"
+		artist = "1"
+	>;
+
+	["diffuse色彩"]
+	uniform lowp float4 diffuse_color_manual
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.2, 0.6, 0.9, 0.3)"
+		uigroup = "diffuse色彩"
+		artist = "1"
+	>;
+
+	["流光密度"]
+	uniform float2 lightflowDensity
+	<
+		artist = "1" 
+		init = "(1.0, 1.0)"
+		uigroup = "流光"
+		artist = "1"
+	>;
+    
+    ["流光速度"]
+	uniform float2 lightflowSpeed
+	<
+		artist = "1" 
+		init = "(0.0, 0.0)"
+		uigroup = "流光"
+		artist = "1"
+	>;
+
+	["流光强度"]
+	uniform lowp float lightflowIntensity
+	<
+		uigroup = "流光"
+		artist = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+		init = "0.5"
+	>;
+
+	["法线强度"]
+	uniform float normalIntensity
+	<
+		uigroup = "法线"
+		artist = "1"
+		init = "1.0"
+	>;
+
+	["法线强度(流光)"]
+	uniform float normalIntensity1
+	<
+		uigroup = "法线"
+		artist = "1"
+		init = "1.0"
+	>;
+
+	["透明度裁切"]
+	uniform float alphaThreshold
+	<
+		uigroup = "MatCap"
+		artist = "1"
+		init = "0.0"
+	>;
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float3 PosWorld;
+	varying mediump float effectlerp;// 替代ghostlerp icelerp firelerp goldlerp petrify_shadow ;
+	varying mediump float height_sm;
+
+	varying mediump float3 v_normalWorld;
+
+	varying mediump float2 effectuv;// 替代petrify_uv v_gold_uv v_ghost_uv;
+	varying mediump float2 v_matcap_uv;
+	
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;	
+		highp float4 normal = nor;
+		highp float4 pos = transform(position, wvp);
+		highp float4 pos_world = transform(position, world);
+		out(PosWorld,pos_world.xyz);
+		out(UV0, texcoord0.xy);
+		//out(v_height_fac, clamp(position.y/10.0f, 0.0f, 1.0f));
+		
+		mediump float3 normal_view = normalize(transform(normal.rgb,float3x3(wv)));
+		mediump float2 matcap_uv = (normal_view.xy) * float2(0.5f, -0.5f) + float2(0.5f);
+		out(v_matcap_uv, matcap_uv);	        
+
+
+
+		float3 normalWorld = normalize(transform(normal.rgb,float3x3(world)));
+		out(v_normalWorld,normalWorld);
+
+		vertex(pos);
+    }
+
+	pixel
+	{
+		float2 UV00 = UV0.xy;
+		// diffuse
+		macro(NO_DIFFUSE) out(lowp float4 diffuse_map_color) 
+		{
+			branch ("0") 
+			{
+				out(diffuse_map_color, sample(Tex0, UV00.xy));
+			}
+			branch ("1") 
+			{
+				out(diffuse_map_color, diffuse_color_manual);
+			}
+		};
+
+		lowp float3 view_dir0 = camera_pos.xyz - PosWorld.xyz;
+		lowp float3 normal_dir0 = v_normalWorld;
+		
+		
+		macro(IS_LIQUID) out(lowp float3 diffuse_color)
+		{
+
+			branch ("1") 
+			{
+				mediump float3 worldBodyPosition = (world[3]).xyz;                  
+				mediump float3 worldLiqCenter = worldBodyPosition + liqHeight * (world[1]).xyz;
+				mediump float liqHeightWorld0 = worldLiqCenter.y;
+				macro(SHAKE_ENABLE) out(mediump float liqHeightWorld) 
+				{
+					branch ("0") 
+					{
+						out(liqHeightWorld, liqHeightWorld0);
+					}
+					branch ("1") 
+					{
+						mediump float3 liqDis = PosWorld.xyz - worldLiqCenter;
+						mediump float liqAngle = atan2(liqDis.x, liqDis.z);
+						mediump float liqHeightWorld1 = liqHeightWorld0 + cos(liqAngle + frame_time * shakeFreq) * shakeAmp * ShakeAmount;
+						out(liqHeightWorld, liqHeightWorld1);
+					}
+				};
+
+				alphatest("<")(liqHeightWorld, PosWorld.y);
+
+				lowp float liqColorLerp01 = smoothstep(liqPos01, liqPos02, liqHeightWorld - PosWorld.y);
+		        lowp float liqColorLerp02 = smoothstep(liqPos03, liqPos04, liqHeightWorld - PosWorld.y);
+
+                lowp float4 diffuse_map_color_0 = lerp(liqColor01, liqColor02, float4(liqColorLerp01));
+                lowp float4 diffuse_map_color_1 = lerp(diffuse_map_color_0, liqColor03, float4(liqColorLerp02));
+
+                out(diffuse_color, diffuse_map_color_1.rgb);
+
+			}
+			branch ("0") 
+			{
+				out(diffuse_color, diffuse_map_color.rgb);
+			}
+		};
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+
+		//lowp float3 diffuse_color = diffuse_map_color.rgb;
+
+		macro(USE_NORMAL) out(float2 uvOffset) 
+		{
+			branch ("0") 
+			{
+				out(uvOffset, float2(0.0f));
+			}
+			branch ("1") 
+			{
+				lowp float4 normalMapColor = sample(normalMap, UV00);
+				float2 uvOffset0 = (normalMapColor.xy * 2.0f - float2(1.0f));
+				out(uvOffset, uvOffset0);
+			}
+		};
+
+		// 加入matcap
+		mediump float2 v_matcap_uv0 = v_matcap_uv;
+		macro(MATCAP_ENABLE) out(lowp float3 matcap_combined, lowp float alpha_adding) 
+		{
+			branch ("1") 
+			{
+				
+				lowp float4 matcap_map_color = sample(MatcapTex, v_matcap_uv0 + uvOffset * normalIntensity);
+                lowp float3 rim_color = matcap_map_color.r * matcap_rim_color.rgb * matcap_rim_intensity;
+                lowp float3 dirlight_color = lerp(matcap_dark_color.rgb, matcap_light_color.rgb, float3(matcap_map_color.g))*2.0f;
+                lowp float3 spec_color = matcap_map_color.b * matcap_highlight_color.rgb * matcap_highlight_intensity;
+                lowp float3 diffuse_light = diffuse_color.rgb * dirlight_color + rim_color + spec_color;
+                out(matcap_combined, lerp(diffuse_color.rgb, diffuse_light, float3(matcap_lerp)));
+                out(alpha_adding, matcap_alpha_adjust * dot(spec_color + rim_color * 0.5f, float3(0.3f, 0.59f, 0.11f)));
+			}
+			branch ("0")
+			{
+				out(matcap_combined, diffuse_color.rgb);
+                out(alpha_adding, 0.0f);
+			} 
+		};
+
+		lowp float final_alpha0 = alpha * alpha_adjust + alpha_adding;
+
+		macro(LIGHTFLOW_ENABLE) out(lowp float4 finalcolor) 
+		{
+			branch ("1") 
+			{
+				lowp float4 lightflowColor = sample(lightflowMap, UV00.xy * lightflowDensity + lightflowSpeed * frame_time + uvOffset * normalIntensity1);
+				lowp float3 lightflowBlend = lerp(2.0f * matcap_combined * lightflowColor.rgb, float3(1.0f) - 2.0f * (float3(1.0f) - matcap_combined) * (float3(1.0f) - lightflowColor.rgb), step(float3(0.5f), lightflowColor.rgb));
+				lowp float lightflowBrightness = dot(lightflowColor.rgb, float3(0.3f, 0.59f, 0.11f));
+				lowp float final_alpha = saturate(final_alpha0 + abs(lightflowBrightness - 0.5f) * lightflowIntensity);
+				out(finalcolor, float4(lerp(matcap_combined, lightflowBlend, float3(lightflowIntensity)), final_alpha));
+			}
+			branch ("0") 
+			{
+				out(finalcolor, float4(matcap_combined.rgb, final_alpha0));
+			}
+		};
+
+		lowp float alphaCut = step(alphaThreshold, alpha) * AlphaMtl;
+
+		pixel(float4(finalcolor.rgb, alphaCut * finalcolor.a));
+	}
+}

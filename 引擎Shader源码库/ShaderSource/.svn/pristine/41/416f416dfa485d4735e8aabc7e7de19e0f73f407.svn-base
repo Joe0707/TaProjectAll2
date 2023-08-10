@@ -1,0 +1,136 @@
+["波动的后处理效果"]
+pipeline
+<
+	technique = "Distortion"
+>
+{
+	attribute float4 a_position: POSITION;
+	["屏幕空间坐标"]
+	attribute float4 a_texture0: TEXTURE0;
+	
+	varying mediump float2 v_texture0: TEXTURE0;
+	
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+		addressw = "CLAMP"
+	>;
+	
+	uniform sampler TexCorner: OTHER0
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "common\\pipeline\\dark_corner.dds"
+	>;
+	
+	/////////////////////////参数扰动相关
+	["扰动幅度"]
+	uniform float distortionScale: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "0.2"
+		init = "0.01"
+	>;
+
+	["扰动速度"]
+	uniform float distortionSpeed: OTHER1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "8.0"
+		init = "6.0"
+	>;
+
+	["扰动尺寸"]
+	uniform float distortionLength: OTHER2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "5.0"
+	>;
+	
+	["扰动中心"]
+	uniform float distortionBegin: OTHER3
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.1"
+	>;
+	
+	["向里衰减"]
+	uniform float distortionPower: OTHER4
+	<
+		artist = "1"
+		min = "0.3"
+		max = "1.0"
+		init = "0.35"
+	>;
+	
+	["DarkAlpha"]
+	uniform float DarkAlpha: OTHER5
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "1.0"
+	>;
+	
+	["压暗程度"]
+	uniform float DarkIntensity: OTHER6
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "0.35"
+	>; 
+	
+	["开始位置"]
+	uniform float DarkBegin: OTHER7
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>; 
+	
+	uniform float4 screen_size : VIEWPORT_SIZE;
+	
+	uniform float FrameTime: FRAME_TIME;
+	
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(float4(a_position.xyz, 1.0f));
+		out(v_texture0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		lowp float4 mask_clr = sample(TexCorner, v_texture0);
+		float halfpi = 3.1415926f * 0.5f;
+		float distor_factor = pow( 1.0f - abs(sin( saturate(mask_clr.r + distortionBegin) * halfpi)), distortionPower);
+		
+		//扰动部分
+		float2 backgroundUv = v_texture0 + transform(screen_size.zw, 0.5f);
+		float factor1 = distortionScale * 0.1f * distor_factor;
+		float factor2 = FrameTime * distortionSpeed;
+		float factor3 = 10.0f * distortionLength;
+		float offsetX = sin(factor2 + backgroundUv.x * factor3) * factor1;
+		float offsetY = cos(factor2 + backgroundUv.y * factor3) * factor1;
+		float4 final_color = sample(Tex0, backgroundUv + float2(offsetX, offsetY));
+		float intensity = pow( abs(sin( saturate(mask_clr.r + DarkBegin) * halfpi)), DarkIntensity) * DarkAlpha;
+		pixel(transform(final_color, intensity));
+	}
+
+}

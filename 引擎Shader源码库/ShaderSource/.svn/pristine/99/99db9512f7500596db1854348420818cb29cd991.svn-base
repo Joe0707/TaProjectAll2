@@ -1,0 +1,82 @@
+["HDR Bloom downsample"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	category = "postprocess"
+	technique = "hdr_bloom"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float4 TexCoord0;
+	varying mediump float4 TexCoord1;
+	varying mediump float4 TexCoord2;
+	varying mediump float4 TexCoord3;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	uniform mediump float blur_size
+	<
+		artist = "1"
+		init = "4"
+		min = "0"
+		max = "10"
+	>;
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	
+	function calc_half_pixel in(mediump float4 rtsize) out (mediump float2 res)
+	{
+	    out(res, float2(0.5f) * rtsize.zw); 
+	};
+
+	function circle_point in(float start, float points, float point) out(mediump float2 uv_shift) {
+		float rad = (3.1415926f * 2.0f / points) * (point + start);
+		out(uv_shift, float2(sin(rad), cos(rad)));
+	};
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		function calc_half_pixel(rtSize) out (mediump float2 half_pixel);
+		float start = 2.0f / 7.0f;
+		function circle_point(start, 7.0f, 0.0f) out(mediump float2 uv_s0);
+		function circle_point(start, 7.0f, 1.0f) out(mediump float2 uv_s1);
+		function circle_point(start, 7.0f, 2.0f) out(mediump float2 uv_s2);
+		function circle_point(start, 7.0f, 3.0f) out(mediump float2 uv_s3);
+		function circle_point(start, 7.0f, 4.0f) out(mediump float2 uv_s4);
+		function circle_point(start, 7.0f, 5.0f) out(mediump float2 uv_s5);
+		function circle_point(start, 7.0f, 6.0f) out(mediump float2 uv_s6);
+		out(TexCoord0, float4(a_texture0.xy + 0.00f * blur_size * half_pixel, a_texture0.xy + uv_s0 * blur_size * half_pixel));
+		out(TexCoord1, float4(a_texture0.xy + uv_s1 * blur_size * half_pixel, a_texture0.xy + uv_s2 * blur_size * half_pixel));
+		out(TexCoord2, float4(a_texture0.xy + uv_s3 * blur_size * half_pixel, a_texture0.xy + uv_s4 * blur_size * half_pixel));
+		out(TexCoord3, float4(a_texture0.xy + uv_s5 * blur_size * half_pixel, a_texture0.xy + uv_s6 * blur_size * half_pixel));
+	}
+	
+	pixel
+	{
+		lowp float4 color_0 = sample(Tex0, TexCoord0.xy);
+		lowp float4 color_1 = sample(Tex0, TexCoord0.zw);
+		lowp float4 color_2 = sample(Tex0, TexCoord1.xy);
+		lowp float4 color_3 = sample(Tex0, TexCoord1.zw);
+		lowp float4 color_4 = sample(Tex0, TexCoord2.xy);
+		lowp float4 color_5 = sample(Tex0, TexCoord2.zw);
+		lowp float4 color_6 = sample(Tex0, TexCoord3.xy);
+		lowp float4 color_7 = sample(Tex0, TexCoord3.zw);
+
+		lowp float4 aver_color = (color_0 + color_1 + color_2 + color_3 + color_4 + color_5 + color_6 + color_7) * 0.125f;
+		pixel(aver_color);
+	}
+}

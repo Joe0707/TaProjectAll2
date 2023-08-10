@@ -1,0 +1,68 @@
+["comm sys"]
+pipeline
+<
+	author = "xuxing"
+	company = "netease"
+	category = "postprocess"
+	technique = "TNoShader"
+>
+{
+	
+	attribute float4 position: POSITION;
+  attribute float4 diffuse: DIFFUSE;
+	attribute float4 texcoord0 : TEXTURE0;
+	
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+  uniform highp float4x4 texTrans0: TEXTURE_TRANS0;
+
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+  
+  uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	uniform float blendValue : ALPHA_MTL
+  <
+    init = "1.0"
+  >;
+
+
+  varying lowp float2 UV0;
+  varying lowp float4 Color;
+	
+	vertex main
+	{
+		vertex(transform(position, wvp));
+    out(Color, diffuse);
+    mediump float4 tmp0 = float4(texcoord0.xy, 1.0f, 0.0f);
+    mediump float4 tmp1 = transform(tmp0, texTrans0);
+    out(UV0, tmp1.xy);
+	}
+	
+	pixel main
+	{
+    lowp float4 tmpvar_1 = sample(Tex0, UV0.xy);
+    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+    {
+      branch("1") {
+        lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+        out(alpha, separateColor.w);
+      }
+      branch("0") {
+        out(alpha, tmpvar_1.a);
+      }
+    };
+
+    lowp float4 result = Color * tmpvar_1;
+    lowp float result_alpha = alpha * blendValue;
+    pixel(float4(result.xyz, result.a * result_alpha));
+	}
+	
+}

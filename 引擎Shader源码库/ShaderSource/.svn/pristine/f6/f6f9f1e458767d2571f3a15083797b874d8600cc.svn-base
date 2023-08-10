@@ -1,0 +1,118 @@
+["lightflow"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+	eitheror NEOX_CHANGE_COLOR;
+	macro(NEOX_CHANGE_COLOR)
+	<  
+		default = "0"
+	>;
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+	>;	
+	
+	["emissive贴图"]
+	uniform sampler EmissiveMap1 : EMISSIVE
+	<
+		artist = "1"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0 : TEXTURE0;
+
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;	
+	// uniform highp float4x4 ww: WORLD;
+	uniform highp float4x4 texTrans0: TEXTURE_TRANS0;
+
+	varying highp float4 tex0;
+	varying highp float4 RawTexCoord0;
+	varying highp float4 posW;
+	
+	uniform float dir_light_intensity
+	<
+		artist = "0"
+		min = "0.0"
+		max = "1.0"
+		init = "0.5"
+	>;
+	
+	["流动自发光"]
+	uniform float change_color_bright
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>;
+
+	["本身自发光"]
+	uniform float change_color_bright1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+	>;	
+	
+	uniform float alpha : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	function GetChangeClr in (mediump float3 color_tex) out (mediump float3 change_clr)
+	{
+		out(change_clr, color_tex);
+	};
+	
+	vertex
+	{
+		vertex(transform(position, wvp));
+		// out(posW, transform(position, ww));
+		out(RawTexCoord0, texcoord0);
+		out(tex0, transform(float4(texcoord0.xy, 1.0f, 0.0f), texTrans0));
+	}
+	
+	pixel
+	{
+		float3 emissive_color = sample(EmissiveMap1, tex0.xy).xyz;
+		float emissive_mask = sample(EmissiveMap1, RawTexCoord0.xy).a;
+		float4 diffuse_map_color = sample(Tex0, RawTexCoord0.xy);
+	
+		function GetChangeClr(emissive_color) out (mediump float3 rt1);
+		function GetChangeClr(diffuse_map_color.xyz) out (mediump float3 rt2);	
+		float3 rt = rt1 * change_color_bright * emissive_mask + rt2 * (change_color_bright1 + 1.0f * dir_light_intensity);
+		
+		//下面为了省下一个if判断,在alpha_blend的情况下如果通道(Tex0)的颜色值是(0,0,0)就不要显示该颜色(alpha设为0)
+		float ratio = step(dot(diffuse_map_color.xyz, float3(1.0f, 1.0f, 1.0f)), 0.001f);	//是否纯黑
+		float blackMask = (1.0f - ratio) + ratio * dot(rt.xyz, float3(1.0f, 1.0f, 1.0f));
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float d_alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, RawTexCoord0.xy);
+			out(d_alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(d_alpha, diffuse_map_color.a);
+		  }
+		};
+
+		pixel(float4(rt, d_alpha * blackMask * alpha));
+	}
+	
+}

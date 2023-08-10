@@ -1,0 +1,760 @@
+["terrain shader for DM62"]
+pipeline
+<
+	version = "1.0.0"
+	author = "fanyu"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{	
+
+	["二层混合"]
+	eitheror SECOND_TEX;
+	macro(SECOND_TEX)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["是否接受迷雾"]
+	eitheror FOW_ENABLE;
+	macro(FOW_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["是否高级混合"]
+	eitheror BLEND_ENABLE;
+	macro(BLEND_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["第一层为模型贴图"]
+	eitheror MODELTEX_ENABLE;
+	macro(MODELTEX_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["高度图"]
+	eitheror HEIGHT_MAP_ENABLE;
+	macro(HEIGHT_MAP_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;	
+
+
+	// attribute
+	attribute float4 a_position: POSITION;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;// uv1
+	attribute float4 a_texture1 : TEXTURE1;// uv2
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+	attribute float4 a_normal : NORMAL;// 顶点法线
+	attribute float4 tangent : TANGENT;// 顶点切线
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 proj: PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+	uniform mediump float4[6] DynamicGiCube : DYNAMIC_GI;
+
+	["shadow"]
+	varying highp float4 pos_light_proj;
+	varying mediump float2 shadowmap_uv;
+
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float4 shadow_blendall:SHADOW_BLEND_ALL;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	
+	["影子颜色"]
+	uniform mediump float4 u_shadow_color
+	<
+		artist = "1"
+		color = "1"
+//		init = "(0.176, 0.325, 0.384)"
+		init = "(0.55, 0.98, 1.0)"
+	>;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["混合贴图1"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["混合贴图2"]
+	uniform sampler Tex1
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	["混合贴图3"]
+	uniform sampler Tex2
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	["混合贴图4"]
+	uniform sampler Tex3
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;	
+
+	["高度贴图(R第一张/G第二张/B第三张)"]
+	uniform sampler TexHeight
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	["混合比例贴图"]
+	uniform sampler TexBlendMap
+	<
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		artist = "1"
+	>;
+
+	// ["贴花贴图"]
+	// uniform sampler DecalMap
+	// <
+	// 	addressu = "REPEAT"
+	// 	addressv = "REPEAT"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	lodbias = "-0.5"
+	// 	artist = "1"
+	// >;
+
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["迷雾纹理"]
+	uniform sampler view_texture: FOW
+	<
+		artist = "0"
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+	>;
+
+    // ——————————————————  混合 ——————————————————
+
+    ["uv缩放"]
+	uniform lowp float uv_tiling_1
+    <
+        artist = "1"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;
+
+    ["贴图2缩放"]
+	uniform lowp float uv_tiling_2
+    <
+        artist = "0"
+        init = "32.0"
+        uistep = "0.001"
+        min = "0.0"
+        max = "100.0"
+        uigroup = "基础"
+    >;
+
+     ["一层边缘硬度"]
+	uniform lowp float height_low_1
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;   
+
+
+     ["二层边缘硬度"]
+	uniform lowp float height_low_2
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;   
+    
+     ["三层边缘硬度"]
+	uniform lowp float height_low_3
+    <
+        artist = "1"
+        init = "0.2"
+        uistep = "0.001"
+        uigroup = "边缘硬度"
+        min = "0.1"
+        max = "1.0"
+    >;      
+    
+     ["边缘颜色浓度"]
+	uniform lowp float edge_width
+    <
+        artist = "1"
+        init = "0.0"
+        uistep = "0.001"
+        uigroup = "边缘颜色"
+        min = "0.0"
+        max = "5.0"
+    >; 
+
+    
+     ["一层边缘颜色"]
+	uniform lowp float4 edge_color0
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+     ["二层边缘颜色"]
+	uniform lowp float4 edge_color1
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+     ["三层边缘颜色"]
+	uniform lowp float4 edge_color2
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+    ["四层边缘颜色"]
+	uniform lowp float4 edge_color3
+    <
+    	color = "1"
+        artist = "1"
+        init = "1.0, 1.0, 1.0, 1.0"
+        uigroup = "边缘颜色"
+
+    >; 
+
+   // ——————————————————  手动高度值 —————————————————— 
+     ["一层高度值"]
+	uniform lowp float manual_h1
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["二层高度值"]
+	uniform lowp float manual_h2
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["三层高度值"]
+	uniform lowp float manual_h3
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+     ["四层高度值"]
+	uniform lowp float manual_h4
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >; 
+
+
+     ["亮度阈值"]
+	uniform lowp float highlight_range
+    <
+        artist = "1"
+        init = "0.5"
+        uistep = "0.001"
+        uigroup = "手动设置高度值"
+        min = "0.0"
+        max = "1.0"
+    >;  
+
+    // ——————————————————  其他 —————————————————— 
+
+
+	uniform mediump float2 scene_size
+    <
+    	init = "(1628.0, 1628.0)"
+    >;
+
+	// varying
+	// 漫反射贴图的uv
+	varying mediump float4 v_texture0;
+	varying mediump float2 v_texture0_tiled;
+	// lightmap uv
+	varying mediump float2 v_texture1;
+	varying mediump float2 v_texture2; // 顶点色
+
+	varying mediump float4 v_light_proj_pos;
+	varying mediump float4 PosWorld;
+	varying mediump float2 fow_uv;
+
+
+	// ——————————————————  函数 —————————————————— 
+
+	// 地形混合函数（高度图混合）
+	function Blend_color_height in (lowp float3 color0, lowp float3 color1, float height0, float height1, float factor, float height_low, float edge_width, float3 edge_color0, float3 edge_color1) out (mediump float3 finalBlendColor)
+	{
+		lowp float fac0 = 1.0f-factor;
+		lowp float fac1 = factor;
+		// ver 1.1
+		float depth = height_low;
+		float ma = max(fac0 + height0, fac1 + height1) - depth;
+		float b1 = max(fac0 + height0 - ma, 0.0f);
+		float b2 = max(fac1 + height1 - ma, 0.0f);
+		lowp float edge_adjust0 = clamp(fac1 * edge_width, 0.0f, 1.0f);
+		lowp float edge_adjust1 = clamp(fac0 * edge_width, 0.0f, 1.0f);
+		lowp float3 color0_blend = lerp(color0, color0 * edge_color0, float3(edge_adjust0));
+		lowp float3 color1_blend = lerp(color1, color1 * edge_color1, float3(edge_adjust1));
+		lowp float3 finalBlendColor_ = (color0_blend * b1 + color1_blend * b2)/(b1 + b2);
+		out(finalBlendColor, finalBlendColor_);
+	};
+
+
+	// 地形混合函数（普通混合）
+	function Blend_color in (lowp float3 color0, lowp float3 color1, float factor) out (mediump float3 finalBlendColor)
+	{
+		out(finalBlendColor, lerp(color0, color1, float3(factor)));
+	};
+
+	vertex
+	{
+		highp float4 position = a_position;
+		// highp float4 normal = nor_local;
+
+		// ["计算雾效因子"]
+		// condition(u_fog_enable) out (mediump float fog_factor)
+		// {
+		// 	branch("%0%")
+		// 	{
+		// 		macro(FOG_TYPE) out(mediump float fog_factor_inner)
+		// 		{
+		// 			branch("FOG_TYPE_NONE") { out(fog_factor_inner, 0.0f); }
+		// 			branch("FOG_TYPE_LINEAR")
+		// 			{
+		// 				float fog_begin = u_fog_info.x;
+		// 				float fog_end = u_fog_info.y;
+		// 				function get_fog_linear(fog_begin, fog_end, pos.z, proj) out(float fog_factor1);
+		// 				out(fog_factor_inner, fog_factor1); 
+		// 			}
+		// 			branch("FOG_TYPE_HEIGHT")
+		// 			{ 
+		// 				float fog_begin = u_fog_info.x;
+		// 				float fog_end = u_fog_info.y;
+		// 				float fog_height_begin = u_fog_info.z;
+		// 				float fog_height_end = u_fog_info.w;
+		// 				function get_fog_height(fog_begin, fog_end, pos.z, 
+		// 					fog_height_begin, fog_height_end, pos_world.y, proj) out (float fog_factor1);
+		// 				out(fog_factor_inner, fog_factor1);
+		// 			}
+		// 		};
+		// 		out(fog_factor, fog_factor_inner);
+		// 	}
+		// 	default
+		// 	{
+		// 		out(fog_factor, 0.0f);
+		// 	}
+		// };
+
+		mediump float4 pos_world = transform(position, world);
+		// float3x3 worldMat = float3x3(world);
+		// mediump float3 world_normal = float3(normalize(normal.xyz * worldMat));
+		macro(EDITOR) out(mediump float4 final_position, mediump float4 final_pos_world){
+			branch("1")
+			{
+				out(final_position, transform(position, wvp));
+				out(final_pos_world, pos_world);
+			}
+			branch("0"){
+				macro(INSTANCE_TYPE) out(mediump float4 _final_position, mediump float4 _final_pos_world)
+				{
+		            branch("INSTANCE_TYPE_PRS")
+		            {
+		                float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                float4 world_pos = transform(position, instWorldMat);
+		                out(_final_pos_world, world_pos);
+		                out(_final_position, transform(world_pos, viewProj));
+		            }
+		            
+		            branch("INSTANCE_TYPE_PRS_LM")
+		            {
+		                float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                float4 world_pos = transform(position, instWorldMat);
+		                out(_final_pos_world, world_pos);
+		                out(_final_position, transform(world_pos, viewProj));
+		            }
+
+		            branch("INSTANCE_TYPE_NONE")
+		            {
+		            	out(_final_pos_world, pos_world);
+		                out(_final_position, transform(position, wvp));
+		            }
+				};
+				out(final_position, _final_position);
+				out(final_pos_world, _final_pos_world);
+			}
+		};
+		["wvp变换"]
+		highp float4 pos = final_position;
+
+
+		// ["计算雾效因子"]
+		// condition(u_fog_enable) out (mediump float fog_factor)
+		// {
+		// 	branch("%0%")
+		// 	{
+		// 		macro(FOG_TYPE) out(mediump float fog_factor_inner)
+		// 		{
+		// 			branch("FOG_TYPE_NONE") { out(fog_factor_inner, 0.0f); }
+		// 			branch("FOG_TYPE_LINEAR")
+		// 			{
+		// 				float fog_begin = u_fog_info.x;
+		// 				float fog_end = u_fog_info.y;
+		// 				function get_fog_linear(fog_begin, fog_end, pos.z, proj) out(float fog_factor1);
+		// 				out(fog_factor_inner, fog_factor1); 
+		// 			}
+		// 			branch("FOG_TYPE_HEIGHT")
+		// 			{ 
+		// 				float fog_begin = u_fog_info.x;
+		// 				float fog_end = u_fog_info.y;
+		// 				float fog_height_begin = u_fog_info.z;
+		// 				float fog_height_end = u_fog_info.w;
+		// 				function get_fog_height(fog_begin, fog_end, pos.z, 
+		// 					fog_height_begin, fog_height_end, pos_world.y, proj) out (float fog_factor1);
+		// 				out(fog_factor_inner, fog_factor1);
+		// 			}
+		// 		};
+		// 		out(fog_factor, fog_factor_inner);
+		// 	}
+		// 	default
+		// 	{
+		// 		out(fog_factor, 0.0f);
+		// 	}
+		// };
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				macro(EDITOR) out(mediump float4 tmp_texture_1)
+				{
+					branch("1"){
+						out(tmp_texture_1, transform(float4(a_texture1.xy, 1.0f, 0.0f), lightmapTrans));
+					}
+					branch("0"){
+						macro(INSTANCE_TYPE) out(mediump float4 _tmp_texture_1)
+				        {
+				            branch("INSTANCE_TYPE_PRS_LM")
+				            {
+				                float4x4 instLightmapTrans = float4x4(float4(texcoord4.x, 0.0f, 0.0f, 0.0f),
+				                                                      float4(0.0f, texcoord4.y, 0.0f, 0.0f),
+				                                                      float4(texcoord4.z, texcoord4.w, 1.0f, 0.0f),
+				                                                      float4(0.0f, 0.0f, 0.0f, 1.0f));
+				                out(_tmp_texture_1, transform(float4(a_texture1.xy, 1.0f, 0.0f), instLightmapTrans));
+				            }
+				            branch("INSTANCE_TYPE_NONE")
+				            {
+				                out(_tmp_texture_1, transform(float4(a_texture1.xy, 1.0f, 0.0f), lightmapTrans));
+				            }
+				            branch("INSTANCE_TYPE_PRS")
+				            {
+				                out(_tmp_texture_1, transform(float4(a_texture1.xy, 1.0f, 0.0f), lightmapTrans));
+				            }
+				           
+				        };
+				        out(tmp_texture_1, _tmp_texture_1);
+					}
+				};
+				out(v_texture1, tmp_texture_1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		
+
+
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 1.0f));
+		out(v_texture0_tiled, a_texture0.xy * uv_tiling_1);
+
+		// ——————————————————  贴花 ——————————————————
+		macro(FOW_ENABLE)
+		{
+			branch("1"){
+				mediump float2 _fow_uv = float2(final_pos_world.x / scene_size.x + 0.5f, final_pos_world.z / scene_size.y + 0.5f);
+		        out(fow_uv, _fow_uv);
+			}
+			branch("0")
+			{
+
+			}
+		};
+		vertex(pos);
+
+	}
+
+	pixel
+	{	
+
+		// ——————————————————  LIGHTMAP ——————————————————
+        macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+        {
+            branch("1") {
+                // lightmap已经是线性的了
+                lowp float3 light_map_color_gamma = sample(TexLightmap, v_texture1.xy).xyz * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz);
+
+            }
+            branch("0") {
+                out(lightmap_color, float3(1.0f));
+            }
+        };
+
+		// ——————————————————  采样 ——————————————————
+
+        // uV
+        lowp float2 UV0 = v_texture0.xy;
+        lowp float2 UV0_tiled = v_texture0_tiled;
+
+		// 混合比例贴图 
+		//lowp float4 blend_tex = sample(TexBlendMap, UV0);
+
+		// diffuse 贴图
+		//function gamma_2_linear_4(sample(Tex0, UV0_tiled)) out(lowp float4 tex_1);
+
+		macro(MODELTEX_ENABLE) out(lowp float3 tex_1){
+			branch ("1") {
+				lowp float4 tex_1_ = sample(Tex0, UV0);
+				out(tex_1, tex_1_.rgb);
+			}
+			branch ("0"){
+				lowp float4 tex_1_ = sample(Tex0, UV0_tiled);
+				out(tex_1, tex_1_.rgb);
+			}
+		};
+		//lowp float4 tex_1 = sample(Tex0, UV0_tiled);
+
+		macro(SECOND_TEX) out(lowp float3 tex_2, lowp float4 blend_tex) {
+			branch ("1"){
+				//function gamma_2_linear_4(sample(Tex1, UV0_tiled)) out(lowp float4 tex_2);
+				lowp float4 tex_2_ = sample(Tex1, UV0_tiled);
+				lowp float4 blend_tex_ = sample(TexBlendMap, UV0);
+				out(tex_2, tex_2_.rgb);
+				out(blend_tex, blend_tex_);
+			}
+			branch("0"){
+				out(tex_2, float3(0.0f));
+				out(blend_tex,  float4(0.0f));
+			}
+		};
+
+		// ——————————————————  混合计算 ——————————————————
+		macro (BLEND_ENABLE) out (lowp float3 diffuse_blend){
+			/////////////////////////////////
+			// 普通混合
+			branch("0"){
+				// 1 和 2 混合
+				macro(SECOND_TEX) out(lowp float3 blend_2) {
+					branch ("1") {
+						function Blend_color(tex_1.rgb, tex_2.rgb, blend_tex.r) out(lowp float3 blend_2_);
+						out(blend_2, blend_2_);
+					}
+					branch("0"){
+						out(blend_2, tex_1.rgb);
+					}
+				};
+
+				out(diffuse_blend, blend_2);
+			}
+
+			///////////////////////////////////
+			// 高度图混合
+			branch("1"){
+				macro(HEIGHT_MAP_ENABLE) out(lowp float height_1, lowp float height_2, lowp float height_3) {
+					branch ("1") {
+						lowp float4 tex_height = sample(TexHeight, UV0_tiled);
+						out(height_1, tex_height.r);
+						out(height_2, tex_height.g);
+					}
+					branch("0"){
+						//lowp float highlight_range = 0.5f;
+						lowp float shadow_range = 0.0f;
+						out(height_1, (tex_1.b)/clamp((manual_h1 - shadow_range), 0.0f, 1.0f));
+						out(height_2, (tex_2.b)/clamp((manual_h2 - shadow_range), 0.0f, 1.0f));
+
+						// out(height_1, step(manual_h1, tex_1.b) + 0.0299f * tex_1.r - 0.0587f * tex_1.g);
+						// out(height_2, step(manual_h2, tex_2.b) + 0.0299f * tex_2.r - 0.0587f * tex_2.g);
+						// out(height_3, step(manual_h3, tex_3.b) + 0.0299f * tex_3.r - 0.0587f * tex_3.g);
+						// out(height_4, step(manual_h4, tex_4.b) + 0.0299f * tex_4.r - 0.0587f * tex_4.g);
+
+					}
+				};
+				// 高度图
+				//function gamma_2_linear_4(sample(TexHeight, UV0_tiled)) out (lowp float4 tex_height);
+
+
+				// 1 和 2 混合
+				macro (SECOND_TEX) out (lowp float3 blend_2, lowp float height_mix_2)
+				{
+					branch("1"){
+						lowp float height_mix_2_ = lerp(height_1, height_2, blend_tex.r);
+						function Blend_color_height(tex_1.rgb, tex_2.rgb, height_1, height_2, blend_tex.r, height_low_1, edge_width, edge_color0.rgb, edge_color1.rgb) out (lowp float3 blend_2_);
+						out(blend_2, blend_2_);
+						out(height_mix_2, height_mix_2_);
+					}
+					branch("0"){
+						out(blend_2, tex_1.rgb);
+						out(height_mix_2, height_1);
+					}
+				};
+				
+				out(diffuse_blend, blend_2);
+			}
+		};
+
+		// 混合lightmap
+		mediump float3 light_diffuse = diffuse_blend * lightmap_color.rgb;
+
+		macro(FOW_ENABLE) out (mediump float3 final_result)
+		{
+			branch("1"){
+
+		        float fow = sample(view_texture, fow_uv).x;
+
+		        float final_alpha = 0.5f * (1.0f - fow);
+
+		        out(final_result, lerp(light_diffuse, float3(0.0f), float3(final_alpha)));
+			}
+			branch("0")
+			{
+				out(final_result, light_diffuse);
+			}
+		};
+
+		// ——————————————————  Gamma —————————————————— 
+		// function linear_2_gamma_3(final_result) out(mediump float3 gamma_color);
+		lowp float4 encode_color = float4(final_result, 1.0f);
+		macro(NEOX_DEBUG_MODE) out(mediump float4 pixel_color)
+        {
+            branch("NEOX_DEBUG_MODE_NONE") {
+                out(pixel_color, encode_color);
+            }
+            branch("NEOX_DEBUG_MODE_MTL") {
+                out(pixel_color, float4(diffuse_blend, 1.0f));
+            }
+            branch("NEOX_DEBUG_MODE_LIT") {
+                out(pixel_color, float4(lightmap_color, 1.0f));
+            }
+        };
+
+		// // ——————————————————  Gamma —————————————————— 
+		// function linear_2_gamma_3(color_shadow) out(mediump float3 gamma_color);
+		// lowp float4 encode_color = float4(gamma_color, 1.0f);
+
+		// 迷雾处理
+		pixel(pixel_color);
+	}
+}

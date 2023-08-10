@@ -1,0 +1,183 @@
+["ice"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+	
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler TexDiffuse : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+    path = "shader\\core\\texture\\freeze\\normal_nrm.dds"
+	>;
+	
+	["ice"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "clamp" 
+		addressv = "clamp"
+    path = "shader\\core\\texture\\icetex.dds"
+	>;
+	
+	["颜色调整"]
+	uniform mediump float4 adjust_color
+	<
+		artist = "1"
+    color = "1"
+		init = "0.097, 0.914, 0.99, 1.0"
+	>;
+	
+	["自发光强度"]
+	uniform mediump float change_color_bright
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "5.0" 
+		init = "1.0"
+	>;
+
+  ["base_intensity"]
+  uniform float base_intensity
+  <
+    artist = "1"
+    min = "0.8"
+    max = "10"
+    init = "1.5"
+	uistep = "0.1"
+  >;
+
+  ["flow_intensity"]
+  uniform float flow_intensity
+  <
+    artist = "1"
+    min = "0.8"
+    max = "10"
+    init = "3.0"
+	uistep = "0.1"
+  >;
+
+  ["rotate_speed0"]
+  uniform float rotate_speed0
+  <
+    artist = "1"
+    min = "0.8"
+    max = "10"
+    init = "0.05"
+	uistep = "0.01"
+  >;
+
+  ["rotate_speed1"]
+  uniform float rotate_speed1
+  <
+    artist = "1"
+    min = "0.8"
+    max = "10"
+    init = "0.01"
+	uistep = "0.01"
+  >;
+
+  uniform float FrameTime: FRAME_TIME;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4 CameraPos : CAMERA_POSITION;
+
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+
+// varying变量
+	varying mediump float2 UV0;
+	varying highp float4 PosWorld;
+	varying lowp float3 NormalWorld;
+
+	vertex
+	{
+	["是否开启GPU蒙皮"]
+	macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+	{
+		branch("1")
+		{
+			function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+			out(vec, pos1);
+			out(nor, nor1);
+			
+		}
+		branch("0") 
+		{
+			out(vec, a_position);
+			out(nor, a_normal);
+		}
+	};
+
+    highp float4 position = vec;
+    highp float4 normal = nor;
+    float3x3 worldNormalMat = float3x3(world);
+    float3 world_normal = normalize(normal.xyz * worldNormalMat);
+
+		mediump float4 pos_world = position * world;
+    out(PosWorld, pos_world);
+    out(NormalWorld, world_normal);
+		highp float4 pos = transform(position, wvp);
+    vertex(pos);
+		mediump float4 uv = texcoord0 * texTrans0;
+		out(UV0, uv.xy);
+
+	}
+
+	pixel
+	{
+		lowp float4 temp0 = sample(TexDiffuse, UV0.xy);
+    lowp float4 temp1 = temp0 * adjust_color * base_intensity;
+
+    lowp float3 view_dir = normalize(CameraPos.xyz - PosWorld.xyz);
+    lowp float view_fac = dot(-view_dir, NormalWorld);
+    lowp float view_fac1 = 1.0f - abs(view_fac);
+
+    lowp float2 temp4 = UV0.xy * 0.7f + float2(rotate_speed0 * 0.3f, -rotate_speed0 * 0.59f) * FrameTime;
+    lowp float4 temp5 = sample(Tex1, temp4);
+
+    lowp float2 temp6 = UV0.xy * 3.3f + float2(-rotate_speed1, rotate_speed1 * 0.73f) *  FrameTime;
+    lowp float4 temp7 = sample(Tex1, temp6);
+
+    lowp float3 temp8 = temp5.xyz * temp7.xyz;
+    lowp float3 temp9 = temp8 * view_fac1;
+
+    lowp float3 temp10 = temp9 * flow_intensity;
+    lowp float3 temp11 = temp10 + temp1.xyz;
+
+
+		pixel(float4(temp11.xyz, 1.0f));
+	}
+}

@@ -1,0 +1,154 @@
+["shadow on plane"]
+pipeline
+<
+	author = "lql"
+	category = "ext technique"
+	zenable = "1"
+	zwritable = "0"
+	stencilenable = "1"
+	stencilwritemask = "255"
+
+	stencilfunc= "!="
+
+	stencilmask = "255"
+	stencilref = "0"
+
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+
+>
+{
+	attribute float4 a_position: POSITION;
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	
+	uniform highp float4x4 vp_mat: VIEW_PROJECTION;
+	uniform highp float4x4 world_mat: WORLD;
+	
+	// py用
+	["方向+高度"]
+	uniform highp float4 light_info: OTHER0
+	<
+		init = "0.5,1.2,0.8,0.0"
+		artist = "1"
+	>;
+	["FadeStart"]
+	uniform highp float FadeStart
+	<
+		init = "0.85"
+		artist = "1"
+		uistep = "0.001"
+		min = "0.0" 
+		max = "2.0" 
+	>;
+	["FadeEnd"]
+	uniform highp float FadeEnd
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "0.001"
+		min = "0.0" 
+		max = "2.0" 
+	>;
+	["FadeScale"]
+	uniform highp float FadeScale
+	<
+		init = "0.5"
+		artist = "1"
+		uistep = "0.001"
+		min = "0.0" 
+		max = "2.0" 
+	>;
+	
+	["角色的世界坐标位置"]
+	uniform highp float4 char_world_pos;
+
+	["控制深度偏移"]
+	uniform highp float4 z_bias_params
+	<
+		init = "0.0,0.075,0.02,0.0"
+		artist = "1"
+	>;
+
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	varying lowp float v_pixel_alpha;
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec)
+		{
+			branch("1")
+			{
+				function get_skin_pos(a_blendweight, uint4(a_blendindices), a_position, u_bone_vec) out (highp float4 pos1);
+				out(vec, pos1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+			}
+		};
+		
+		highp float4 pos_world = transform(vec, world_mat);
+		macro(TRANS_ENABLE) out(float trans)
+		{
+			branch("0")
+			{
+				out(trans, 1.0f);
+			}
+			branch("1")
+			{
+				out(trans, -1.0f);
+			}
+		};
+		float2 xz = transform(light_info.xz, (light_info.w - trans * pos_world.y) / light_info.y) + pos_world.xz;
+		float3 char_pos_world = float3(world_mat[3][0], world_mat[3][1], world_mat[3][2]);
+		mediump float2 plane_to_char = xz - float2(char_pos_world.x, char_pos_world.z);
+		mediump float dis = length(plane_to_char);
+		lowp float alpha = lerp(FadeStart,FadeEnd,saturate(dis * 0.0725f * FadeScale));
+		out(v_pixel_alpha, max(0.1f, alpha));
+
+		mediump float dis_limit = z_bias_params.x;
+		mediump float dis_factor = z_bias_params.y;
+		mediump float dis_fix = length(plane_to_char) - dis_limit;
+		mediump float h = clamp(char_pos_world.y - light_info.w, 0.0f, 20.0f);
+		mediump float h_factor = z_bias_params.z;
+		lowp float z_delta = clamp(dis_fix * dis_factor * h * h_factor, 0.0f, 0.5f);
+
+		float4 projected = float4(xz.x, trans * light_info.w , xz.y, 1.0f);
+		float4 vertex_pos = transform(projected, vp_mat);
+		vertex(vertex_pos + float4(0.0f, 0.0f, - z_delta * vertex_pos.w, 0.0f));
+	}
+	
+	pixel
+	{
+		macro(TRANS_ENABLE) out(float trans)
+		{
+			branch("0")
+			{
+				out(trans, 1.0f);
+			}
+			branch("1")
+			{
+				out(trans, -1.0f);
+			}
+		};
+
+		pixel(float4(0.0f, 0.0f, 0.0f, v_pixel_alpha));
+	}
+	
+}

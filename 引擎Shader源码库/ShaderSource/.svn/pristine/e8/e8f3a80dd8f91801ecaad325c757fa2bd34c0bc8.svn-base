@@ -1,0 +1,297 @@
+["blendadd for particle"]
+pipeline
+<
+	author = "liqinlin"
+	category = "common"
+	company = "netease"
+	version = "1.0.0"
+	techinque = "TShader"
+>
+{
+	["hdr光晕效果"]
+	eitheror HDR_ENABLE;
+	
+	["使用了几张贴图"]
+	enum TEX_COUNT
+	{
+		["使用一张贴图"]
+		TEX_COUNT_1,
+		
+		["使用两张贴图"]
+		TEX_COUNT_2
+	};
+	
+	["顶点色模式"]
+	enum VCOLOR_MODE
+	{
+		["乘以顶点色"]
+		VCOLOR_MODE_MUL,
+		["加上顶点色"]
+		VCOLOR_MODE_ADD,
+		["使用顶点色做变色"]
+		VCOLOR_MODE_CHANGE
+	};
+	
+	["颜色倍率"]
+	enum MUL_RATIO
+	{
+		["颜色倍率为1"]
+		MUL_RATIO_1 = 1,
+		["颜色倍率为2"]
+		MUL_RATIO_2 = 2,
+		["颜色倍率为4"]
+		MUL_RATIO_4 = 4
+	};
+	
+	["直接改变为hsv_offset_h值，而不是偏移"]
+	eitheror HSV_CHANGE_HUE;
+	
+	// 标注macro
+	
+	macro(HDR_ENABLE)
+	<  
+		default = "1"
+	>;
+	
+	macro(HSV_CHANGE_HUE)
+	<
+		default = "1" //默认开启
+		customizable = "0" // 不可以在模型中定制
+		cache = "1" // 可用于生成effect cache
+	>;
+
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "1"
+	>;
+	
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点
+	>;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float4 a_texture0: TEXTURE0;
+	["其实不是高光色，就是特效的第二个顶点色"]
+	attribute float4 a_specular: SPECULAR;
+	attribute float4 a_texture1: TEXTURE1;
+	
+	["传给PixelShader的顶点色"]
+	varying lowp float4 v_diffuse: DIFFUSE;
+	varying lowp float4 v_specular: SPECULAR;
+	varying mediump float4 v_texture0: TEXTURE0;
+	["Blend Color"]
+	varying mediump float4 v_texture1: TEXTURE1;
+	["AlphaUVOffset"]
+	varying mediump float4 v_texture2: TEXTURE2;	
+
+	// 顶点位置
+	varying lowp float4 v_worldpos: WORLD_POSITION;
+	
+	uniform highp float4x4 u_world_view_projection: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0
+	<
+		init = "(1.0,0.0,0.0,0.0),(0.0,1.0,0.0,0.0),(0.0,0.0,1.0,0.0),(0.0,0.0,0.0,1.0)"
+	>;
+	uniform lowp float u_alpha_ref: ALPHA_REF;
+	uniform lowp float4 u_blend_color: BLEND_COLOR
+	<
+		color="1"
+		artist="1"
+	>;
+	uniform lowp float u_alpha_mtl: ALPHA_MTL;
+	uniform lowp float4 u_tfactor: TFACTOR;
+	uniform highp float4x4 u_projection: PROJECTION;
+	uniform highp float4x4 u_world: WORLD;
+
+	["饱和度"]
+	uniform lowp float hsv_offset_A: OTHER0
+	<
+		init = "0.25"
+	>;
+	["明度"]
+	uniform lowp float hsv_offset_I: OTHER1
+	<
+		init = "0.0"
+	>;
+	["alpha变换"]
+	uniform lowp float alpha_add: OTHER2
+	<
+		init = "0.0"
+	>;
+	["alpha的截断范围"]
+	uniform lowp float alpha_clamp_range: OTHER3
+	<
+		init = "1.0"
+	>;
+	uniform sampler Tex0 : DIFFUSE
+	<
+		export = "0"
+	>;
+	uniform sampler sepAlphaTex7 : DIFFUSE_ALPHA
+  <
+    export = "0"
+  >;
+
+	// 平面裁剪
+	uniform lowp float4 u_clipplane1: OTHER4;
+	uniform lowp float4 u_clipplane2: OTHER5;
+	uniform lowp float4 u_clipplane3: OTHER6;
+	uniform lowp int clipplane_style
+	<
+		init = "1"
+	>;
+	
+	vertex
+	{
+		["wvp变换"]
+		highp float4 pos = transform(a_position, u_world_view_projection);
+		["输出vertex shader的最终位置"]
+		// mediump float pos_scale = 100.0f;
+		// vertex(float4(a_position.z * pos_scale, a_position.y * pos_scale, -a_position.x * pos_scale, a_position.w));
+		// vertex(float4(a_position.z * pos_scale, a_position.y * pos_scale, -1.0f, 1.0f));
+		vertex(pos);
+		
+		["计算uv动画"]
+		mediump float4 transUV = transform(float4(a_texture0.xy, 1.0f, 0.0f), u_texture_trans0);
+		out(v_texture0, float4(transUV.xyz, 1.0f));
+		["输出顶点色"]
+		out(v_diffuse, a_diffuse);
+
+		// 输出全局顶点位置
+		macro(CLIPPLANE_ENABLE)
+		{
+			branch("1")
+			{
+				highp float4 worldpos = transform(a_position, u_world);
+				out(v_worldpos, worldpos);
+			}
+			branch("0")
+			{
+			}
+		};
+		
+		macro(TEX_COUNT)
+		{
+			branch("TEX_COUNT_1")
+			{
+			}
+			branch("TEX_COUNT_2")
+			{
+				out(v_specular, a_specular);
+				out(v_texture1, a_texture1);
+			}
+		};
+	}
+	
+	pixel
+	{
+		mediump float2 uv0 = v_texture0.xy;
+		lowp float4 diffuseColor = sample(Tex0, uv0);
+		["判断diffuse的alpha是否存放于另一张贴图"]
+		macro(DIFFUSE_ALPHA_SEPARATE) out(float4 diffuseColor1)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex7, uv0);
+				out(diffuseColor1, float4(diffuseColor.xyz, separateColor.w));
+			}
+			branch("0") { out(diffuseColor1, diffuseColor);}
+		};
+		["根据贴图的数目再计算一次颜色"]
+		macro(TEX_COUNT) out(float4 diffuseColor2)
+		{
+			branch("TEX_COUNT_1") { out(diffuseColor2, diffuseColor1); }
+			branch("TEX_COUNT_2") 
+			{
+					mediump float2 uv1 = v_texture1.xy;
+					lowp float4 secondDiffuseColor = sample(Tex0, uv1);
+					macro(DIFFUSE_ALPHA_SEPARATE) out(float4 secondDiffuseColor1)
+					{
+						branch("1")
+						{
+							lowp float4 separateColor = sample(sepAlphaTex7, uv1);
+							out(secondDiffuseColor1, float4(secondDiffuseColor.xyz, separateColor.w));
+						}
+						branch("0") { out(secondDiffuseColor1, secondDiffuseColor);}
+					};					
+					out(diffuseColor2, lerp(diffuseColor1, secondDiffuseColor1, float4(v_specular.w)));	
+			}
+		};
+		
+		lowp float4 textureColor = diffuseColor2 * float4(MUL_RATIO);
+		// lowp float4 textureColor = diffuseColor2 * float4(4.0f);
+		lowp float4 vertexColor = v_diffuse;
+		["综合计算顶点色和纹理色"]
+		macro(VCOLOR_MODE) out(float4 t_v_color)
+		{
+			branch("VCOLOR_MODE_MUL") { out(t_v_color, textureColor * vertexColor); }
+			branch("VCOLOR_MODE_ADD") { out(t_v_color, textureColor + vertexColor); }
+			branch("VCOLOR_MODE_CHANGE") 
+			{
+				["把顶点色转到hsv空间"]
+				function rgb_to_hsv(vertexColor.xyz) out(float3 hsv);
+				float alpha = textureColor.w * vertexColor.w;
+				["计算纹理色的明度"]
+				float gray = saturate(dot(textureColor.xyz, float3(0.299f, 0.587f, 0.114f)) + hsv_offset_I);
+				["计算饱和度"]
+				float s = (0.5f-abs(gray - 0.5f))*2.0f * hsv_offset_A;
+				float grayWithS = gray + (hsv_offset_A-0.5f) * s * step(0.5f, hsv_offset_A);
+				macro(HSV_CHANGE_HUE) out(float newHue)
+				{
+					branch("1")
+					{
+						out(newHue, hsv.x);
+					}
+					branch("0")
+					{
+						function rgb_to_hsv(textureColor.xyz) out(float3 texColorHsv);
+						out(newHue, fractional(hsv.x + texColorHsv.x));
+					}
+				};
+				float3 newHsv = float3(newHue, s, grayWithS);
+				function hsv_to_rgb(newHsv) out(float3 newRgb);
+				out(t_v_color, float4(newRgb, alpha));
+			}
+		};
+		
+		lowp float4 saturatedColor = saturate(t_v_color);
+		lowp float3 screenClr = saturatedColor.xyz;
+		lowp float finalAlpha = clamp(saturatedColor.w + alpha_add, 0.0f, alpha_clamp_range)/alpha_clamp_range;
+		macro(ALPHA_TEST_ENABLE)
+		{
+			branch("1") { alphatest("<")(finalAlpha, u_alpha_ref);}
+			branch("0") { }
+		};
+		
+		// 裁剪平面
+		macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+		{
+			branch("1")
+			{
+				lowp float pf1 = v_worldpos.x * u_clipplane1.x + v_worldpos.y * u_clipplane1.y + v_worldpos.z * u_clipplane1.z + u_clipplane1.w;
+				lowp float pf2 = v_worldpos.x * u_clipplane2.x + v_worldpos.y * u_clipplane2.y + v_worldpos.z * u_clipplane2.z + u_clipplane2.w;
+				lowp float pf3 = v_worldpos.x * u_clipplane3.x + v_worldpos.y * u_clipplane3.y + v_worldpos.z * u_clipplane3.z + u_clipplane3.w;
+				condition(clipplane_style) out(lowp float pf)
+				{
+					branch("%0% == 1") // 并集
+					{
+						out(pf, step(0.001f, step(0.0f, pf1) + step(0.0f, pf2) + step(0.0f, pf3)));
+					}
+					default // 交集
+					{
+						out(pf, step(0.0f, pf1) * step(0.0f, pf2) * step(0.0f, pf3));
+					}
+				};
+				out(clipAlpha, pf);
+			}
+			branch("0")
+			{
+				out(clipAlpha, 1.0f);
+			}
+		};
+
+		pixel(float4(screenClr, finalAlpha * clipAlpha));
+	}
+}

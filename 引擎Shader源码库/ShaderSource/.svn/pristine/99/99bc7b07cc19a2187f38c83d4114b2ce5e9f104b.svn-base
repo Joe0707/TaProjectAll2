@@ -1,0 +1,159 @@
+["HDR Bloom Sample Illum"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	category = "postprocess"
+	technique = "hdr_bloom"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float2 TexCoord0;
+	varying mediump float2 TexCoord1;
+	varying mediump float2 TexCoord2;
+	varying mediump float2 TexCoord3;
+	varying mediump float2 TexCoord4;
+	varying mediump float2 TexCoord5;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	["bloom 图"]
+	uniform sampler Tex1
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	uniform float debug
+	<
+		init = "1"
+	>;
+
+	function ACES_ToneMapping in (mediump float3 color, mediump float adapted_lum) out (mediump float3 mapping_color)
+	{
+		mediump float3 A = float3(2.51f);
+		mediump float3 B = float3(0.03f);
+		mediump float3 C = float3(2.43f);
+		mediump float3 D = float3(0.59f);
+		mediump float3 E = float3(0.14f);
+		mediump float3 adapted_color = color * adapted_lum;
+
+		out(mapping_color, adapted_color * (A * adapted_color + B) / (adapted_color * (C * adapted_color + D) + E));
+	};
+
+
+	function Uncharted2Tonemap in (mediump float3 x) out (mediump float3 mapping_color)
+	{
+		mediump float3 A = float3(0.15f);
+		mediump float3 B = float3(0.50f);
+		mediump float3 C = float3(0.10f);
+		mediump float3 D = float3(0.20f);
+		mediump float3 E = float3(0.02f);
+		mediump float3 F = float3(0.30f);
+		mediump float3 W = float3(11.2f);
+		out(mapping_color, ((x*(A*x+C*B)+D*E)/(x*(A*x+B)+D*F))-E/F);
+	};
+
+	function Unreal_Tonemapping in(mediump float3 color) out(mediump float3 mapping_color)
+	{
+		out(mapping_color,color/(color+ float3(0.187f)) * 1.035f);
+	};
+
+	function simple_ToneMapping in (mediump float3 color) out (mediump float3 mapping_color)
+	{
+		out(mapping_color, color / (float3(1.0f) + color));
+	};
+
+	function decode in (mediump float3 color) out (mediump float3 decode_color)
+	{
+		mediump float3 hdr_color = (0.3f * color.xyz) / (float3(1.0f) - color.xyz);
+		out(decode_color, hdr_color);
+	};
+	function Tonemap_Uchimura_Base in(float3 x, float Exposed, float P, float a, float m, float l, float c, float b) out(float3 toneColor)
+	{
+		float3 color = x*Exposed;
+	    // Uchimura 2017, "HDR theory and practice"
+	    // Math: https://www.desmos.com/calculator/gslcdxvipg
+	    // Source: https://www.slideshare.net/nikuque/hdr-theory-and-practicce-jp
+	    float l0 = ((P - m) * l) / a;
+	    float S0 = m + l0;
+	    float S1 = m + a * l0;
+	    float C2 = (a * P) / (P - S1);
+	    float CP = -C2 / P;
+
+	    float3 w0 = float3(1.0f) - smoothstep(float3(0.0f), float3(m), color);
+	    float3 w2 = step(float3(m + l0), color);
+	    float3 w1 = float3(1.0f) - w0 - w2;
+
+	    float3 T = m * pow(color / float3(m), float3(c)) + float3(b);
+	    float3 S = float3(P) - (P - S1) * exp(CP * (color - float3(S0)));
+	    float3 L = float3(m) + a * (color - float3(m));
+	    float3 tonecolor = (T * w0 + L * w1 + S * w2);
+	    // float3 tonecolor_gamma = pow(tonecolor,float3(1.0f/2.2f));
+	    float3 tonecolor_gamma = sqrt(tonecolor);
+	    out(toneColor, tonecolor_gamma);
+	};
+
+	function Tonemap_Uchimura in (float3 x, float Exposed)  out(float3 toneColor)
+	{
+	    float P = 1.0f;  // max display brightness
+	    float a = 1.0f;  // contrast
+	    float m = 0.22f; // linear section start
+	    float l = 0.4f;  // linear section length
+	    float c = 1.2f; // black
+	    float b = 0.0f;  // pedestal
+	    function Tonemap_Uchimura_Base(x, Exposed, P, a, m, l, c, b) out(float3 toneColor1);
+	    out(toneColor, toneColor1);
+	};
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		// function decode (sample(Tex0, TexCoord0).xyz) out (mediump float3 scene_color_hdr);
+		// mediump float3 scene_color_hdr = sample(Tex0, TexCoord0).xyz;
+
+		// // function gamma_2_linear_3(scene_color_hdr) out (mediump float3 scene_color_hdr_linear);
+		// // function ACES_ToneMapping(scene_color_hdr_linear, 0.6f) out (mediump float3 mapping_color);
+		// //function Unreal_Tonemapping(scene_color_hdr) out (mediump float3 scene_color);
+		// // function Uncharted2Tonemap(scene_color_hdr_linear * float3(2.0f)) out (mediump float3 mapping_color);
+		// // gamma 
+
+		// // function linear_2_gamma_3(mapping_color) out (mediump float3 scene_color);
+		// mediump float3 glow = sample(Tex1, TexCoord0).xyz;
+		// mediump float3 l_glow = glow * glow;
+		// // function decode (glow) out (mediump float3 glow_decode);
+		// mediump float3 blend_color = scene_color_hdr * scene_color_hdr * 1.5f * 1.5f + l_glow;
+		// function Unreal_Tonemapping(blend_color) out (mediump float3 blend_color_);
+
+		mediump float4 tex_color = sample(Tex0, TexCoord0);
+		mediump float4 bloom = sample(Tex1, TexCoord0);
+
+		float3 color_rgb = tex_color.rgb;
+		float3 color_in = bloom.rgb + color_rgb * color_rgb - saturate(bloom.rgb) * saturate(color_rgb) * saturate(color_rgb) * 0.9f;// adpat_factor;
+
+		function Tonemap_Uchimura(color_in,1.0f) out(mediump float3 tone_color);
+		// mediump float3 debug_color = lerp(sqrt(color_in.rgb),tone_color,float3(debug));
+		// pixel(float4(float3(sqrt(color_in.rgb)), tex_color.a));
+		pixel(float4(tone_color,tex_color.a));
+	}
+}

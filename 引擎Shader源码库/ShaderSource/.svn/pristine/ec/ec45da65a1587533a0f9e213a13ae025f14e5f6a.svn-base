@@ -1,0 +1,150 @@
+["spider web horizontal"]
+pipeline
+<
+	version = "1.0.0"
+	author = "klj"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+
+	["漫反射贴图"]
+	uniform sampler _MainTex: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "wrap"
+		addressv = "wrap"
+
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+
+
+	["Color"]
+	uniform float4 _Color
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["_EmissGain"]
+	uniform float _EmissGain
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+	["_ConeLength"]
+	uniform float _ConeLength
+	<
+		artist = "1"
+		// min = "-2.0"
+		// max = "2.0"
+		// uistep = "0.01"
+		init = "0.95"
+	>;
+	["_ExpandStrenth"]
+	uniform float _ExpandStrenth
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["_NormalOffset"]
+	uniform float _NormalOffset
+	<
+		artist = "1"
+		min = "-0.5"
+		max = "0.5"
+		uistep = "0.01"
+		init = "0.0"
+	>;
+	["_Expand"]
+	uniform float _Expand
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.01"
+		init = "0.5"
+	>;
+	["_ExpandSoftness"]
+	uniform float _ExpandSoftness
+	<
+		artist = "1"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+		init = "0.5"
+	>;
+	["_EnhancePoint"]
+	uniform float4 _EnhancePoint
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 0.0, 0.0)"
+	>;
+		// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 u_view_poj:VIEW_PROJECTION;
+
+	attribute float4 a_position: POSITION;
+	attribute float3 a_normal : NORMAL;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_texture1 : TEXTURE1;
+	// varying
+	varying mediump float4 v_texture0;
+	//varying lowp float4 v_color;
+
+	vertex{
+		out(v_texture0, float4(a_texture0.xy, 1.0f, 0.0f) * texTrans0);
+		float3 topPoint = (transform(float4(_ConeLength, 0.0f,0.0f,1.0f),world)).xyz;
+		float3 forceDir = _EnhancePoint.xyz - topPoint;
+		float expandcontrol = 1.0f - a_texture1.y;
+		float3 expandFactor = float3(smoothstep(_Expand, (_Expand + _ExpandSoftness),expandcontrol));
+		float3 offsetPoint =  expandFactor * float3(_ExpandStrenth) * float3(_NormalOffset,a_normal.y,a_normal.z);
+		float4 mdlPos = a_position + float4(offsetPoint,0.0f);
+		float4 worldPos = transform(mdlPos,world);
+		float4 worldPos_force = worldPos + float4(forceDir.xyz * float3(expandcontrol),0.0f);
+		float4 screen_pos = transform(worldPos_force,u_view_poj);
+		vertex(screen_pos);
+	}
+
+	pixel
+	{	
+		lowp float4 texColor0 = sample(_MainTex, v_texture0.xy);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 color_out){
+            branch("1"){
+            	lowp float4 sep_color = sample(sepAlphaTex, v_texture0.xy);
+                out(color_out, float4(texColor0.xyz, sep_color.w));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+
+
+        lowp float4 result = color_out * _Color * float4(_EmissGain);
+		pixel(result);
+	}
+}

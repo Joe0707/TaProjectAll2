@@ -1,0 +1,100 @@
+["局部模糊"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+	technique = "TShader"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	varying mediump float2 v_texture0: TEXTURE0;
+	varying mediump float2 v_texture1: TEXTURE1;
+	varying mediump float2 v_texture2: TEXTURE2;
+	varying mediump float2 v_texture3: TEXTURE3;
+	varying mediump float2 v_texture4: TEXTURE4;
+	varying mediump float2 v_texture5: TEXTURE5;
+	varying mediump float2 v_texture6: TEXTURE6;
+	varying mediump float2 v_texture7: TEXTURE7;
+	
+	// some const, tweak for best look   
+	["采样间隔"]
+	uniform highp float fSampleDist: OTHER0
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.5"
+	>;
+	
+	["模糊力度"]
+	uniform float fSampleStrength: OTHER1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "4.0"
+	>;
+	
+	["模糊中心u坐标"]
+	uniform lowp float radial_center_u: OTHER2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.5"
+	>;
+	
+	["模糊中心v坐标"]
+	uniform lowp float radial_center_v: OTHER3
+	<
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.5"
+	>;
+	
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	vertex
+	{
+		vertex(a_position);
+		["0.5,0.5 is the center of the screen, so substracting uv from it will result in a vector pointing to the middle of the screen"]
+		mediump float2 dir = float2(radial_center_u, radial_center_v) - a_texture0.xy;  
+		mediump float2 biasUV = transform(normalize(dir), fSampleDist);
+		out(v_texture0, a_texture0.xy);
+		out(v_texture1, a_texture0.xy + transform(biasUV, -0.08f));
+		out(v_texture2, a_texture0.xy + transform(biasUV, -0.05f));
+		out(v_texture3, a_texture0.xy + transform(biasUV, -0.02f));
+		out(v_texture4, a_texture0.xy + transform(biasUV, -0.01f));
+		out(v_texture5, a_texture0.xy + transform(biasUV, 0.02f));
+		out(v_texture6, a_texture0.xy + transform(biasUV, 0.05f));
+		out(v_texture7, a_texture0.xy + transform(biasUV, 0.08f));
+	}
+	
+	pixel
+	{
+		["0.5,0.5 is the center of the screen, so substracting uv from it will result in a vector pointing to the middle of the screen"]
+		mediump float2 dir = float2(radial_center_u, radial_center_v) - v_texture0.xy;  
+		["calculate the distance to the center of the screen   "]
+		float dist = length(dir);
+		["this is the original colour of this pixel, using only this would result in a nonblurred version"]
+		mediump float4 color = sample(Tex0, v_texture0);
+		highp float4 sum = transform(color + sample(Tex0, v_texture1) + sample(Tex0, v_texture2) + sample(Tex0, v_texture3)
+								  + sample(Tex0, v_texture4) + sample(Tex0, v_texture5) + sample(Tex0, v_texture6)
+								  +	sample(Tex0, v_texture7), 0.125f); 
+		["weighten the blur effect with the distance to the center of the screen ( further out is blurred more)"]
+		highp float t = saturate(dist * fSampleStrength);
+		
+		["Blend the original color with the averaged pixels"]
+		pixel(lerp(color, sum, float4(t)));
+	}
+}

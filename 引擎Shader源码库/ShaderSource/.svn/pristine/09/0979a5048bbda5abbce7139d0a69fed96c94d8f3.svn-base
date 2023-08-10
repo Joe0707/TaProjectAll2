@@ -1,0 +1,30 @@
+["cocos"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "label"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_MVPMatrix;
+  uniform float4 u_color;
+  uniform float u_pointSize;
+  
+
+  varying lowp float4 v_fragmentColor;
+
+
+  vertex main
+  {
+    vertex(position * CC_MVPMatrix);
+    out(v_fragmentColor, u_color);
+    // howto??? gl_PointSize = u_pointSize;
+  }
+  pixel main
+  {
+    pixel(v_fragmentColor);
+  }
+}

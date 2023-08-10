@@ -1,0 +1,38 @@
+["motion_blur"]
+pipeline
+<
+	author = "y"
+	company = "netease"
+	category = "postprocess"
+>
+{
+	attribute float4 a_position:POSITION;
+	attribute float4 a_texture0:TEXTURE0;
+
+	varying mediump float2 TexCoord0;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "POINT"
+		mip = "POINT"
+		min = "POINT"
+	>;
+	
+
+	vertex
+	{
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+
+	pixel
+	{
+		float4 sceneColor = sample(Tex0, TexCoord0.xy);
+		pixel(sceneColor);
+
+	}
+
+}

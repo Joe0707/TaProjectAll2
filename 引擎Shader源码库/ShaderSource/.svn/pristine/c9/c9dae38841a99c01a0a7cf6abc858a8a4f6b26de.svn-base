@@ -1,0 +1,572 @@
+
+	function linear_to_srgb in(float3 linear_color) out(float3 srgb_color)
+	{
+		out(srgb_color,pow(linear_color,float3(1.0f / 2.2f)));
+	};
+
+	function fresnel_value in(
+	float vdh,
+	float3 F0)
+	out(highp float3 f)
+	{
+		// Schlick with Spherical Gaussian approximation
+		// cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+		float sphg = pow(2.0f, (-5.55473f*vdh - 6.98316f) * vdh);
+		float3 ans = F0 + (float3(1.0f, 1.0f, 1.0f) - F0) * float3(sphg) ;
+		out(f,ans);
+	};
+
+	function G1 in(
+	float ndw, // w is either Ln or Vn
+	float k)
+	out( highp float g1 )
+	{
+		// One generic factor of the geometry function divided by ndw
+		// NB : We should have k > 0
+		float ans = 1.0f /(ndw*(1.0f-k)+k);
+		out(g1,ans);
+	};
+
+	function diffuse_brdf in(
+	float3 Nn,
+	float3 Ln,
+	float3 Vn,
+	float3 Kd)
+	out(float3 ans)
+	{
+		float M_INV_PI = 0.31830988618379067153776752674503f;
+		float3 tmp_ans =  Kd * float3( M_INV_PI );
+		out(ans,tmp_ans);
+	};
+
+	function StrandSpecular in(float3 T,float3 V,float3 L,float exponent)
+	out(highp float result)
+	{
+		float3 H = normalize ( L + V );
+		float dotTH = dot ( T, H );
+		float sinTH = sqrt ( 1.0f - dotTH * dotTH);
+		float dirAtten = smoothstep( -1.0f, 0.0f, dotTH );
+		float ans = dirAtten * pow(sinTH, exponent);
+		out(result,ans);
+	};
+
+		//specular_color
+	function generateSpecularColor in(
+	highp float3 baseColor, 
+	highp float metallic)
+	out(highp float3 specular_color)
+	{
+		highp float3 ans = lerp(float3(0.04f), baseColor, float3(metallic) );
+		out(specular_color,ans);
+	};
+
+	//diffuse_color
+	function generateDiffuseColor in(
+	highp float3 baseColor, 
+	highp float metallic)
+	out (highp float3 diffuse_color)
+	{
+		highp float3 ans = baseColor * float3(1.0f - metallic);
+		out(diffuse_color,ans);
+	};
+
+	function normal_distrib in(
+	highp float ndh,
+	highp float Roughness)
+	out ( highp float n_distrib )
+	{
+		highp float PI = 3.1415926535897932384626433832795f;
+		highp float INV_PI = 0.31830988618379067153776752674503f;
+		highp float INV_PIX2 = 0.15915494309189533576888376337251f;
+		// use GGX / Trowbridge-Reitz, same as Disney and Unreal 4
+		// cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+		float alpha = Roughness * Roughness;
+		float tmp = alpha / max(1e-8f,(ndh*ndh*(alpha*alpha-1.0f)+1.0f));
+		float ans = tmp * tmp * INV_PI;
+		out(n_distrib,ans);
+	};
+
+	function visibility in(
+	float ndl,
+	float ndv,
+	float Roughness)
+	out(highp float vis)
+	{
+		// Schlick with Smith-like choice of k
+		// cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+		// visibility is a Cook-Torrance geometry function divided by (n.l)*(n.v)
+		float k = Roughness * Roughness * 0.5f;
+		function G1(ndl,k) out(highp float tmp_g1);
+		function G1(ndv,k) out(highp float tmp_g2);
+		float ans = tmp_g1 * tmp_g2;
+		out(vis,ans);
+	};
+
+	function microfacets_brdf in(
+	float3 Nn,
+	float3 Ln,
+	float3 Vn,
+	float3 Ks,
+	float Roughness)
+	out(highp float3 brdf)
+	{
+		float3 Hn = normalize(Vn + Ln);
+		float vdh = max( 0.0f, dot(Vn, Hn) );
+		float ndh = max( 0.0f, dot(Nn, Hn) );
+		float ndl = max( 0.0f, dot(Nn, Ln) );
+		float ndv = max( 0.0f, dot(Nn, Vn) );
+		function fresnel_value(vdh,Ks) out(highp float3 tmp_fresnel);
+		function normal_distrib(ndh,Roughness) out(highp float tmp_distrib);
+		function visibility(ndl,ndv,Roughness) out(highp float tmp_visibility);
+		highp float3 ans = tmp_fresnel * float3(tmp_distrib) * float3(tmp_visibility) / float3(4.0f);
+		out(brdf,ans);
+	};
+
+	function pointLightContribution in(
+	highp float3 normaldir_WS,
+	highp float3 pointToLightDirWS,
+	highp float3 viewdir_WS,
+	highp float3 diffColor,
+	highp float3 specColor,
+	highp float roughness,
+	highp float3 LampColor)
+	out(highp float3 ans)
+	{
+		highp float n_dot_l = max( dot( normaldir_WS,pointToLightDirWS ), 0.0f );
+		function diffuse_brdf(normaldir_WS,
+		pointToLightDirWS,viewdir_WS,diffColor*(float3(1.0f,1.0f,1.0f)-specColor)) out(highp float3 diffuse_result);
+		function microfacets_brdf(normaldir_WS,
+		pointToLightDirWS,viewdir_WS,specColor,roughness) out(highp float3 specular_result);
+		highp float PI = 3.1415926535897932384626433832795f;
+		highp float3 result = float3(n_dot_l) * (diffuse_result + specular_result) * float3(PI);
+		out(ans,result);
+	};
+
+	function get_mipmap 
+	in( highp float roughness,
+		highp float	max_lod )
+	out(highp float lod)
+	{
+		float tmp = max_lod * roughness;
+		out(lod,tmp);
+	};
+
+	function ShiftTangent in(float3 T,float3 N,float shift)
+	out(float3 result)
+	{
+		float3 shiftedT = T + (shift * N);
+		float3 ans =  normalize(shiftedT);
+		out(result,ans);
+	};
+
+	function irradianceFromCube in(samplercube irradiance,highp float3 n)
+	out(highp float3 result)
+	{
+		highp float3 ans = sample(irradiance,n).rgb;
+		out(result,ans);
+	};
+	function srgb_to_linear in(float3 srgb_color) out(float3 linear_color)
+	{
+		out(linear_color,pow(srgb_color,float3(2.2f)));
+	};
+
+	function EnvBRDFApproxWithoutBrightness in(float3 SpecularColor,float Roughness,float NoV )
+	out( float3 brdf )
+	{
+		// [ Lazarov 2013, "Getting More Physical in Call of Duty: Black Ops II" ]
+		// Adaptation to fit our G term.
+		float4 c0 = float4(-1.0f, -0.0275f, -0.572f, 0.022f);
+		float4 c1 = float4(1.0f, 0.0425f, 1.04f, -0.04f);
+		float4 r = float4( Roughness ) * c0 + c1;
+		float a004 = min( r.x * r.x, exp2( -9.28f * NoV ) ) * r.x + r.y;
+		float2 AB = float2( -1.04f, 1.04f ) * a004 + r.zw;
+		// Anything less than 2% is physically impossible and is instead considered to be shadowing
+		// Note: this is needed for the 'specular' show flag to work, since it uses a SpecularColor of 0
+		float aby=AB.y * clamp( 50.0f * SpecularColor.g, 0.0f, 1.0f) ;
+		highp float3 ans = SpecularColor * float3(AB.x) + float3(AB.y);
+		out(brdf,ans);
+	};
+
+	function calc_brdf_env_diffuse in (
+				mediump float4x4 envSHR,
+				mediump float4x4 envSHG,
+				mediump float4x4 envRot,
+				mediump float4x4 envSHB,
+				mediump float env_exposure,
+				mediump float3 normal
+	) out(mediump float3 color_out)
+	{
+		mediump float4 n = float4(normalize(transform(normal, float3x3(envRot))), 1.0f);
+		mediump float3 env_diffuse_color = float3(
+				dot(n, transform(n, envSHR)),
+				dot(n, transform(n, envSHG)),
+				dot(n, transform(n, envSHB)));
+
+		out(color_out, env_diffuse_color * env_exposure);
+	};
+	
+	function calc_env_sh
+		in (mediump float4x4 envSHR,
+			mediump float4x4 envSHG,
+			mediump float4x4 envSHB,
+			mediump float3 normal)
+		out(mediump float3 color_out)
+{
+	mediump float4 n = float4(normal.xyz, 1.0f);
+	mediump float3 env_diffuse_color = float3(
+			dot(n, transform(n, envSHR)),
+			dot(n, transform(n, envSHG)),
+			dot(n, transform(n, envSHB)));
+
+	out(color_out, env_diffuse_color);
+};
+
+
+	// —————————————————— Sphere Gassian ——————————————————
+	function SG in (lowp float x, mediump float k) out (lowp float result)
+	{
+		mediump float a = k * 1.44269504f + 1.089234755f;
+		out (result, exp2(a * x - a));
+	};
+
+	function Luminance in (mediump float3 LinearColor) out (mediump float illum)
+	{
+		out(illum, dot(LinearColor, float3(0.2126f, 0.7152f, 0.0722f)));
+	};
+
+	// —————————————————— PBR函数 ——————————————————
+	// D
+	function CookTorranceContrib in (lowp float vdh, lowp float ndh, lowp float ndl, lowp float ndv, lowp float Roughness) out (mediump float brdf)
+	{
+	  // This is the contribution when using importance sampling with the GGX based
+	  // sample distribution. This means ct_contrib = ct_brdf / ggx_probability
+	  
+	  // Schlick with Smith-like choice of k
+	  // cf http://blog.selfshadow.com/publications/s2013-shading-course/karis/s2013_pbs_epic_notes_v2.pdf p3
+	  // visibility is a Cook-Torrance geometry function divided by (n.l)*(n.v)
+	  
+	  float k = max(Roughness * Roughness * 0.5f, 1e-5f);
+	  out(brdf, vdh * ndl / (ndh * ( ndl*(1.0f-k) +  k ) * ( ndv*(1.0f-k) +  k )));
+	};
+
+	// GGX / Trowbridge-Reitz
+	// [Walter et al. 2007, "Microfacet models for refraction through rough surfaces"]
+	function D_GGX in( float Roughness, float NoH ) out (highp float D_GGX)
+	{
+		float m = Roughness * Roughness;
+		float m2 = m * m;
+		float d = ( NoH * m2 - NoH ) * NoH + 1.0f;	// 2 mad
+		out(D_GGX, min(m2 / ( d*d ), 10000.0f));		// 2 mul, 1 rcp
+	};
+
+	// Anisotropic GGX
+	// [Burley 2012, "Physically-Based Shading at Disney"]
+	function D_GGXaniso in ( float RoughnessX, float RoughnessY, float NoH, float3 H, float3 X, float3 Y ) out(mediump float D_GGX)
+	{
+		float mx = RoughnessX * RoughnessX;
+		float my = RoughnessY * RoughnessY;
+		float XoH = dot( X, H );
+		float YoH = dot( Y, H );
+		float d = XoH*XoH / (mx*mx) + YoH*YoH / (my*my) + NoH*NoH;
+		out(D_GGX, 1.0f / ( mx*my * d*d ));
+	};
+		
+	// G
+	function SmithJointGGXVisibilityTerm in (lowp float a, lowp float NdotL, lowp float NdotV) out (lowp float V)
+	{
+		//lowp float a = roughness * roughness;
+		lowp float mina = 1f - a;
+		lowp float lambdaV = NdotL * (NdotV * mina + a);
+		lowp float lambdaL = NdotV * (NdotL * mina + a);
+		out(V, 1.0f / (lambdaV + lambdaL + 1e-5f));
+	};
+	
+	// G
+	// Tuned to match behavior of Vis_Smith
+	// [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
+	function Vis_Schlick in ( lowp float Roughness, lowp float NoV, lowp float NoL ) out (mediump float v)
+	{
+		float k = ( Roughness * Roughness ) * 0.5f;
+		float Vis_SchlickV = NoV * (1.0f - k) + k;
+		float Vis_SchlickL = NoL * (1.0f - k) + k;
+		out(v ,0.25f / ( Vis_SchlickV * Vis_SchlickL ));
+	};
+
+	function G_Schlick_Disney in (lowp float Roughness,lowp float NoV,lowp float NoL ) out(mediump float G)
+	{
+		float k = ( 0.5f + 0.5f*Roughness ) * ( 0.5f + 0.5f*Roughness );
+		float G_SchlickV = NoV * (1.0f - k) + k;
+		float G_SchlickL = NoL * (1.0f - k) + k;
+		out(G, 0.25f / ( G_SchlickV * G_SchlickL ));
+	};
+
+	// F
+	// [Schlick 1994, "An Inexpensive BRDF Model for Physically-Based Rendering"]
+	// [Lagarde 2012, "Spherical Gaussian approximation for Blinn-Phong, Phong and Fresnel"]
+	function F_Schlick in (mediump float3 SpecularColor, lowp float VoH) out (mediump float3 f_color)
+	{
+		lowp float t = 1.0f - VoH;
+		//float Fc = pow(1.0f - VoH, 5.0f); 
+		function SG(t, 5.0f) out(lowp float Fc);
+		out(f_color, SpecularColor + (float3(1.0f) - SpecularColor) * Fc);
+		
+
+	};
+
+
+	// IBL
+	function EnvBRDFApprox in (mediump float3 SpecularColor, lowp float Roughness, lowp float NoV, mediump float brightness) out (mediump float3 env_brdf)
+	{
+		lowp float4 c0 = float4( -1f, -0.0275f, -0.572f, 0.022f );
+		lowp float4 c1 = float4( 1.0f, 0.0425f, 1.04f, -0.04f );
+		mediump float4 r = Roughness * c0 + c1;
+		//lowp float rx = max(0.2f, r.x);
+		mediump float a004 = min( r.x * r.x, exp2(-9.28f * NoV )) * r.x + r.y;
+		mediump float2 AB = float2( -1.04f, 1.04f ) * a004 + r.zw;
+		out(env_brdf, SpecularColor * AB.x + float3(AB.y) * brightness);
+
+	};
+
+	// IBL采样（matcap方式）
+	function GetEnvirmentColor in (lowp float lod, mediump float row_num, mediump float d_row_num, lowp float2 normal_view_xy, sampler env_map) out(mediump float3 envir_color)
+	{
+		mediump float lod1 = lod;
+		
+		mediump float2 uv_1 = normal_view_xy * 0.5f + float2(0.5f);
+		
+		mediump float v_index_1 = floor(lod1 / row_num);
+		mediump float u_index_1 = floor(lod1 - v_index_1 * row_num);
+		
+		mediump float2 final_uv_1 = float2(uv_1.x + u_index_1, uv_1.y + v_index_1) * d_row_num;
+
+		lowp float4 envir1 = sample(env_map, final_uv_1.xy);
+		mediump float3 envir1_hdr = float3(0.3f) / max(float3(1.0f) - envir1.xyz, float3(0.02f)) - float3(0.3f);
+		out(envir_color, envir1_hdr * envir1_hdr);
+	};
+
+
+	// IBL specular采样
+	function GetEnvirmentColor_prefiltered in(
+		// sampler env_map, mediump float rough, highp float3 R, mediump float brightness, lowp float max_brightness,lowp float nx_offset) out(mediump float3 envir_color)
+		sampler env_map, mediump float rough, highp float3 R, mediump float brightness, lowp float max_brightness) out(mediump float3 envir_color)
+	{
+		//mediump float MIP_ROUGHNESS = 0.14f;
+		mediump float MIP_ROUGHNESS = 0.14f;
+		highp float level = rough / MIP_ROUGHNESS;
+		highp float fsign = max(sign(R.z), 0.0f);
+		highp float fsign2 = fsign * 2.0f - 1.0f;
+		mediump float2 uv0 = R.xy / ((R.z + fsign2) * fsign2);
+		mediump float2 uv1 = uv0 * float2(0.25f, -0.25f) + float2(0.25f + 0.5f * fsign);
+		
+		// mediump float4 env_tex = samplelod(env_map, uv1 + float2(nx_offset,0.0f), level);
+		mediump float4 env_tex = samplelod(env_map, uv1, level);
+		mediump float3 env_color = env_tex.rgb  *  env_tex.a * max_brightness;
+
+		out(envir_color, env_color);
+	};
+
+	//IBL 旋转
+	function RotationGIDirection in(/*half3 normalDirection, */float3 viewReflectDirection, float degrees_) out(float3 reflUVW)
+	{
+		// half3 normalWorld = normalDirection;
+		// reflUVW = viewReflectDirection;
+		float pi = 3.1415926f;
+		float theta = degrees_ * pi / 180.0f;
+		float costha = cos(theta);
+		float sintha = sin(theta);
+		// normalWorld = half3(normalWorld.x * costha - normalWorld.z * sintha, normalWorld.y, normalWorld.x * sintha + normalWorld.z * costha);
+		float3 reflUVW_ = float3(viewReflectDirection.x * costha - viewReflectDirection.z * sintha, viewReflectDirection.y, viewReflectDirection.x * sintha + viewReflectDirection.z * costha);
+		out(reflUVW,reflUVW_);
+	};
+
+
+	// IBL_panorama
+	// function GetEnvirmentColor_panorama in(sampler env_map, mediump float rough, highp float3 R, lowp float max_brightness,lowp float nx_offset) out(mediump float3 envir_color)
+	function GetEnvirmentColor_panorama in(sampler env_map, mediump float rough, highp float3 R, lowp float max_brightness) out(mediump float3 envir_color)
+	{
+		//mediump float MIP_ROUGHNESS = 0.14f;
+		mediump float MIP_ROUGHNESS = 0.2f;
+		highp float level = rough / MIP_ROUGHNESS;
+		mediump float PI = 3.1415926535897932384626433832795f;
+		mediump float INV_PI = 0.31830988618379067153776752674503f;
+		mediump float INV_PIX2 = 0.15915494309189533576888376337251f;
+
+		mediump float theta = atan2(R.z, R.x);
+		mediump float2 ref_uv = float2((theta + PI) * INV_PIX2, acos(R.y) * INV_PI);
+
+		// mediump float4 env_tex = samplelod(env_map, ref_uv + float2(nx_offset,0.0f), level);
+		mediump float4 env_tex = samplelod(env_map, ref_uv, level);
+		mediump float3 env_color = env_tex.rgb * env_tex.a *  max_brightness;
+
+		out(envir_color, env_color);
+	};
+
+	
+	
+	function GetShadowColor in(mediump float3 light_dir,mediump float3 normalWorld, mediump float shadow_fac, mediump float3 in_shadow_color, mediump float3 no_shadow_color) out(mediump float3 shadow_color, mediump float dark_area)
+	{
+		mediump float normal_dot_light_raw = clamp(dot(normalWorld, -light_dir), 0.0f, 1.0f);
+		mediump float normal_dot_light = saturate(normal_dot_light_raw);
+		mediump float dark_area_ = min(normal_dot_light_raw, shadow_fac);
+		mediump float3 _shadow_color = lerp(in_shadow_color, no_shadow_color, float3(dark_area_));
+		out(shadow_color, _shadow_color);
+		out(dark_area, dark_area_);
+	};
+
+	function hdr_tonemap_aces in (highp float3 color, mediump float adapted_lum) out(highp float3 color_out)
+	{
+		float A = 2.51f;
+		float B = 0.03f;
+		float C = 2.43f;
+		float D = 0.59f;
+		float E = 0.14f;
+
+		highp float3 adapt_color = color * adapted_lum;
+		out(color_out, (adapt_color * (A * adapt_color + float3(B))) / (adapt_color * (C * adapt_color + float3(D)) + float3(E)));
+	};
+
+
+	function Uncharted2Tonemap in(float A,float B,float C,float D,float E,float F, float3 x) out(float3 x_1) {
+		// float A = 0.15f;
+		// float B = 0.50f;
+		// float C = 0.10f;
+		// float D = 0.20f;
+		// float E = 0.02f;
+		// float F = 0.30f;
+		float W = 11.2f;
+		out(x_1, ((x*(A*x+float3(C*B))+float3(D*E))/(x*(A*x+float3(B))+float3(D*F)))-float3(E/F));
+	};
+
+	["UEtonemapping"]
+	function rgb_2_saturation in(float3 rgb) out(float saturation) {
+		float minrgb = min( min(rgb.r, rgb.g ), rgb.b );
+		float maxrgb = max( max(rgb.r, rgb.g ), rgb.b );
+		out(saturation, ( max( maxrgb, pow(10.0f,-10.0f) ) - max( minrgb, pow(10.0f,-10.0f) ) ) / max( maxrgb, pow(10.0f,-2.0f) ));
+	};
+
+	function center_hue in(float hue, float centerH) out(float center_hue) {
+		float hueCentered = hue - centerH;
+		condition(hueCentered) out(float hueCentered1) {
+			branch ("%0% < -180.0f") {
+				out(hueCentered1, hueCentered + 360.0f);
+			}
+			branch ("%0% > 180.0f") {
+				out(hueCentered1, hueCentered - 360.0f);
+			}
+			default {
+				out(hueCentered1, hueCentered);
+			}
+		};
+		out(center_hue,hueCentered1);
+	};
+
+		function ACES_ToneMapping in (
+		mediump float3 color, 
+		mediump float adapted_lum
+	) out (mediump float3 mapping_color)
+	{
+		mediump float3 A = float3(2.51f);
+		mediump float3 B = float3(0.03f);
+		mediump float3 C = float3(2.43f);
+		mediump float3 D = float3(0.59f);
+		mediump float3 E = float3(0.14f);
+
+		mediump float3 adapted_color = color * adapted_lum;
+
+		out(mapping_color, adapted_color * (A * adapted_color + B) / (adapted_color * (C * adapted_color + D) + E));
+	};
+
+	function calc_shadowmap_factor1 in(
+	samplershadow shadow_sampler, 
+	highp float4 light_proj_pos,	// 在光源投影空间的坐标
+	highp float4 shadow_info,		// 阴影信息
+	highp float2 shadow_bias_factor,
+	highp float shadowmap_bias
+	) out(highp float shadow_factor) // 阴影因子
+	{
+		//ios:(0.002, 0.0002)
+		//android(0.004, 0.001)
+		highp float bias = clamp(shadow_bias_factor.x * (1.0f - light_proj_pos.w) + shadow_bias_factor.y,  0.0f, 1.0f );
+
+		highp float2 uv = light_proj_pos.xy;
+		highp float pos_z_bias = light_proj_pos.z - bias;
+
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(highp float pos_z)
+		{
+			branch("1")
+			{
+				out(pos_z, pos_z_bias * 0.5f + 0.5f);
+			}
+			branch("0")
+			{
+				out(pos_z, pos_z_bias);
+			}
+		};
+
+		macro(NEOX_HLSL) out (highp float factor){
+			branch("0"){
+				// highp float _factor = sampleProj(shadow_sampler, float4(uv, pos_z, 1.0f));
+				mediump float texsize = 1.0f/1024.0f * shadowmap_bias;
+				// 9次采样
+				highp float _factor1 = sampleProj(shadow_sampler, float4(uv+ float2(-1.0f,-1.0f) * texsize, pos_z, 1.0f));
+				highp float _factor2 = sampleProj(shadow_sampler, float4(uv+ float2(-1.0f,0.0f) * texsize, pos_z, 1.0f));
+				highp float _factor3 = sampleProj(shadow_sampler, float4(uv+ float2(-1.0f,1.0f) * texsize, pos_z, 1.0f));
+				highp float _factor4 = sampleProj(shadow_sampler, float4(uv+ float2(0.0f,-1.0f) * texsize, pos_z, 1.0f));
+				highp float _factor5 = sampleProj(shadow_sampler, float4(uv+ float2(0.0f,0.0f) * texsize, pos_z, 1.0f));
+				highp float _factor6 = sampleProj(shadow_sampler, float4(uv+ float2(0.0f,1.0f) * texsize, pos_z, 1.0f));
+				highp float _factor7 = sampleProj(shadow_sampler, float4(uv+ float2(1.0f,-1.0f) * texsize, pos_z, 1.0f));
+				highp float _factor8 = sampleProj(shadow_sampler, float4(uv+ float2(1.0f,0.0f) * texsize, pos_z, 1.0f));
+				highp float _factor9 = sampleProj(shadow_sampler, float4(uv+ float2(1.0f,1.0f) * texsize, pos_z, 1.0f));
+				out(factor, (_factor1 + _factor2 + _factor3 + _factor4 + _factor5 + _factor6 + _factor7 + _factor8 + _factor9)/9.0f);
+				// 5次采样
+				// highp float _factor1 = sampleProj(shadow_sampler, float4(uv+ float2(-1.0f,-1.0f) * texsize, pos_z, 1.0f));
+				// highp float _factor3 = sampleProj(shadow_sampler, float4(uv+ float2(-1.0f,1.0f) * texsize, pos_z, 1.0f));
+				// highp float _factor5 = sampleProj(shadow_sampler, float4(uv+ float2(0.0f,0.0f) * texsize, pos_z, 1.0f));
+				// highp float _factor7 = sampleProj(shadow_sampler, float4(uv+ float2(1.0f,-1.0f) * texsize, pos_z, 1.0f));
+				// highp float _factor9 = sampleProj(shadow_sampler, float4(uv+ float2(1.0f,1.0f) * texsize, pos_z, 1.0f));
+				// out(factor, (_factor1 + _factor3 + _factor5 + _factor7 +_factor9)/4.0f);
+				// // 泊松采样
+				// highp float _factor1 = sampleProj(shadow_sampler, float4(uv+ float2(-0.94201624f, -0.39906216f) * texsize, pos_z, 1.0f));
+				// highp float _factor2 = sampleProj(shadow_sampler, float4(uv+ float2(0.94558609f, -0.76890725f) * texsize, pos_z, 1.0f));
+				// highp float _factor3 = sampleProj(shadow_sampler, float4(uv+ float2(-0.094184101f,-0.92938870f) * texsize, pos_z, 1.0f));
+				// highp float _factor4 = sampleProj(shadow_sampler, float4(uv+ float2(0.34495938f,0.29387760f) * texsize, pos_z, 1.0f));
+				// out(factor, (_factor1 +_factor2 +_factor3 +_factor4)/2.0f);
+			}
+			branch("1"){
+				lowp float _factor = sample(shadow_sampler, uv).x;
+				lowp float fac_step = step(pos_z, _factor);
+				out(factor, fac_step);
+			}
+		};
+
+		highp float4 inLightVec = sign(float4(uv.x, 1.0f-uv.x, uv.y, 1.0f-uv.y));
+		// 只有inLightVec每一个分量都是1，dot的结果才会为4，inLight的值才会为1
+		highp float inLight = step(3.5f, dot(inLightVec, float4(1.0f, 1.0f, 1.0f, 1.0f)));
+
+		// 投影范围外的shadow_factor是1
+		out(shadow_factor, clamp(factor + (1.0f - inLight), 0.0f, 1.0f));
+	};
+
+	function ParallaxOffset in(float h, float height, float3 viewDir) out(float2 parallaxoffset)
+	{
+	    float h_bias = h * height - height / 2.0f;
+	    float3 v = normalize(viewDir);
+	    float v_z = v.z + 0.42f;
+	    float2 offset = h_bias * (v.xy / float2(v_z));
+	    out(parallaxoffset,offset);
+	};
+
+	function ParallaxOffsetNetiveY in(float h, float height, float3 viewDir) out(float2 parallaxoffset)
+	{
+	    float h_bias = h * height - height / 2.0f;
+	    float3 v = normalize(viewDir);
+	    float v_z = v.z + 0.42f;
+	    float2 offset = h_bias * (v.xy / float2(v_z));
+	    //float2 offset = h_bias * v.xy
+	    out(parallaxoffset,float2(offset.x,-offset.y));
+	};
+
+	function LuminanceGamma in (mediump float3 LinearColor) out (mediump float illum)
+	{
+		out(illum, dot(LinearColor, float3(0.3f, 0.59f, 0.11f)));
+	};

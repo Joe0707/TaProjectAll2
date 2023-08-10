@@ -1,0 +1,62 @@
+["最简单的勾边实现"]
+pipeline
+<
+	author = "liuzhibin"
+	company = "netease"
+	category = "postprocess"
+	technique = "TNoShader"
+>
+{
+	macro(SKIN_VEC_PER_BONE)
+	<
+		default = "SKIN_VEC_PER_BONE_QUAT"
+		customizable = "0"
+		cache = "0"
+	>;
+
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+	
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	["勾边颜色"]
+	uniform float4 OutlineColor: OTHER0
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+	>;
+
+	
+	vertex
+	{
+		float4 pos_in = a_position;
+		["是否支持GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out(float4 pos_out)
+		{
+			branch("1")
+			{
+				function get_skin_pos(a_blendweight, uint4(a_blendindices), pos_in, u_bone_vec)
+					out(float4 pos_out1);
+				out(pos_out, pos_out1);
+			}
+			branch("0")
+			{
+				out(pos_out, pos_in);
+			}
+		};
+		vertex(transform(pos_out, wvp));
+	}
+	
+	pixel
+	{
+    lowp float4 result = OutlineColor;
+		pixel(result);
+	}
+	
+}

@@ -1,0 +1,67 @@
+["技能模糊"]
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+  category = "spell_blur"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+
+  uniform sampler tex0
+  <
+    export = "0"
+  >;
+  uniform sampler tex1
+  <
+    export = "0"
+  >;
+  
+  varying mediump float2 TexCoord0;
+  varying mediump float2 TexCoord1;
+  varying mediump float2 TexCoord2;
+  varying mediump float2 TexCoord3;
+  varying mediump float2 TexCoord4;
+  varying mediump float2 TexCoord5;
+  varying mediump float2 TexCoord6;
+  varying mediump float2 TexCoord7;
+
+  vertex
+  {
+		vertex(position);
+    lowp float2 dir = float2(1.0f,0.0f);
+    mediump float dist = length(dir);
+
+    lowp float2 dir2 = dir / dist;
+    
+    mediump float fSampleDist = 0.1f;
+
+    out(TexCoord0, texcoord0.xy);
+    out(TexCoord1, texcoord0.xy + dir * -0.08f * fSampleDist);
+    out(TexCoord2, texcoord0.xy + dir * -0.05f * fSampleDist);
+    out(TexCoord3, texcoord0.xy + dir * -0.02f * fSampleDist);
+    out(TexCoord4, texcoord0.xy + dir * -0.01f * fSampleDist);
+    out(TexCoord5, texcoord0.xy + dir * 0.02f * fSampleDist);
+    out(TexCoord6, texcoord0.xy + dir * 0.05f * fSampleDist);
+    out(TexCoord7, texcoord0.xy + dir * 0.08f * fSampleDist);
+  }
+
+  pixel
+  {
+    lowp float4 color = sample(tex0, TexCoord0);
+    lowp float4 main = sample(tex1, TexCoord0);
+
+    float4 sum = (color + sample(tex0, TexCoord1)
+          + sample(tex0, TexCoord2)
+          + sample(tex0, TexCoord3)
+          + sample(tex0, TexCoord4)
+          + sample(tex0, TexCoord5)
+          + sample(tex0, TexCoord6)
+          + sample(tex0, TexCoord7)) / 8.0f;
+    lowp float4 temp = sum * main;
+    lowp float length1 = length(temp);
+    lowp float3 result = float3(length1) * temp.xyz + color.xyz * float3(1.0f - length1);
+    pixel(float4(result, 1.0f));
+  }
+}

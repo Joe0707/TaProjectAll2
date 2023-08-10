@@ -1,0 +1,315 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+  
+	["开启变身贴图"]
+	eitheror CHANGE_DIFFUSE_ENABLE;
+	macro(CHANGE_DIFFUSE_ENABLE)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+
+  
+	["开启溶解变身"]
+	eitheror DISSOLVE_CHANGE_DIFFUSE;
+	macro(DISSOLVE_CHANGE_DIFFUSE)
+	<  
+		default = "1"
+		customizable = "1"
+	>;
+
+	
+// 贴图
+	
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["光照贴图"]
+	uniform sampler LightTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\lighttex.png"
+	>;
+
+	["变身贴图"]
+	uniform sampler SamplerChangediffuse
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "fx\\texture\\effect\\dissolve.png"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	["光照贴图亮度"]
+	uniform float LightScale
+	<
+		uigroup = "1 基础光照"
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		init = "2.2"
+		uistep = "0.1"
+	>;
+
+	["溶解变身程度"]
+	uniform float ChangeAmount
+	<
+		uigroup = "2 溶解"
+		artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.0"
+		uistep = "0.1"
+	>;
+
+	["溶解变身叠加色"]
+	uniform mediump float4 change_line_color
+	<
+		uigroup = "2 溶解"
+		artist = "1"
+		color = "1"
+		init = "1.0,1.0,1.0,1.0"
+	>;
+
+	["溶解叠加色宽度"]
+	uniform  float change_line_scale
+	<
+		uigroup = "2 溶解"
+		artist = "1"
+		uistep = "1"
+		min = "0.0"
+		max = "0.1"
+		init = "0.02"
+	>;	
+
+	["覆盖范围"]
+	uniform mediump float rim_power_lurk
+	<
+		uigroup = "3 变身"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"
+		max = "1.0"
+		min = "5.0"
+	>;
+	["变身颜色强度"]
+	uniform mediump float rim_multi_lurk
+	<
+		uigroup = "3 变身"
+		init = "0"
+		uistep = "0.001"
+		artist = "1"    
+		max = "5.0"
+		min = "1.0"
+	>;
+
+	["轮廓颜色"]
+	uniform mediump float4 rim_color_lurk
+	<
+		uigroup = "3 变身"
+		init = "(0.0, 0.0, 0.0, 0.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["内部颜色"]
+	uniform mediump float4 adjust_inner_lurk
+	<
+		uigroup = "3 变身"
+		init = "(0.5,0.5,0.5,0.5)"
+		artist = "1"
+		color ="1"
+	>;	
+
+	["rim 开始"]
+	uniform mediump float u_rim_start_lurk
+	<
+		uigroup = "3 变身"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["rim 结束"]
+	uniform mediump float u_rim_end_lurk
+	<
+		uigroup = "3 变身"
+		uistep = "0.001"
+		init = "1"
+		max = "1.5"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["隐身颜色"]
+	uniform mediump float4 color_lurk
+	<
+		uigroup = "3 变身"
+		init = "(0.5,0.5,0.5,0.5)"
+		artist = "1"
+		color ="1"
+	>;
+
+	["隐身可见程度"]
+	uniform mediump float alpha_lurk
+	<
+		uigroup = "3 变身"
+		init = "0.5"
+		artist = "1"
+		uistep = "1"
+		max = "1"
+		min = "0"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+
+
+	// varying变量
+	varying mediump float2 UV0;
+	varying lowp float4    vertex_color1;
+	varying mediump float4 PosWorld;
+	varying lowp float3 v_NormalWorld;
+	varying lowp float3 v_view_dir;
+
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		highp float4 position = vec;	
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		out(UV0, texcoord0.xy);
+		out(vertex_color1, a_color);
+		macro(CHANGE_DIFFUSE_ENABLE) out(lowp float4 diffuse_map_color) 
+		{
+			branch ("1") {
+				highp float4 pos_world = transform(vec, world);
+				out(v_view_dir,normalize(camera_pos.xyz - pos_world.xyz));
+				float3x3 worldMat = float3x3(world);
+				highp float3 world_normal = float3(normalize(transform(nor.xyz, worldMat)));
+				out(v_NormalWorld,world_normal);
+
+			}
+			branch("0"){
+
+			}
+		};
+    }
+
+	pixel
+	{
+
+		lowp float4 texture1 = sample(Tex0,UV0.xy);
+		lowp float4 vertex_color = vertex_color1;
+
+		macro(CHANGE_DIFFUSE_ENABLE) out(lowp float4 diffuse_map_color)
+		 {
+			branch ("1") {
+				lowp float NdotV = saturate(dot(v_view_dir, v_NormalWorld));
+				lowp float rim_ = 1.0f - NdotV;
+				mediump float rim = smoothstep(u_rim_start_lurk, u_rim_end_lurk, rim_);
+				lowp float4 texture2 = float4(texture1.rgb + color_lurk.rgb,lerp(alpha_lurk,1.0f,rim));
+				macro(DISSOLVE_CHANGE_DIFFUSE) out(float changevalue,float changeline)
+				 {
+					branch ("1") {
+						float changediffmask = sample(SamplerChangediffuse,UV0.xy).r;
+						float changevalue1 = smoothstep(ChangeAmount,ChangeAmount + change_line_scale,changediffmask);
+						float changevalue2 = 1.0f-smoothstep(ChangeAmount - change_line_scale,ChangeAmount,changediffmask);
+						out(changevalue, changevalue1);
+						out(changeline,saturate(1.0f - changevalue1 - changevalue2));
+					}
+					branch ("0") {
+						lowp float4 diffuse_ori = float4(0.0f,0.0f,0.0f,0.0f);
+						out(changevalue, 0.0f);
+						out(changeline,0.0f);
+					}
+				};
+				lowp float4 diffuse_change = lerp(texture2,texture1,float4(changevalue)) + change_line_color * changeline * 2.0f;
+				out(diffuse_map_color,diffuse_change);
+			}
+
+			branch ("0") {
+				out(diffuse_map_color, texture1);
+			}
+		};
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+		
+		pixel(float4(diffuse_map_color.xyz, alpha * AlphaMtl));
+	}
+}

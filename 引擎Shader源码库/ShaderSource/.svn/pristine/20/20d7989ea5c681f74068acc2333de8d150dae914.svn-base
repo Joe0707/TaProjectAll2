@@ -1,0 +1,166 @@
+["simple technique internal use only"]
+pipeline
+<
+	version = "1.0.0"
+	author = "liqinlin"
+	category = "common"
+	company = "netease"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+	attribute float4 diffuse: DIFFUSE;
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 revView: VIEWPORT_TRANS;
+	uniform highp float4x4 texTrans0: TEXTURE_TRANS0;
+	varying mediump float4 UV0;
+	varying lowp float4 Color;
+	uniform lowp float4 tFactor : TFACTOR;
+	uniform sampler Tex0 : DIFFUSE
+	<
+		export = "0"
+	>;
+	uniform sampler Tex1
+	<
+		export = "0"
+	>;
+	uniform sampler sepAlphaTex : DIFFUSE_ALPHA
+	<
+		export = "0"
+	>;
+	
+	eitheror POSI_SCREEN;
+	eitheror REVERT_V;
+	eitheror MUL_TEXTURE;
+	eitheror MUL_TEXTURE_A8;
+	eitheror MUL_CONSTANT;
+	eitheror MUL_DIFFUSE;
+	eitheror MUL_STATURATE;
+	eitheror BLEND_TEXTURE;
+	eitheror MUL_ALPHA_TEXTURE;
+	eitheror MUL_ALPHA_CONSTANT;
+	eitheror MUL_ALPHA_DIFFUSE;
+	eitheror TEXTURE_BLEND_RATE;
+	
+	vertex
+	{
+		float4 localpos = position;
+		macro(POSI_SCREEN) out(highp float4 finalPos)
+		{
+			branch("1") { out(finalPos, localpos * revView); }
+			branch("0") { out(finalPos, localpos * wvp); }
+		};
+		vertex(finalPos);
+		out(Color, diffuse);
+		float4 texc = float4(texcoord0.xy, 1.0f, 0.0f);
+		float4 uv0 = texc * texTrans0;
+		macro(REVERT_V) out(float4 final_uv)
+		{
+			branch("1") { out(final_uv, float4(uv0.x, oneminus(uv0.y), uv0.zw));}
+			branch("0") { out(final_uv, uv0);}
+		};
+		out(UV0, final_uv);
+	}
+	pixel
+	{
+		float4 texColor = sample(Tex0, UV0.xy);
+		float3 texRGB = texColor.xyz;
+		float4 color0 = float4(1.0f, 1.0f, 1.0f, 1.0f);
+		float4 vertexColor = Color;
+		macro(DIFFUSE_ALPHA_SEPARATE) out(float texA)
+		{
+			branch("1")
+			{
+				float4 sepTexColor = sample(sepAlphaTex, UV0.xy);
+				out(texA, sepTexColor.w);
+			}
+			branch("0") { out(texA, texColor.w); }
+		};
+		
+		macro(MUL_TEXTURE) out(float4 color1)
+		{
+			branch("1")
+			{
+				out(color1, color0 * float4(texRGB, texA));
+			}
+			branch("0") { out(color1, color0); }
+		};
+		
+		macro(MUL_TEXTURE_A8) out(float4 color2)
+		{
+			branch("1")
+			{
+				out(color2, color1 * float4(1.0f, 1.0f, 1.0f, texA));
+			}
+			branch("0") { out(color2, color1); }
+		};
+		
+		macro(MUL_CONSTANT) out(float4 color3)
+		{
+			branch("1")
+			{
+				out(color3, color2 * float4(1.0f, 1.0f, 1.0f, texA));
+			}
+			branch("0") { out(color3, color2); }
+		};
+		
+		macro(MUL_DIFFUSE) out(float4 color4)
+		{
+			branch("1")
+			{
+				out(color4, color3 * vertexColor);
+			}
+			branch("0") { out(color4, color3); }
+		};
+		
+		macro(MUL_STATURATE) out(float4 color5)
+		{
+			branch("1")
+			{
+				float gray = dot(color4.xyz, float3(0.3f, 0.59f, 0.11f));
+				out(color5, float4(gray, gray, gray, color4.w));
+			}
+			branch("0") { out(color5, color4); }
+		};
+		
+		macro(BLEND_TEXTURE) out(float4 color6)
+		{
+			branch("1")
+			{
+				float3 newColor = texRGB * texA + color5.xyz * oneminus(texA);
+				out(color6, float4(newColor, color5.w));
+			}
+			branch("0") { out(color6, color5); }
+		};
+		
+		macro(MUL_ALPHA_CONSTANT) out(float4 color7)
+		{
+			branch("1")
+			{
+				out(color7, float4(color6.xyz, color6.w * tFactor.a));
+			}
+			branch("0") { out(color7, color6); }
+		};
+		
+		macro(MUL_ALPHA_DIFFUSE) out(float4 color8)
+		{
+			branch("1")
+			{
+				out(color8, float4(color7.xyz, color7.w * vertexColor.a));
+			}
+			branch("0") { out(color8, color7); }
+		};
+		
+		macro(TEXTURE_BLEND_RATE) out(float4 color9)
+		{
+			branch("1")
+			{
+				float4 tex1 = sample(Tex1, UV0.xy);
+				out(color9, lerp(color8, tex1, tFactor));
+			}
+			branch("0") { out(color9, color8); }
+		};
+		pixel(color9);		
+	}
+	
+}

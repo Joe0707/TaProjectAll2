@@ -1,0 +1,193 @@
+["公告板溶解"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "liuyu" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+	cull = "none"
+	alphablend = "true"
+	srccolor = "blend_op_0"
+	dstcolor = "blend_op_1"
+>
+{
+	// 贴图
+	["diffuse0"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["TexFadeout"]
+	uniform sampler TexFadeout
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;	
+	
+	["threshold"]
+	uniform mediump float threshold
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.5"
+	>;
+
+	["u速度"]
+	uniform mediump float u_speed
+	<
+		artist = "1" 
+		min = "0.8" 
+		max = "1.5" 
+		init = "0.5"
+	>;
+
+	["uv缩放"]
+	uniform mediump float uv_scale
+	<
+		artist = "1" 
+		min = "0.8" 
+		max = "1.5" 
+		init = "1.0"
+	>;
+	
+	["溶解宽度"]
+	uniform mediump float dis_range
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "1.0" 
+		init = "0.001"
+	>;
+	["溶解边缘颜色强度"]
+	uniform lowp float tint_multi
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "500.0" 
+		init = "1.0"
+	>;
+	uniform mediump float4 blend_op
+	<
+		init = "(5.0, 2.0, 1.0, 0)"
+	>;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["溶解边缘颜色"]
+	uniform lowp float4 tint_color
+	<
+		artist = "1" 
+		color = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+	>;
+
+
+	// ["tint_colorR"]
+	// uniform lowp float tint_color_r
+	// <
+	// 	artist = "1" 
+	// 	min = "0.0" 
+	// 	max = "1.0" 
+	// 	init = "1.0"
+	// >;
+
+	// ["tint_colorG"]
+	// uniform lowp float tint_color_g
+	// <
+	// 	artist = "1" 
+	// 	min = "0.0" 
+	// 	max = "1.0" 
+	// 	init = "1.0"
+	// >;
+
+	// ["tint_colorB"]
+	// uniform lowp float tint_color_b
+	// <
+	// 	artist = "1" 
+	// 	min = "0.0" 
+	// 	max = "1.0" 
+	// 	init = "1.0"
+	// >;
+
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_diffuse : DIFFUSE;
+	attribute float2 a_texcoord0 : TEXTURE0;
+
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float4 UV1;
+	varying mediump float4 Color;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0
+	<
+		init = "1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0,0.0,0.0,0.0,0.0,1.0"
+	>;
+
+	uniform mediump float FrameTime: FRAME_TIME;	
+
+	vertex
+	{
+		vertex(float4(transform(a_position, wvp)));
+		out(Color, a_diffuse);
+		mediump float4 texc = float4(a_texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, transform(texc, u_texture_trans0));
+
+		mediump float4 _uv1 = (texc - float4(0.5f)) * float4(uv_scale) + float4(0.5f);
+		mediump float2 _uv1_xy = float2(_uv1.xy + float2(-u_speed * 0.6f, u_speed * 0.3f) * FrameTime);
+		out(UV1, float4(_uv1_xy, _uv1.zw));
+
+	}
+
+	pixel
+	{
+		lowp float4 tex_color_0 = sample(Tex0, UV0.xy);
+		lowp float4 tex_color_1 = sample(TexFadeout, UV1.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, tex_color_0.a);
+			}
+		};	
+		//lowp float _tex_color_0_alpha = step(0.99999f - threshold, tex_color_1.r) * alpha; // A-B A+B
+		// 使用smoothstep要记得限制a和b值域防止被坑...
+		mediump float fac_a = clamp(threshold - dis_range, 0.00001f, 1.0f); // [0.00001, 1]
+		mediump float _fac_b = min(threshold + dis_range, 1.0f); // [0.00001, 1]
+		mediump float fac_b = clamp(threshold + dis_range, 0.00001f, 1.0f);
+		function linearstep(fac_a, fac_b, oneminus(tex_color_1.r)) out (mediump float step_res);
+		mediump float _tex_color_0_alpha = (1.0f - step_res) * alpha; 
+
+		//lowp float3 tint_color = float3(tint_color_r, tint_color_g, tint_color_b);
+		lowp float3 lerp_color = lerp(tex_color_0.rgb, tex_color_0.rgb  * tint_color.rgb * tint_multi, float3(oneminus(_tex_color_0_alpha)));
+		lowp float4 final_tex_color_0 = float4(lerp_color.xyz, _tex_color_0_alpha) * Color * blend_op.b;
+
+
+		
+		pixel(float4(final_tex_color_0.xyz, _tex_color_0_alpha * AlphaMtl));
+	}
+}

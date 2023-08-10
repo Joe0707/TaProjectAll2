@@ -1,0 +1,62 @@
+["editor force field shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "luojincong"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+	alphablend = "true"
+	srccolor = "1"
+	srcalpha = "1"
+	dstcolor = "1"
+	dstalpha = "1"
+>
+{
+	// attribute
+	attribute float3 a_position: POSITION;
+	attribute float2 a_texture0: TEXTURE0;// uv1
+
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4 cam_pos : CAMERA_POSITION;
+	uniform highp float4 u_camera_info: CAMERA_INFO;
+    
+    uniform float texture_size
+    <
+		init = "0.0"
+    >;
+
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	varying mediump float2 uv;
+	varying mediump float ratio;
+	vertex
+	{
+		highp float4 position = float4(a_position.x, 0.0f, a_position.y, 1.0f);
+		highp float4 pos_world = transform(position, world);
+		highp float4 final_position = transform(pos_world, viewProj);
+		vertex(final_position);
+		out(uv, a_texture0.xy);
+		out(ratio, a_position.z);
+	}
+
+	pixel
+	{
+		mediump float4 loc_result = sample(Tex0, uv.xy);
+		mediump float2 dir = float2((loc_result.x - loc_result.y) * ratio, (loc_result.z - loc_result.w) * ratio);
+		mediump float4 result = float4(max(dir.x, 0.0f), -min(dir.x, 0.0f), max(dir.y, 0.0f), -min(dir.y, 0.0f));
+		pixel(result);
+	}
+}

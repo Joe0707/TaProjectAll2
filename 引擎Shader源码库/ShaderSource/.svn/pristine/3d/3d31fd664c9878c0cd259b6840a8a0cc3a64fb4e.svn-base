@@ -1,0 +1,129 @@
+["最基础的shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "ly"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{   
+	uniform highp samplershadow SMAP : SHADOW
+	<
+	>;
+
+	uniform highp sampler Env : ENVIRONMENT_REFLECT
+	<
+	>;
+	
+	// 顺序为先声明低配sampler，再声明高配sampler
+	uniform sampler t0
+	<
+	>;
+
+	uniform sampler t1
+	<
+	>;
+
+	uniform sampler t2
+	<
+	>;
+
+	uniform sampler t3
+	<
+	>;
+
+	uniform sampler t4
+	<
+	>;
+
+	uniform sampler t5
+	<
+	>;
+
+	uniform sampler t6
+	<
+	>;
+
+	uniform sampler t7
+	<
+	>;
+
+	uniform sampler t8
+	<
+	>;
+
+	uniform sampler t9
+	<
+	>;
+
+	attribute float4 a_position: POSITION;
+
+	
+	vertex
+	{
+		macro(LEVEL_HIGH)out(mediump float4 c6){
+			branch("1")
+			{
+				mediump float4 tc6 = sample(t6, float2(0.0f, 0.0f));
+				out(c6, tc6);
+			}
+			branch("0")
+			{
+				out(c6, float4(1.0f, 1.0f, 1.0f, 1.0f));
+			}
+		};
+		
+		macro(LEVEL_HIGH)out(mediump float4 c7){
+			branch("1")
+			{
+				mediump float4 tc7 = sample(t7, float2(0.0f, 0.0f));
+				out(c7, tc7);
+			}
+			branch("0")
+			{
+				out(c7, float4(1.0f, 1.0f, 1.0f, 1.0f));
+			}
+		};
+
+		macro(LEVEL_HIGH)out(mediump float4 c8){
+			branch("1")
+			{
+				mediump float4 tc8 = sample(t8, float2(0.0f, 0.0f));
+				out(c8, tc8);
+			}
+			branch("0")
+			{
+				out(c8, float4(1.0f, 1.0f, 1.0f, 1.0f));
+			}
+		};
+
+		macro(LEVEL_HIGH)out(mediump float4 c9){
+			branch("1")
+			{
+				mediump float4 tc9 = sample(t9, float2(0.0f, 0.0f));
+				out(c9, tc9);
+			}
+			branch("0")
+			{
+				out(c9, float4(1.0f, 1.0f, 1.0f, 1.0f));
+			}
+		};
+
+		vertex(float4(0.0f, 0.0f, 0.001f, 0.00f));
+	}
+
+	pixel
+	{
+		//低配的最大sampler使用量为8，这个数量包含了阴影和环境贴图或其他内置语义的sampler	
+		mediump float4 tc0 = sample(t0, float2(0.0f, 0.0f));
+		mediump float4 tc1 = sample(t1, float2(0.0f, 0.0f));
+		mediump float4 tc2 = sample(t2, float2(0.0f, 0.0f));
+		mediump float4 tc3 = sample(t3, float2(0.0f, 0.0f));
+		mediump float4 tc4 = sample(t4, float2(0.0f, 0.0f));
+		mediump float4 tc5 = sample(t5, float2(0.0f, 0.0f));
+		mediump float4 tc6 = sample(Env, float2(0.0f, 0.0f));
+		mediump float4 tc7 = sample(SMAP, float2(0.0f, 0.0f));
+		pixel(float4(1.0f, 1.0f, 1.0f, 1.0f));
+	}
+}

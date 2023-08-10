@@ -1,0 +1,540 @@
+["场景 PBR Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhang ying peng" 
+	category = "common" 
+	company = "netease"
+	merge = "1"
+>
+{
+// 宏
+	["编辑器"]
+	macro(EDITOR)
+	<
+		default = "0"
+	>;
+
+	["启用雾效"]
+	macro(FOG_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["高度指数雾"]
+	eitheror FOG_HEIGHT_ENABLE;
+	macro(FOG_HEIGHT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["是否启用场景转置"]
+	eitheror TRANS_ENABLE;
+	macro(TRANS_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["是否启用雾气噪声"]
+	eitheror FOG_NOISE_ENABLE;
+	macro(FOG_NOISE_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["雾气是否启用高度mask"]
+	eitheror USE_MASK;
+	macro(USE_MASK)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+
+
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+
+	["雾气高度贴图"]
+	uniform sampler heightMap
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+		path = "common\\textures\\height_mask.png"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-2"
+	>;
+
+	["雾气噪声贴图"]
+	uniform sampler noiseMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "common\\textures\\fog_noise.png"
+	>;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;	
+	
+	["lightmap亮度"]
+	uniform mediump float lightmap_brightness
+	<
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "1.0"
+	>;
+	
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+    ["雾气高度"]
+	uniform float fogHeight
+	<
+		init = "20.0"
+		artist = "1"
+	>;
+
+    ["雾气浓度"]
+	uniform float fog_density : HEIGHT_FOG_DENSITY;
+	// <
+	// 	init = "0.867"
+	// 	artist = "1"
+	// >;
+
+    ["水平能见度"]
+	uniform float hori_field
+	<
+		init = "200.0"
+		artist = "1"
+	>;
+
+    ["垂直能见度"]
+	uniform float vert_field
+	<
+		init = "35.6"
+		artist = "1"
+	>;
+
+	["平均最大浓度"]
+	uniform float max_density
+	<
+		init = "1.0"
+		artist = "1"
+	>;
+
+	// ——————————————————噪声——————————————————
+	
+	["噪声密度"]
+	uniform mediump float2 noise_density
+	<
+		uigroup = "雾气噪声"
+		artist = "1" 
+		init = "(1.0, 0.63)"
+	>;
+
+	["噪声速度"]
+	uniform mediump float3 noise_speed
+	<
+		uigroup = "雾气噪声"
+		artist = "1" 
+		init = "(0.17, 0.12, 1.83)"
+	>;
+
+	["噪声强度"]
+	uniform mediump float noise_intensity
+	<
+		uigroup = "雾气噪声"
+		artist = "1"  
+		init = "0.143"
+	>;
+
+	["噪声自扰动强度"]
+	uniform mediump float tor_intensity
+	<
+		uigroup = "雾气噪声"
+		artist = "1" 
+		init = "0.23"
+	>;
+
+	["噪声纵深"]
+	uniform mediump float noise_dis
+	<
+		uigroup = "雾气噪声"
+		artist = "1" 
+		init = "4.0"
+	>;
+
+// attribute变量
+	attribute float4 a_position : POSITION;
+	attribute float4 a_texcoord0 : TEXTURE0;
+	attribute float4 a_texcoord1 : TEXTURE1;
+
+	attribute float4 texcoord4 : TEXTURE4;
+    attribute float4 texcoord5 : TEXTURE5;
+    attribute float4 texcoord6 : TEXTURE6;
+    attribute float4 texcoord7 : TEXTURE7;
+
+// varying变量
+	varying mediump float2 UV0;
+	varying mediump float2 UV1;
+	varying mediump float3 v_posWorld;
+	varying mediump float3 v_temp;
+	varying highp float4 v_pPos;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 viewProj : VIEW_PROJECTION;
+	uniform highp float4x4 view : VIEW;
+
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform mediump float lm_scale : LIGHTMAP_TINT_FACTOR;	
+	uniform mediump float FrameTime: FRAME_TIME;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;	
+
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	["fog 雾效参数"]
+	uniform lowp float4 u_fog_color : FOG_COLOR
+	<
+		color = "1"
+		init = "(1.0,1.0,1.0,0.0)"
+	>;
+	uniform mediump float4 u_fog_info : FOG_INFO; 
+
+    // function
+    function NoiseDisLerp in (mediump float dis, mediump float perdis) out (mediump float noiseLerp)
+	{
+		out(noiseLerp, 1.0f - abs(dis - perdis) / perdis);
+	};
+
+	
+	vertex
+	{
+		highp float4 position = a_position;
+
+		// 世界空间坐标
+		macro(EDITOR) out(mediump float4 pos_world){
+			branch("1")
+			{
+				out(pos_world, transform(position, world));
+			}
+			branch("0"){
+				macro(INSTANCE_TYPE) out(mediump float4 _pos_world)
+				{
+		            branch("INSTANCE_TYPE_PRS")
+		            {
+		                float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                float4 world_pos = transform(position, instWorldMat);
+
+		            	macro(TRANS_ENABLE) out(float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+		            
+		            branch("INSTANCE_TYPE_PRS_LM")
+		            {
+		                mediump float4x4 instWorldMat = float4x4(float4(texcoord5.x, texcoord6.x, texcoord7.x, 0.0f),
+		                                             float4(texcoord5.y, texcoord6.y, texcoord7.y, 0.0f),
+		                                             float4(texcoord5.z, texcoord6.z, texcoord7.z, 0.0f),
+		                                             float4(texcoord5.w, texcoord6.w, texcoord7.w, 1.0f));
+		                mediump float4 world_pos = transform(position, instWorldMat);
+		                
+		            	macro(TRANS_ENABLE) out(mediump float4 trans_world_pos){
+							branch("1") {
+								out(trans_world_pos, float4(world_pos.x, -world_pos.y, world_pos.z, world_pos.w));
+							}
+							branch("0") {
+								out(trans_world_pos, world_pos);
+							}
+						};
+		                out(_pos_world, trans_world_pos);
+		            }
+
+		            branch("INSTANCE_TYPE_NONE")
+		            {
+		            	// 未合批的在引擎中已经转了world了
+		            	out(_pos_world, transform(position, world));
+		            }
+				};
+				out(pos_world,  _pos_world);
+			}
+		};
+
+		highp float4 final_position = transform(pos_world, viewProj);
+
+		macro(FOG_ENABLE) 
+		{
+			branch ("1") 
+			{
+				out(v_posWorld, pos_world.xyz);
+				out(v_pPos, final_position);
+			}
+			branch ("0") 
+			{
+			}
+		};
+
+		//out(v_temp, pos_world.xyz);
+		
+		vertex(final_position);
+
+		macro(LIGHT_MAP_ENABLE)
+		{
+			branch("1") {
+				mediump float4 uv1 = float4(a_texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+				out(UV1, uv1.xy);
+			}
+			branch("0") {
+			}
+		};
+
+		macro(TRANS_ENABLE) out(mediump float height) {
+			branch ("1") {
+				out(height, -pos_world.y);
+			}
+			branch ("0") {
+				out(height, pos_world.y);
+			}
+		};
+
+		// macro(FOG_ENABLE) out(mediump float fog_height_factor1, mediump float fog_distance_) {
+		// 	branch ("1") {
+				
+		// 		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float fog_distance1)
+		// 		{
+		// 			branch("1")
+		// 			{
+		// 				["GL渲染系统下"]
+		// 				// out(fog_distance1, final_position.z * 2.0f - 1.0f);
+		// 				out(fog_distance1, final_position.w * ((final_position.z/final_position.w) *0.5f + 0.5f));
+		// 			}
+		// 			branch("0")
+		// 			{
+		// 				["Dx和Metal渲染系统下"]
+		// 				out(fog_distance1, final_position.z);
+		// 			}
+		// 		};
+		// 		function get_fog_height1(u_fog_info.z, u_fog_info.w, height) out(mediump float fog_height_factor_);
+		// 		out(fog_height_factor1, fog_height_factor_);
+		// 		out(fog_distance_, fog_distance1);
+		// 	}
+		// 	branch ("0") {
+		// 		out(fog_height_factor1, 0.0f);
+		// 		out(fog_distance_, 0.0f);
+		// 	}
+		// };
+		out(UV0, a_texcoord0.xy);
+	}
+
+	pixel
+	{
+		// mediump float fog_distance = UV0.z;
+		// mediump float fog_height_factor = UV0.w;
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		// float line = abs(v_temp.y - fogHeight);
+		// float line0 = 0.2f;
+  //       condition(line, line0) out(lowp float4 diffuse_map_color) 
+  //       {
+  //       	branch ("%0% < %1%") 
+  //       	{
+  //       		out(diffuse_map_color, float4(1.0f, 0.0f, 0.0f, 1.0f));
+  //       	}
+  //       	default 
+  //       	{
+  //       		out(diffuse_map_color, diffuse_map_color0);
+  //       	}
+  //       };
+		
+        macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+        {
+            branch("1") {
+            	lowp float4 _lightmap_color = sample(TexLightmap, UV1.xy);
+                // 不再对lightmap染色
+                // lowp float3 light_map_color_gamma = _lightmap_color.xyz * lerp(u_fog_color.rgb, ambient_color.rgb, float3(_lightmap_color.w)) * LightMapScale.yzw;
+                lowp float3 light_map_color_gamma = _lightmap_color.xyz * LightMapScale.yzw;
+                out(lightmap_color, light_map_color_gamma.xyz);
+            }
+            branch("0") {
+                out(lightmap_color, float3(1.0f));
+            }
+        };
+
+		// mediump float3 color_diffuse_lightmap = diffuse_map_color.rgb * diffuse_map_color.rgb * lightmap_color.xyz;
+		mediump float3 color_diffuse_lightmap = diffuse_map_color.rgb * lightmap_color.xyz;
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, diffuse_map_color.a);
+		  }
+		};
+		
+		macro(FOG_ENABLE) out(mediump float3 final_color_with_fog) 
+		{
+			branch ("1") 
+			{
+				float3 posWorld = v_posWorld;
+				highp float4 Ppos = v_pPos;
+				macro(FOG_NOISE_ENABLE) out(lowp float fogNoise) 
+				{
+					branch ("0") 
+					{
+						out(fogNoise, 0.0f);
+					}
+					branch ("1") 
+					{
+						macro(LEVEL_MIDDLE) out(lowp float fogNoise0) 
+						{
+							branch ("0") 
+							{
+								out(fogNoise0, 0.0f);
+							}
+							branch ("1") 
+							{
+								//highp float2 srcUV = (Ppos.xy - float2(0.5f)) / Ppos.w;
+								highp float2 srcUV = Ppos.xy/ Ppos.w * float2(0.5f, -0.5f);
+								//-----计算噪声纵深运动插值------
+								mediump float dis03 = 1.0f + noise_speed.z * FrameTime;
+								mediump float dis010 = fmod(dis03, noise_dis * 2.0f);
+								mediump float dis01 = lerp(-dis010, noise_dis * 2.0f - dis010, step(0.0f, dis010));
+								mediump float dis02 = lerp(dis01 + noise_dis, dis01 - noise_dis, step(noise_dis, dis01));
+                                //--------计算噪声---------
+								lowp float2 noiseTor01 = 2.0f * (sample(noiseMap, (srcUV + noise_speed.xy * FrameTime / 1.7f) * noise_density)).gb - float2(1.0f);
+								lowp float2 noiseTor02 = 2.0f * (sample(noiseMap, (srcUV - noise_speed.xy * FrameTime / 1.7f) * noise_density)).rg - float2(1.0f);
+								lowp float4 noiseColor01 = sample(noiseMap, (srcUV * dis01 + noise_speed.xy * FrameTime + (noiseTor01 + noiseTor02) * tor_intensity) * noise_density);
+								lowp float4 noiseColor02 = sample(noiseMap, (srcUV * dis02 + noise_speed.xy * FrameTime + (noiseTor01 + noiseTor02) * tor_intensity) * noise_density);
+
+								function NoiseDisLerp(dis01, noise_dis) out (lowp float noiseLerp01);
+								function NoiseDisLerp(dis02, noise_dis) out (lowp float noiseLerp02);
+								lowp float fogNoise1 = ((noiseColor01.r * noiseLerp01 + noiseColor02.g * noiseLerp02) * 2.0f - 1.0f) * noise_intensity;
+								out(fogNoise0, fogNoise1);
+							}
+						};
+						
+						out(fogNoise, fogNoise0);
+					}
+				};
+				macro(FOG_HEIGHT_ENABLE) out(lowp float fogDensityFinal) 
+				{
+					branch ("1") 
+					{
+						float cameraFogHeight0 = fogHeight - camera_pos.y;
+						float cameraFogHeight = max(0.0f, cameraFogHeight0) / vert_field;
+						float posFogHeight0 = fogHeight - posWorld.y;
+						float posFogHeight = max(0.0f, posFogHeight0) / vert_field;
+				        //float fogHeightFactor = (cameraFogHeight + posFogHeight) / 2.0f / vert_field;
+				        float fogHeightFactor = (cameraFogHeight * cameraFogHeight + posFogHeight * posFogHeight + cameraFogHeight * posFogHeight) / 3.0f;//平方积分后使用立方差公式
+						float disHeightFactor0 = saturate(posFogHeight0 / (camera_pos.y - posWorld.y));
+						float disHeightFactor = lerp(1.0f - disHeightFactor0, disHeightFactor0, step(0.0f, camera_pos.y - posWorld.y));
+						float disFactor = length(camera_pos.xyz - posWorld.xyz) * disHeightFactor / hori_field;
+						lowp float fogDensityFinal0 = clamp(fog_density * disFactor * fogHeightFactor, 0.0f, max_density);
+						lowp float fogDensityFinal1 = saturate(fogDensityFinal0 + fogNoise * saturate((fogHeight + 8.0f - posWorld.y) / 16.0f ));
+						out(fogDensityFinal, fogDensityFinal1);
+					}
+					branch ("0") 
+					{
+						float fogDepthFactor = length(posWorld - camera_pos.xyz) / hori_field;
+						lowp float fogDensityFinal0 = clamp(fog_density * fogDepthFactor * fogDepthFactor, 0.0f, max_density);
+						macro(USE_MASK) out(lowp float dMask, lowp float nMask) 
+						{
+							branch ("0") 
+							{
+								out(dMask, 1.0f);
+								out(nMask, 1.0f);
+							}
+							branch ("1") 
+							{
+								lowp float2 srcUV0 = Ppos.xy/ Ppos.w * float2(0.5f, -0.5f) + float2(0.5f, 0.5f);
+								// macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(float2 srcUV0)
+								// {
+								// 	branch("1")
+								// 	{
+								// 		["GL渲染系统下"]
+								// 		out(srcUV0, Ppos.xy/ Ppos.w * float2(0.5f) + float2(0.5f));
+								// 	}
+								// 	branch("0")
+								// 	{
+								// 		["Dx和Metal渲染系统下"]
+								// 		out(srcUV0, Ppos.xy/ Ppos.w * float2(0.5f, -0.5f) + float2(0.5f));
+								// 	}
+								// };
+								lowp float4 maskColor = sample(heightMap, srcUV0);
+								out(dMask, maskColor.r);
+								out(nMask, maskColor.g);
+							}
+						};
+						lowp float fogDensityFinal1 = saturate(fogDensityFinal0 * dMask + fogNoise * nMask);
+						out(fogDensityFinal, fogDensityFinal1);
+						//out(fogDensityFinal, dMask);
+					}
+				};			
+				out(final_color_with_fog, lerp(color_diffuse_lightmap.rgb, u_fog_color.rgb, float3(fogDensityFinal)));
+				//out(final_color_with_fog, float3(fogDensityFinal));
+        	}
+			branch ("0") 
+			{
+				out(final_color_with_fog, color_diffuse_lightmap);
+			}
+		};
+
+		lowp float final_alpha = alpha * AlphaMtl;
+
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(final_alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		pixel(float4(final_color_with_fog, final_alpha));
+	}
+}

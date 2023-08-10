@@ -1,0 +1,60 @@
+["cocos"]
+pipeline
+<
+  author = "linguanyong"
+  company = "netease"
+  category = "sprite"
+>
+{
+  attribute float4 position: POSITION;
+  attribute float2 texCoord0: TEXTURE0;
+  attribute float4 diffuse: DIFFUSE;
+
+  uniform float4x4 CC_PMatrix;
+  uniform sampler CC_Texture0
+    <name = "CC_Texture0">;
+  uniform sampler CC_Texture1
+    <name = "CC_Texture1">;
+  uniform sampler CC_Texture2
+    <name = "CC_Texture2">;
+  uniform lowp float2 size_bg;
+  uniform lowp float2 size_fg;
+  uniform lowp float2 offset;
+
+  varying lowp float4 v_fragmentColor;
+  varying mediump float2 v_texCoord;
+
+  eitheror USE_SEPARATE_ALPHA;
+
+  vertex main
+  {
+    vertex(position * CC_PMatrix);
+    out(v_fragmentColor, diffuse);
+    out(v_texCoord, texCoord0);
+  }
+  pixel main
+  {
+    lowp float4 texColor = sample(CC_Texture0, v_texCoord);
+    lowp float4 temp = texColor * v_fragmentColor;
+
+    macro(USE_SEPARATE_ALPHA) out(lowp float alphaTex0)
+    {
+        branch("1")
+        {
+            lowp float sep_alpha= sample(CC_Texture1, v_texCoord.xy).r;
+            out(alphaTex0, sep_alpha);
+        }
+        branch("0") {
+            out(alphaTex0, texColor.a);
+        }
+    };
+
+    lowp float xp = v_texCoord.x * size_fg.x - offset.x;
+    lowp float yp = v_texCoord.y * size_fg.y - offset.y;
+    lowp float x = clamp(xp / size_bg.x, 0.0f, 1.0f);
+    lowp float y = clamp(yp / size_bg.y, 0.0f, 1.0f);
+    lowp float4 texMask = sample(CC_Texture2, float2(x, y));
+    lowp float4 temp1 = float4(temp.rgb, temp.a * texMask.a * texColor.a);
+    pixel(temp1);
+  }
+}

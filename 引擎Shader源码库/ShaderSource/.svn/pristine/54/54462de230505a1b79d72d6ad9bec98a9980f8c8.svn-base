@@ -1,0 +1,406 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+    ["用2U控制云朵"]
+	eitheror UV02_ENABLE;
+	macro(UV02_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["中心扩散云朵噪声"]
+	eitheror NOISE_ENABLE;
+	macro(NOISE_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["噪声自扰"]
+	eitheror NOISE_TOR;
+	macro(NOISE_TOR)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["噪声使用屏幕UV"]
+	eitheror SCREEN_UV;
+	macro(SCREEN_UV)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["流动贴图"]
+	eitheror FLOWMAP_ENABLE;
+	macro(FLOWMAP_ENABLE)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["开启背景"]
+	eitheror BG_ON;
+	macro(BG_ON)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+	
+	["云朵贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+    
+    ["背景贴图"]
+	uniform sampler bgTEX
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+
+	["噪声贴图"]
+	uniform sampler noiseTEX
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+
+	["流动贴图"]
+	uniform sampler flowTEX
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-1.0"
+	>;
+
+	["噪声速度"]
+	uniform float3 noise_speed
+	<
+		artist = "1"
+		init = "(0.0, 0.0, 0.0)"
+		uigroup = "噪声"
+	>;
+
+	["噪声密度/自扰密度"]
+	uniform float4 noise_density
+	<
+		artist = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+		uigroup = "噪声"
+	>;
+
+	["噪声强度/自扰强度"]
+	uniform float2 tor_intensity
+	<
+		artist = "1"
+		init = "(0.05, 0.05)"
+		uigroup = "噪声"
+	>;
+
+	["噪声纵深"]
+	uniform mediump float noise_dis
+	<
+		uigroup = "云朵"
+		artist = "1" 
+		min = "0.005" 
+		max = "10.0" 
+		init = "2.0"
+	>;
+
+	["噪声扩散中心"]
+	uniform float2 noise_center
+	<
+		artist = "1"
+		init = "(0.5, 0.5)"
+		uigroup = "噪声"
+	>;
+
+	["流动周期"]
+	uniform lowp float PeriodSec
+	<
+		artist = "1"
+		uigroup = "流动"
+		init = "1.0"
+	>;
+
+	["流动速度"]
+	uniform lowp float Speed
+	<
+		artist = "1"
+		uigroup = "流动"
+	>;
+
+	["UV平移速度"]
+	uniform lowp float2 uv_speed
+	<
+		artist = "1"
+		uigroup = "流动"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal: NORMAL;
+    attribute float4 a_blend_weight: BLENDWEIGHT;
+    attribute float4 a_blend_indice: BLENDINDICES;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform lowp float alphaRef : ALPHA_REF;
+    uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying mediump float4 v_noiseInfo;
+	varying mediump float2 UV_anim;
+	varying mediump float2 v_cloudUV;
+
+	function NoiseDisLerp in (mediump float dis, mediump float perdis) out (mediump float noiseLerp)
+	{
+		out(noiseLerp, 1.0f - abs(dis - perdis) / perdis);
+	};
+	
+	vertex
+	{
+		// 是否使用GPU蒙皮
+        macro(GPU_SKIN_ENABLE) out(float4 pos, float4 nor)
+        {
+            branch("1")
+            {
+                function get_skin_pos_normal(a_blend_weight, uint4(a_blend_indice),a_position, a_normal, u_bone_vec)
+                out(float4 out_pos, float4 out_nor);
+                out(pos, out_pos);
+                out(nor, out_nor);
+            }
+            branch("0")
+            {
+                out(pos, a_position);
+                out(nor, a_normal);
+            }
+        };
+        
+		highp float4 pos_wvp = transform(a_position, wvp);
+	    vertex(pos_wvp);
+
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+        
+        macro(UV02_ENABLE) out(mediump float2 UV02) 
+		{
+			branch ("1") 
+			{
+				out(UV02, texcoord1.xy);
+			}
+			branch ("0") 
+			{
+				out(UV02, texcoord0.xy);
+			}
+		};
+		out(v_cloudUV, UV02);
+		
+		//-----计算噪声纵深运动插值------
+		macro(NOISE_ENABLE)
+		{
+			branch ("1") 
+			{
+				mediump float dis03 = 1.0f + noise_speed.z * FrameTime;
+				mediump float dis010 = fmod(dis03, noise_dis * 2.0f);
+				mediump float dis01 = lerp(-dis010, noise_dis * 2.0f - dis010, step(0.0f, dis010));
+				mediump float dis02 = lerp(dis01 + noise_dis, dis01 - noise_dis, step(noise_dis, dis01));
+				macro(SCREEN_UV) out(mediump float2 srcUV) 
+				{
+					branch ("1") 
+					{
+						out(srcUV, (pos_wvp.xy - noise_center.xy) / pos_wvp.w);
+					}
+					branch ("0") 
+					{
+						out(srcUV, UV02.xy - noise_center.xy);
+					}
+				};
+
+				out(v_noiseInfo, float4(srcUV, dis01, dis02));
+			}
+			branch ("0") 
+			{
+			}
+		};
+
+		macro(FLOWMAP_ENABLE)
+		{
+			branch ("1") 
+			{
+				out(UV_anim, UV02.xy + uv_speed * FrameTime);
+			}
+			branch ("0") 
+			{
+			}
+		};
+	}
+
+	pixel
+	{
+        macro(NOISE_ENABLE) out(float2 noiseOffset01, float2 noiseOffset02) 
+        {
+        	branch ("1") 
+        	{
+        		mediump float2 srcUV = v_noiseInfo.xy;
+        		mediump float dis01 = v_noiseInfo.z;
+        		mediump float dis02 = v_noiseInfo.w;
+        		macro(NOISE_TOR) out(float2 noiseTor) 
+        		{
+        			branch ("1") 
+        			{
+        				float2 noiseTor00 = 2.0f * (sample(noiseTEX, (srcUV + noise_speed.xy * FrameTime) * noise_density.zw)).gb - float2(1.0f);
+        				out(noiseTor, noiseTor00 * tor_intensity.y);
+        			}
+        			branch ("0") 
+        			{
+        				out(noiseTor, float2(0.0f));
+        			}
+        		};
+
+        		lowp float4 noiseColor01 = sample(noiseTEX, (srcUV * dis01 + noise_speed.xy * FrameTime + noiseTor) * noise_density.xy);
+        		lowp float4 noiseColor02 = sample(noiseTEX, (srcUV * dis02 + noise_speed.xy * FrameTime + noiseTor) * noise_density.xy);
+
+        		function NoiseDisLerp(dis01, noise_dis) out (lowp float noiseLerp01);
+        		function NoiseDisLerp(dis02, noise_dis) out (lowp float noiseLerp02);
+        		float2 noise001 = noiseColor01.xy * noiseLerp01 + noiseColor02.yz * noiseLerp02;
+        		float2 noise002 = noiseColor01.yz * noiseLerp01 + noiseColor02.xy * noiseLerp02;
+
+        		out(noiseOffset01, noise001.xy * tor_intensity.x);
+        		out(noiseOffset02, noise002.xy * tor_intensity.x);
+        	}
+        	branch ("0") 
+        	{
+        		out(noiseOffset01, float2(0.0f));
+        		out(noiseOffset02, float2(0.0f));
+        	}
+        };
+
+        float2 UV00 = UV0.xy;
+        float2 UV02 = v_cloudUV.xy;
+
+        macro(FLOWMAP_ENABLE) out(lowp float4 cloud_color) 
+        {
+        	branch ("0") 
+        	{
+        		float2 finalUV = UV02.xy + noiseOffset01;
+
+        		lowp float4 diffuse_map_color = sample(Tex0, finalUV);
+
+        		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 cloud_color0)
+        		{
+        			branch("1")
+        			{
+        				lowp float4 separateColor = sample(sepAlphaTex, finalUV);
+        				out(cloud_color0, float4(diffuse_map_color.xyz, separateColor.w));
+        			}
+        			branch("0") {
+        				out(cloud_color0, diffuse_map_color);
+        			}
+        		};
+        		out(cloud_color, cloud_color0);
+        	}
+        	branch ("1") 
+        	{
+        		lowp float HalfPeriod = PeriodSec * 0.5f;
+        		lowp float4 flowmap_color = sample(flowTEX, UV02.xy);
+        		lowp float2 Flow_dir = (flowmap_color.rg - float2(0.5f)) * 2.0f;
+        		lowp float fmod1 = fmod(FrameTime, PeriodSec);
+        		lowp float fmod2 = fmod(FrameTime + HalfPeriod,PeriodSec);
+        		lowp float2 NewUV1 = fmod1 * Flow_dir * Speed + UV_anim + noiseOffset01;
+        		lowp float2 NewUV2 = fmod2 * Flow_dir * Speed + UV_anim + noiseOffset02;
+
+        		lowp float4 combiend_flow10 = sample(Tex0, NewUV1);
+        		lowp float4 combiend_flow20 = sample(Tex0, NewUV2);
+        		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 combiend_flow1, lowp float4 combiend_flow2)
+        		{
+        			branch("1")
+        			{
+        				lowp float4 separateColor1 = sample(sepAlphaTex, NewUV1);
+        				out(combiend_flow1, float4(combiend_flow10.xyz, separateColor1.w));
+
+        				lowp float4 separateColor2 = sample(sepAlphaTex, NewUV2);
+        				out(combiend_flow2, float4(combiend_flow20.xyz, separateColor2.w));
+        			}
+        			branch("0") {
+        				out(combiend_flow1, combiend_flow10);
+        				out(combiend_flow2, combiend_flow20);
+        			}
+        		};
+        		lowp float flow_lerp = abs(HalfPeriod - fmod1) / HalfPeriod;
+        		lowp float4 combiend_flow = lerp(combiend_flow1,combiend_flow2, float4(flow_lerp));
+
+        		out(cloud_color, combiend_flow);
+        	}
+        };
+        
+        macro(BG_ON) out(lowp float4 finalColor) 
+        {
+        	branch ("1") 
+        	{
+        		lowp float4 bgColor = sample(bgTEX, UV0.xy);
+		        lowp float3 finalColor0 = lerp(bgColor.rgb, cloud_color.rgb, float3(cloud_color.a));
+		        out(finalColor, float4(finalColor0.rgb, 1.0f));
+        	}
+        	branch ("0") 
+        	{
+        		out(finalColor, cloud_color);
+        	}
+        };
+
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") 
+		  	{
+				alphatest("<")(finalColor.a - alphaRef, 0.0f);
+		  	}
+			branch("0") 
+			{
+		 	}
+		};
+
+		//pixel(float4(diffuse_map_color.rgb, alpha * AlphaMtl));
+		pixel(finalColor);
+	}
+}

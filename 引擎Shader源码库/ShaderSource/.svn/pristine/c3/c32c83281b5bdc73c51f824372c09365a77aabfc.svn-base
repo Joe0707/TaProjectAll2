@@ -1,0 +1,161 @@
+﻿["yinshen"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "ly" 
+	category = "common" 
+	company = "netease"
+    merge = "1"
+>
+{
+
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	
+	["轮廓光颜色强度"]
+	uniform mediump float rim_multi
+	<
+		uigroup = "3 轮廓光"
+		init = "2.26"
+		uistep = "0.001"
+		artist = "1"    
+		max = "5.0"
+		min = "1.0"
+	>;
+
+	["轮廓颜色"]
+	uniform mediump float4 rim_color
+	<
+		uigroup = "3 轮廓光"
+		init = "(0.0, 0.514, 1.0, 1.0)"
+		color = "1"
+		artist = "1"
+	>;
+
+	["rim 开始"]
+	uniform mediump float u_rim_start
+	<
+		uigroup = "3 轮廓光"
+		uistep = "0.001"
+		init = "0.26"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["rim 结束"]
+	uniform mediump float u_rim_end
+	<
+		uigroup = "3 轮廓光"
+		uistep = "0.001"
+		init = "1.15"
+		max = "1.5"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+
+	// varying变量
+	varying mediump float2 UV0;
+
+	varying mediump float4 PosWorld;
+
+	varying lowp float3 NormalWorld;
+
+
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		highp float4 position = vec;	
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+
+		highp float4 pos_world = transform(position, world);
+		out(UV0, texcoord0.xy);
+		float3x3 worldMat = float3x3(world);
+		lowp float3 world_normal = float3(normalize(transform(nor.xyz, worldMat)));
+
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		out(NormalWorld, world_normal);
+    }
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_map_color.a);
+			}
+		};
+			
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float NdotV = saturate(dot(view_dir, NormalWorld));
+
+		lowp float rim_ = 1.0f - NdotV;
+
+		mediump float rim = smoothstep(u_rim_start, u_rim_end, rim_);
+
+		mediump float3 final_rim_color = lerp(diffuse_map_color.xyz, rim_color.xyz * rim_multi, float3(rim));
+
+		mediump float final_alpha = lerp(0.0f, alpha * AlphaMtl, rim);
+
+		pixel(float4(final_rim_color , final_alpha));
+	}
+}

@@ -1,0 +1,248 @@
+["comm sys"]
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+	["需要法线(NEED_NORMAL)"]
+	eitheror NEED_NORMAL;
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_texcoord0 : TEXTURE0;
+	attribute float4 a_texcoord1 : TEXTURE1;
+	attribute float4 a_diffuse : DIFFUSE;
+	
+	uniform highp float4x4 i_wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 i_world : WORLD;
+	uniform highp float4x4 i_texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 i_lightmapTrans : TEXTURE_TRANS1;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] i_ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform lowp float4 i_Ambient : AMBIENT;
+	
+	varying mediump float4 v_UV0;
+	varying mediump float4 v_UV1;
+	varying mediump float4 v_RAWUV0;
+	varying highp float4 v_PosWorld;
+	varying highp float3 v_NormalWorld;
+	varying lowp float3 v_Lighting;
+	
+	["颜色贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+	>;
+
+	["遮罩贴图"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+	>;
+	
+	["法线贴图"]
+	uniform sampler Tex2
+	<
+		artist = "1"
+	>;	
+
+	["环境贴图"]
+	uniform sampler SkyEnvMap
+	<
+		artist = "1"
+	>;
+	
+	["烘培贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "1"
+	>;	
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+ 
+	uniform mediump float i_FrameTime: FRAME_TIME;
+	uniform mediump float4 i_LightMapScale : LIGHT_MAP_SCALE;
+	uniform highp float3 i_CameraPos : CAMERA_POSITION;
+	uniform float i_AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	
+	["透明度"]
+	uniform float alpha_value
+	<
+		artist = "1" 
+		init = "0.5"
+	>;
+
+	["水面颜色"]
+	uniform float4 face_color<
+		artist = "1" 
+		init = "1.0,1.0,1.0,0.0"
+	>;
+
+	["水的UV重复度"]
+	uniform float repeat_water_uv<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	["法线的UV重复度"]
+	uniform float repeat_normal_uv<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	["波浪强度"]
+	uniform float wave_intensity
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	["扰动强度"]
+	uniform float turlate_intensity
+	<
+		artist = "1" 
+		init = "0.1"
+	>;
+
+	["扰动重复度u"]
+	uniform float ground_repeat_u
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	["扰动重复度v"]
+	uniform float ground_repeat_v
+	<
+		artist = "1" 
+		init = "1.0"
+	>;
+
+	vertex
+	{
+		float4 pos = a_position;
+
+		float4 posWorld = transform(a_position, i_wvp);
+		out(v_PosWorld, posWorld);		
+		
+		macro(NEED_NORMAL) out (lowp float3 normalWorld)
+		{
+		  branch("1") {
+			float3x3 worldNormalMat = float3x3(i_world);
+			float3 nw = normalize(a_normal.xyz * worldNormalMat);
+			out(normalWorld, nw);
+		  }
+		  branch("0") {
+		  	out(normalWorld, float3(1.0f));
+		  }
+		};
+		out(v_NormalWorld, normalWorld);
+		
+		out(v_RAWUV0, a_texcoord0);
+
+		vertex(transform(a_position, i_wvp));
+	
+		out(v_UV0, a_texcoord0);
+		
+		macro(LIGHT_MAP_ENABLE)
+		{
+		  branch("1") {
+			mediump float4 uv1 = float4(a_texcoord1.xy, 1.0f, 0.0f) * i_lightmapTrans;
+			out(v_UV1, uv1);
+		  }
+		  branch("0") {
+		  }
+		};
+	
+		macro(LIT_ENABLE)
+		{
+		  branch("1") {
+			function shadow_light_lit(i_ShadowLightAttr[1], i_ShadowLightAttr[3], i_ShadowLightAttr[4], posWorld.xyz, normalWorld.xyz) out(float3 lit);
+			float3 Lighting = i_Ambient.xyz + lit;			
+			out(v_Lighting, Lighting);
+		  }
+		  branch("0") {
+		  }
+		};
+	}
+	
+	pixel
+	{
+		// 采样法线
+		lowp float2 ttt = (v_UV0.xy + float2(i_FrameTime * 0.1f));
+		lowp float2 normal_uv = ttt * float2(1.0f, repeat_normal_uv);
+		lowp float4 normalTex = sample(Tex2, normal_uv);
+		mediump float3 view_dir = normalize(i_CameraPos.xyz - v_PosWorld.xyz);
+		mediump float3 norm_world = normalize(v_NormalWorld.xyz);
+		lowp float3 normal = normalize(float3(normalTex.rg, 0.0f) * wave_intensity + norm_world);
+
+		// 采样环境
+		lowp float2 sky_uv = v_RAWUV0.xy * float2(ground_repeat_u, ground_repeat_v) + (normal.xy * turlate_intensity);
+		lowp float4 sky_color = sample(SkyEnvMap, sky_uv);
+
+		// 采样遮罩
+		lowp float4 mask_map_color = sample(Tex1, v_RAWUV0.xy);
+
+		// 采样水的颜色
+		lowp float2 water_uv = v_UV0.xy * repeat_water_uv;
+		lowp float4 water_map_color = sample(Tex0, water_uv);
+
+		// 计算最终的结果
+		float ma = alpha_value * mask_map_color.g;
+		float3 xyz = sky_color.rgb * (1.0f - ma) + water_map_color.rgb * ma;
+		float4 result = float4(xyz * face_color.rgb, mask_map_color.r);
+		
+		macro(LIGHT_MAP_ENABLE) out (lowp float3 texColor2)
+		{
+		  branch("1") {
+			lowp float2 lightmap_uv = v_UV1.xy + (normal.xy * turlate_intensity * 0.02f);
+			lowp float3 lightmap_color = sample(TexLightmap, lightmap_uv).xyz * i_LightMapScale.yzw;
+			out(texColor2, lightmap_color);
+		  }
+		  branch("0") {
+			out(texColor2, float3(0.0f));
+		  }
+		};
+	
+		macro(LIT_ENABLE) out (lowp float3 final_lit_color)
+		{
+		  branch("1") {
+			lowp float3 texColor3 = saturate(texColor2 + v_Lighting);
+			out(final_lit_color, texColor3);
+		  }
+		  branch("0") {
+			out(final_lit_color, texColor2);
+		  }
+		};
+
+		macro(LIGHT_MAP_ENABLE) out (lowp float3 final_xyz)
+		{
+		  branch("1") {
+			out(final_xyz, result.xyz * final_lit_color);
+		  }
+		  branch("0") {
+			macro(LIT_ENABLE) out (lowp float3 _final_xyz)
+			{
+			  branch("1") {
+				out(_final_xyz, result.xyz * final_lit_color);
+			  }
+			  branch("0") {
+				out(_final_xyz, result.xyz);
+			  }
+			};
+			out(final_xyz, _final_xyz);
+		  }
+		};
+
+		pixel(float4(final_xyz, result.a * i_AlphaMtl));
+	}
+	
+}

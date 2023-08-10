@@ -1,0 +1,153 @@
+﻿["vertex animation shader for fx"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	["颜色贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+	>;
+
+	["cMoveSpeed"]
+	uniform float cMoveSpeed
+	<
+		artist = "1"
+		min = "0.0"
+		max = "5.0"
+		uistep = "0.01"
+		init = "0.1"
+	>;
+
+	["cMoveIntensity"]
+	uniform float cMoveIntensity
+	<
+		artist = "1"
+		min = "0.0"
+		max = "50.0"
+		uistep = "0.01"
+		init = "0.1"
+	>;
+
+	["cMoveRandomness"]
+	uniform float cMoveRandomness
+	<
+		artist = "1"
+		min = "0.0"
+		max = "0.2"
+		uistep = "0.01"
+		init = "0.0"
+	>;
+
+	// ——————rim——————
+		["轮廓光色彩1"]
+		uniform float4 u_rim_color1
+		<
+			artist = "1"
+			color = "1"
+			init = "(1.0,1.0,1.0,1.0)" 
+			uigroup = "轮廓光"
+		>;
+		["轮廓光色彩2"]
+		uniform float4 u_rim_color2
+		<
+			artist = "1"
+			color = "1"
+			init = "(1.0,1.0,1.0,1.0)" 
+			uigroup = "轮廓光"
+		>;
+
+		["轮廓光起始位置1"]
+		uniform float u_rim_smooth1
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "0.0" 
+			uigroup = "轮廓光"
+		>;
+
+		["轮廓光结束位置2"]
+		uniform float u_rim_smooth2
+		<
+			artist = "1"
+			uistep = "1"
+			min = "0.0"
+			max = "1.0"
+			init = "1.0" 
+			uigroup = "轮廓光"
+		>;
+
+		// ["轮廓光强度"]
+		// uniform float u_rim_strength
+		// <
+		// 	artist = "1"
+		// 	uistep = "1"
+		// 	min = "0.0"
+		// 	max = "5.0"
+		// 	init = "1.0" 
+		// 	uigroup = "轮廓光"
+		// >;
+
+	uniform highp float4x4 u_world: WORLD;
+	uniform highp float4x4 u_wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float u_frametime: FRAME_TIME;
+	uniform mediump float4x4 view_mat : VIEW;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;	
+
+	attribute float4 a_position: POSITION;
+	attribute float2 a_UV0: TEXTURE0;
+	attribute float4 a_normal: NORMAL;
+
+	// varying float2 v_UV0;
+	varying highp float3 v_NormalWorld;
+	varying highp float4 PosWorld;
+
+	function CubicSmooth in(float x) out(float x1) {
+		out(x1, x * x * (3.0f - 2.0f * x));
+	};
+
+	function TriangleWave in(float x) out(float x1) {
+		out(x1, abs((fractional(x + 0.5f) * 2.0f) - 1.0f));
+	};
+
+	function TrigApproximate in(float x) out(float x3) {
+		function TriangleWave(x) out(float x1);
+		function CubicSmooth(x1) out(float x2);
+		out(x3,x2 * 2.0f - 1.0f);
+	};
+
+
+	vertex {
+		highp float4 position_org = a_position;
+		// function TriangleWave(u_frametime * cWindFrequency) out(highp float randomWind1);
+		// highp float randomWind = 0.3f + saturate(randomWind1)*0.7f;
+		function TrigApproximate(a_position.x*cMoveRandomness + u_frametime * cMoveSpeed) out(highp float g);
+		highp float3 globalMove = float3(0.0f,a_normal.yz) * g  * cMoveIntensity ;
+		highp float4 pos = position_org + float4(globalMove,0.0f);
+		// highp float4 pos = position_org;
+		highp float4 pos_wvp = transform(pos,u_wvp);
+		vertex(pos_wvp);
+		// out(v_UV0,a_UV0);
+		highp float3x3 worldMat = float3x3(u_world);		
+		highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+		out(PosWorld, float4(pos.xyz, 1.0f));		
+		out(v_NormalWorld, world_normal);
+	}
+	pixel {
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+		lowp float NdotV = dot(view_dir, v_NormalWorld);
+		lowp float rim_ = saturate(1.0f - NdotV);
+		mediump float rim = smoothstep(u_rim_smooth1, u_rim_smooth2, rim_);
+		// lowp float4 diffuse = sample(Tex0,v_UV0);
+		pixel(lerp(u_rim_color1,u_rim_color2,float4(rim)));
+	}
+}

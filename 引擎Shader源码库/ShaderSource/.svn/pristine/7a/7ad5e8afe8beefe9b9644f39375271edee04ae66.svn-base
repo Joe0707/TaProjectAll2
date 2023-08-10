@@ -1,0 +1,309 @@
+["shadow"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+
+	["使用溶解效果"]
+	eitheror DISSOLVE_ENABLE;
+	macro(DISSOLVE_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["使用溶解效果"]
+	eitheror WEB_SHINING_ENABLE;
+	macro(WEB_SHINING_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["使用溶解效果"]
+	eitheror DISSOLVE_ENABLE2;
+	macro(DISSOLVE_ENABLE2)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+
+// 贴图	
+	["AlphaTest贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["溶解贴图"]
+	uniform sampler u_tex_dissolve : OTHER_ALPHA_TEXTURE
+	<
+	>;
+	
+// 调整参数
+//------------ 溶解效果 -------------
+	["溶解TillingX"]
+	uniform lowp float u_dissolve_tillingx
+	<
+		artist = "1"
+		init = "1.0"
+		uigroup = "溶解"
+	>;
+	["溶解TillingY"]
+	uniform lowp float u_dissolve_tillingy
+	<
+		artist = "1"
+		init = "1.0"
+		uigroup = "溶解"
+	>;
+
+	["AlphaTest 值"]
+	uniform lowp float u_alpha_test_intensity : OHTER_ALPHA_REF
+	<
+		artist = "1"
+		max = "1.0"
+		min = "0.0"
+		init = "0.0"
+		uistep = "0.01"
+		uigroup = "溶解"
+	>;
+
+	["溶解：使用屏幕UV"]
+	uniform lowp float u_usescreen_uv
+	<
+		artist = "1"
+		max = "1.0"
+		min = "0.0"
+		init = "0.0"
+		uistep = "1"
+		uigroup = "溶解"
+	>;
+	["溶解：使用2U"]
+	uniform lowp float u_second_uv
+	<
+		artist = "1"
+		max = "1.0"
+		min = "0.0"
+		init = "0.0"
+		uistep = "1"
+		uigroup = "溶解"
+	>;
+
+	["ChangeAmount"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["角色高度"]
+	uniform mediump float burn_max_height
+	<
+		init = "30.0"
+		artist = "1"
+		uistep = "0.01"
+		max = "50.0"
+		min = "0.01"
+		uigroup = "网格闪烁消融"
+	>;
+
+	["消融方式（0为出现/1为消失）"]
+	uniform lowp float burn_style
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "1.0"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "网格闪烁消融"
+	>;
+	
+// attribute变量
+	attribute float2 texcoord0 : TEXTURE0;
+	attribute float2 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_blendweight: BLENDWEIGHT;
+	attribute float4 a_blendindices: BLENDINDICES;
+
+	
+// varying变量
+	varying float4 v_position;
+	varying mediump float2 v_alpha_test_uv;
+	varying mediump float4 PosWorld;
+
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	
+	uniform mediump float4x4 wv  : WORLD_VIEW;
+	uniform mediump float4 CameraZPlanes : CAMERA_INFO;
+	uniform highp float4x4 world : WORLD;
+	
+	vertex
+	{
+		float4 pos_in = a_position;
+		["是否支持GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out(float4 pos_out)
+		{
+			branch("1")
+			{
+				function get_skin_pos(a_blendweight, uint4(a_blendindices), pos_in, u_bone_vec)
+					out(float4 pos_out1);
+				out(pos_out, pos_out1);
+			}
+			branch("0")
+			{
+				out(pos_out, pos_in);
+			}
+		};
+
+		highp float4 screen_pos = float4(transform(pos_out, wvp));
+		vertex(screen_pos);
+		
+		macro(SHADOW_MAP_ESM) {
+			branch("1") {
+				out(v_position, transform(pos_out, wvp));
+			}
+			branch("0") {
+			}
+		};
+
+		macro(DISSOLVE_ENABLE){
+			branch ("1") {
+				highp float2 dissolve_uv_screen = (screen_pos.xy / float2(screen_pos.w)) * float2(u_dissolve_tillingx,u_dissolve_tillingy);
+				highp float2 dissolve_uv_model = texcoord0.xy * float2(u_dissolve_tillingx,u_dissolve_tillingy);
+				highp float2 dissolve_uv2_model = texcoord1.xy * float2(u_dissolve_tillingx,u_dissolve_tillingy);
+				highp float2 dissolve_uv_ = lerp(dissolve_uv_model,dissolve_uv_screen,float2(u_usescreen_uv));
+				highp float2 dissolve_uv = lerp(dissolve_uv_,dissolve_uv2_model,float2(u_second_uv));
+				out(v_alpha_test_uv, dissolve_uv);
+			}
+			branch ("0") {
+				out(v_alpha_test_uv, texcoord0.xy);
+			}
+		};
+
+		macro(WEB_SHINING_ENABLE){
+			branch ("1") {
+				highp float4 pos_world = transform(pos_in, world);
+				out(PosWorld, float4(pos_world.xyz, 1.0f));
+				out(v_alpha_test_uv, texcoord0.xy);
+			}
+			branch ("0") {
+				out(v_alpha_test_uv, texcoord0.xy);
+			}
+		};
+
+		macro(DISSOLVE_ENABLE2){
+			branch ("1") {
+				out(v_alpha_test_uv, texcoord0.xy);
+			}
+			branch ("0") {
+				out(v_alpha_test_uv, texcoord0.xy);
+			}
+		};
+	}
+
+	pixel
+	{
+		//使用一般的alpha test
+		//macro(ALPHA_TEST_ENABLE)
+		//{
+		//  branch("1") {
+		//	lowp float4 separateColor = sample(sepAlphaTex, v_alpha_test_uv.xy);
+		//	alphatest("<")(separateColor.w - u_alpha_test_intensity, 0.0f);
+		//  }
+		//  branch("0") {
+		//  }
+		//};
+
+		//如果有消融，会优先使用消融效果
+		macro(DISSOLVE_ENABLE)
+		{
+		  branch("1") {
+			lowp float4 dissolveColor = sample(u_tex_dissolve, v_alpha_test_uv.xy);
+			alphatest("<")(dissolveColor.r - u_alpha_test_intensity, 0.0f);
+		  }
+		  branch("0") {
+		  }
+		};
+
+		macro(WEB_SHINING_ENABLE){
+			branch ("1") {
+				mediump float burn_add_height = 0.0f;  //底部/顶部追加高度(消除边缘跳跃)
+		        mediump float burn_web_density = 2.0f; //网格密度
+		        lowp float burn_line_width = 0.1f;     //线条宽度(网格间隙)
+		        lowp float burn_noise_intensity = 0.1f;//网格噪声强度
+		        lowp float burn_spread = 0.1f;         //消融扩散范围
+
+		        mediump float3 CharWorldPos = (world[3]).xyz;
+				mediump float3 web_tex0 = (PosWorld.xyz - CharWorldPos + float3(0.0f, burn_add_height, 0.0f)) * burn_web_density;
+				mediump float3 web_tex1 = floor(web_tex0);
+				mediump float3 web_tex2 = fractional(web_tex0);
+				lowp float webline01 = burn_line_width / 2.0f;
+				lowp float webline02 = 1.0f - webline01;
+		        condition(web_tex2, webline01, webline02) out(mediump float web_tex_intensity)
+		        {
+		                branch ("%0%.x < %1% || %0%.y < %1% || %0%.z < %1% || %0%.x > %2% || %0%.y > %2% || %0%.z > %2%") 
+		                {
+		                        mediump float web_line_intensity = (PosWorld.y - CharWorldPos.y + burn_add_height) / burn_max_height;
+		                        out(web_tex_intensity, web_line_intensity);
+		                }
+		                default
+		                {
+		                        mediump float web_noise_intensity = fractional(sin(web_tex1.x*157.117f + web_tex1.y*73.713f + web_tex1.z*283.452f) * 3851.1379f) * 2.0f - 1.0f;
+		                        out(web_tex_intensity, saturate(web_tex1.y/ burn_web_density/ burn_max_height + web_noise_intensity * burn_noise_intensity));
+		                }
+		        };
+		        lowp float ChangeAmount1 = lerp(-0.5f,1.5f,ChangeAmount);
+		        lowp float burn_style_ = step(0.5f,burn_style);
+		        lowp float alphatest1 = lerp(1.0f - ChangeAmount1,web_tex_intensity, burn_style_);
+		        lowp float alphatest2 = lerp(web_tex_intensity, 1.0f - ChangeAmount1,burn_style_);
+
+		        alphatest("<")(alphatest1, alphatest2);
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(DISSOLVE_ENABLE2){
+			branch ("1") {
+			}
+			branch ("0") {
+			}
+		};
+
+		macro(SHADOW_MAP_ESM) out(highp float4 final_color) {
+			branch("1") {
+				highp float Near = -1.0f * CameraZPlanes.w/CameraZPlanes.z;//1.0; // camera z near
+				highp float Far = CameraZPlanes.z * Near/(CameraZPlanes.z - 1.0f);//3000.0; // camera z far
+				highp float LinearDepthConstant = 1.0f / (Far - Near);
+
+				highp float linearDepth = length(v_position) * LinearDepthConstant;
+				
+				// mediump float depth = 1.0f / max(0.0f, min(150.0f, v_position.z) - 0.0f);
+				// mediump float depth = 1.0f / v_position.z;
+				// mediump float depth = 1.0f / v_position.z / 500.0f;
+				mediump float depth = v_position.z;
+				
+				out(final_color, float4(v_position.z, fmod(v_position.z * 256.0f, 1.0f), fmod(v_position.z * 256.0f * 256.0f, 1.0f), fmod(v_position.z * 256.0f * 256.0f * 256.0f, 1.0f)));
+				// out(final_color, float4(0.5f));
+			}
+			branch("0") {
+				out(final_color, float4(1.0f));
+			}
+		};
+		
+		pixel(final_color);
+	}
+}

@@ -1,0 +1,94 @@
+["screen broken"]
+pipeline
+<
+	author = "ly/xuzhuoliang"
+	company = "netease"
+	category = "postprocess"
+	technique = "screen_broken"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float2 TexCoord0;
+	varying mediump float2 TexCoord1;
+	varying mediump float2 TexCoord2;
+	varying mediump float2 TexCoord3;
+	varying mediump float2 TexCoord4;
+	varying mediump float2 TexCoord5;
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+	["碎裂法线图"]
+	uniform sampler NormalMap
+	<
+		// export = "0"
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		// addressu = "CLAMP"
+		// addressv = "CLAMP"
+	>;
+
+	// ["basic_target 图"]
+	// uniform sampler Tex2
+	// <
+	// 	export = "0"
+	// 	mag = "LINEAR"
+	// 	mip = "LINEAR"
+	// 	min = "LINEAR"
+	// 	addressu = "CLAMP"
+	// 	addressv = "CLAMP"
+	// >;
+
+	["偏移程度"]
+	uniform float noise_factor
+	<
+		// artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.6"
+	>;
+
+	["叠加程度"]
+	uniform float add_factor
+	<
+		// artist = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.6"
+	>;
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		out(TexCoord0, a_texture0.xy);
+	}
+	
+	pixel
+	{
+		// mediump float3 scene_color_hdr = sample(Tex0, TexCoord0).xyz;
+
+		lowp float4 NormalMap_color = sample(NormalMap, TexCoord0 );
+
+		mediump float2 Normal_offset = (NormalMap_color.xy - float2(0.5f)) * 2.0f;
+
+		mediump float4 combined_offset = sample(Tex0, TexCoord0 + Normal_offset * 0.1f * noise_factor);
+		mediump float3 combined_offset1 = combined_offset.rgb + float3(NormalMap_color.b) * add_factor;
+		// mediump float4 combined_offset = sample(Tex0, TexCoord0);
+
+		pixel(float4(combined_offset1.rgb, combined_offset.a));
+	}
+}

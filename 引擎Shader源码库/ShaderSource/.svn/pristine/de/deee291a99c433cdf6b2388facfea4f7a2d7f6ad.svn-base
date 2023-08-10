@@ -1,0 +1,236 @@
+["outfire for fx"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+>
+{
+// 宏
+
+// 贴图
+	["使用自身UV"]
+	uniform mediump float UseUV
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["NoiseTex"]
+	uniform sampler NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;	
+	["里层颜色"]
+	uniform lowp float4 InsideColor
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,0.87,0.73,1.0"
+	>;
+	["边缘颜色"]
+	uniform lowp float4 EdgeColor
+	<
+		artist = "1"
+		color = "1"
+		init = "0.87,0.43,0.14,1.0"
+	>;
+	["模型外拓倍数"]
+	uniform mediump float Outline
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+	["模型深度偏移"]
+	uniform mediump float OutlineZ
+	<
+		artist = "1"
+		init = "-0.01"
+	>;
+	["Noise Tilling X"]
+	uniform mediump float NoiseTillingX
+	<
+		artist = "1"
+		init = "0.5"
+	>;
+	["Noise Tilling Y"]
+	uniform mediump float NoiseTillingY
+	<
+		artist = "1"
+		init = "0.06"
+	>;
+	["Noise Speed X"]
+	uniform mediump float NoiseSpeedX
+	<
+		artist = "1"
+		init = "-0.2"
+		uistep = "0.001"
+		min = "-10.0"
+		max = "10.0"
+	>;
+	["Noise Speed Y"]
+	uniform mediump float NoiseSpeedY
+	<
+		artist = "1"
+		init = "9.2"
+		uistep = "0.001"
+		min = "-10.0"
+		max = "10.0"
+	>;
+	["边缘光Power"]
+	uniform mediump float RimPower
+	<
+		artist = "1"
+		init = "1.91"
+		uistep = "0.001"
+		min = "0.01"
+		max = "10.0"
+	>;
+	["不透明度"]
+	uniform mediump float Opacity
+	<
+		artist = "1"
+		init = "1.9"
+		uistep = "0.001"
+		min = "0.01"
+		max = "10.0"
+	>;
+	["外边"]
+	uniform mediump float Edge
+	<
+		artist = "1"
+		init = "0.0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["外边亮度"]
+	uniform mediump float EdgeBrightness
+	<
+		artist = "1"
+		init = "1.88"
+		uistep = "0.001"
+		min = "0.5"
+		max = "3.0"
+	>;
+	["最终对比度"]
+	uniform mediump float FinalPower
+	<
+		artist = "1"
+		init = "3.0"
+		uistep = "0.001"
+		min = "0.1"
+		max = "10"
+	>;
+	["最终强度"]
+	uniform mediump float FinalIntensity
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;	
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 projection : PROJECTION;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform highp float frame_time : FRAME_TIME;
+
+	// varying变量
+	varying mediump float3 v_viewDir;
+	varying mediump float3 v_normalDir;
+	varying mediump float2 v_screen_uv;
+
+	vertex
+	{	
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+				
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+		highp float4 position = vec;
+		highp float4 normal = nor;
+
+		highp float4 pos_proj = transform(position,wvp);
+		highp float3 norm = normalize(transform(normal.xyz,float3x3(wv)));
+		highp float2 offset = transform(norm.xy,float2x2(projection));
+		highp float2 pos_proj_xy = pos_proj.xy + offset * Outline * pos_proj.z * 0.1f;
+		//highp float2 pos_proj_xy = pos_proj.xy;
+		macro(SYSTEM_DEPTH_RANGE_NEGATIVE) out(mediump float z_offset)
+		{
+			branch("1")
+			{
+				["GL渲染系统下"]
+				out(z_offset, OutlineZ * 0.01f);
+			}
+			branch("0")
+			{
+				["Dx和Metal渲染系统下"]
+				out(z_offset, OutlineZ * 0.005f);
+			}
+		};
+		highp float pos_proj_z = pos_proj.z + z_offset;
+		highp float4 screenpos = float4(pos_proj_xy,pos_proj_z,pos_proj.w);
+
+		vertex(screenpos);
+
+		mediump float2 uv_ = lerp(screenpos.xy,texcoord0.xy,float2(UseUV));
+		out(v_screen_uv,uv_);
+		
+		float3x3 worldMat = float3x3(world);		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		out(v_normalDir, world_normal);
+		highp float4 pos_world = transform(position, world);
+		float3 viewdir = normalize(camera_pos.xyz - pos_world.xyz);
+		out(v_viewDir, viewdir);
+	}
+
+	pixel
+	{
+		mediump float2 uv = float2(v_screen_uv.x * NoiseTillingX * 0.1f - (frame_time * NoiseSpeedX * 0.1f), v_screen_uv.y * NoiseTillingY * 0.1f - (frame_time * NoiseSpeedY * 0.1f)); 
+		lowp float noise = 1.0f - sample(NoiseTex, uv).r;
+		mediump float3 view_dir = normalize(v_viewDir);
+		mediump float3 normal_dir = normalize(v_normalDir);
+		mediump float rim = pow(saturate(dot(normal_dir,view_dir)), RimPower);
+		mediump float subtractRim = rim - noise;
+		lowp float insideRim = saturate(subtractRim * Opacity); 
+		mediump float edgeRim = (saturate((Edge + insideRim) * Opacity) - insideRim) * EdgeBrightness;
+		lowp float3 combined_color = InsideColor.rgb * insideRim + EdgeColor.rgb * edgeRim;
+		lowp float3 res_color = pow(combined_color,float3(FinalPower)) * FinalIntensity;
+		//pixel(float4(float3(rim),1.0f));
+		pixel(float4(float3(res_color),saturate(insideRim + edgeRim)));
+	}
+}

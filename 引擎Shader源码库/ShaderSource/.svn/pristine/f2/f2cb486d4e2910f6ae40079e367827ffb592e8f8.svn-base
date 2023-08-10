@@ -1,0 +1,285 @@
+["terrain Shader"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "liuyu" 
+	category = "common" 
+	company = "netease"
+	technique="TerrainTech"
+>
+{
+  enum TERRAIN_TECH_TYPE
+  {
+    TERRAIN_NONE,
+    TERRAIN_SINGLE_LAYER,
+    TERRAIN_SINGLE_LAYER_LIGHTMAP,
+    TERRAIN_VCOLOR,
+    TERRAIN_VCOLOR_LIGHTMAP,
+    TERRAIN_ALPHAMAP_2,
+    TERRAIN_ALPHAMAP_LIGHTMAP_2,
+    TERRAIN_ALPHAMAP_3,
+    TERRAIN_ALPHAMAP_LIGHTMAP_3,
+    TERRAIN_ALPHAMAP_4,
+    TERRAIN_ALPHAMAP_LIGHTMAP_4
+  };
+
+  // 宏
+  macro(EDITOR)
+  <
+    default = "0"
+    customizable = "0"
+  >;
+
+  macro(TERRAIN_TECH_TYPE)
+  <
+    default = "TERRAIN_SINGLE_LAYER"
+  >;
+
+//********* 以下sampler的顺序不要变化***************//
+  uniform sampler terrain0 : DIFFUSE
+  <
+  export="0"
+  >;
+    
+  uniform sampler terrain1 : TERRAIN1
+    <
+    export="0"
+    >;
+    
+  uniform sampler terrain_blend_0 : TERRAIN_BLEND_EDITOR0
+    <
+    export="0"
+    >;
+
+  uniform sampler terrain2 : TERRAIN2
+  <
+    export="0"
+  >;
+  uniform sampler terrain_blend_1 : TERRAIN_BLEND_EDITOR1
+    <
+    export="0"
+    >;
+  uniform sampler terrain3 : TERRAIN3
+    <
+    export="0"
+    >;
+  uniform sampler terrain_blend_2 : TERRAIN_BLEND_EDITOR2
+    <
+    export="0"
+    >;
+//********* 以上sampler的顺序不要变化***************//
+
+    uniform sampler terrain_blend : TERRAIN_BLEND
+    <
+    export="0"
+    >;
+
+    
+  ["高度图"]
+  uniform sampler tex_height
+  <
+    artist = "0"
+    mag = "LINEAR"
+    mip = "LINEAR"
+    min = "LINEAR"
+    path = "fx\\texture\\effect\\dissolve.png"
+  >;
+  ["环境贴图"]
+  uniform sampler tex_env
+  <
+    artist = "0"
+    mag = "LINEAR"
+    mip = "LINEAR"
+    min = "LINEAR"
+    path = "fx\\texture\\effect\\lighttex.png"
+  >;
+
+  ["lightmap贴图"]
+  uniform sampler TexLightmap : LIGHTMAP
+  <
+    artist = "0"
+    mag = "LINEAR"
+    mip = "LINEAR"
+    min = "LINEAR"
+  >;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform highp float4x4 world : WORLD;
+
+  uniform lowp float alphaRef : ALPHA_REF;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+  uniform mediump float4 uv_transform;
+	
+	uniform highp float4x4 proj : PROJECTION;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+// varying变量
+  // 原始uv
+  varying mediump float4 UV0;
+  // 采样diffuse uv
+	varying mediump float4 UV0_d;
+  // 采样normal uv
+  varying mediump float4 UV0_n;
+	varying mediump float2 UV1;
+	varying highp float4 PosWorld;
+
+  function GetPointLight in(mediump float4 light_diffuse_type, mediump float4 light_attr, mediump float4 light_attr_custom, mediump float3 position) out (lowp float3 light_value)
+  {
+    mediump float3 light_dir= position.xyz - light_attr.xyz;
+    mediump float light_atten = clamp(1.0f - pow(abs(dot(light_dir/light_attr.w, light_dir/light_attr.w)), 2.0f/(light_attr_custom.x)), 0.0f, 1.0f);
+    out(light_value, light_atten * light_diffuse_type.xyz);
+  };
+	
+  function BlendColor in(lowp float4 color0, lowp float4 color1, lowp float factor) out (lowp float4 result)
+  {
+    lowp float4 tmp = color0 * (1.0f - factor) + color1 * factor;
+    out(result, float4(tmp.xyz, color0.w));
+  };
+
+	vertex
+	{
+		highp float4 pos = transform(position, wvp);
+    vertex(pos);
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+    out(UV0, uv0);
+    // diffuse + normal (可能需要区分dx和opengl xy值的方向)
+		// out(UV0_d, float4(uv0.x * 0.5f, uv0.yzw));
+  //   out(UV0_n, float4(uv0.x * 0.5f + 0.5f, uv0.yzw));
+
+    macro(LIGHT_MAP_ENABLE)
+    {
+      branch("1") {
+        // lightmap
+        mediump float4 uv1 = float4(texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+        out(UV1, uv1.xy);
+      }
+      branch("0") {
+      }
+    };
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(terrain0, UV0.xy * uv_transform.x);
+    macro(EDITOR) out(lowp float3 blend_factors) {
+      branch ("1") {
+        lowp float _blend_factor_x = sample(terrain_blend_0, UV0.xy).a;
+        lowp float _blend_factor_y = sample(terrain_blend_1, UV0.xy).a;
+        lowp float _blend_factor_z = sample(terrain_blend_2, UV0.xy).a;
+        out(blend_factors, float3(_blend_factor_x, _blend_factor_y, _blend_factor_z));
+      }
+      branch("0"){
+        lowp float3 _blend_factor = sample(terrain_blend, UV0.xy).xyz;
+        out(blend_factors, _blend_factor);
+      }
+    };
+    
+    /////////////////////////////////////
+    // terrain
+    macro(TERRAIN_TECH_TYPE) out (lowp float4 blend_ter)
+    {
+      branch("TERRAIN_NONE") {
+        out(blend_ter, diffuse_map_color);
+      }
+      branch("TERRAIN_SINGLE_LAYER") {
+        out(blend_ter, diffuse_map_color);
+      }
+      branch("TERRAIN_SINGLE_LAYER_LIGHTMAP") {
+        out(blend_ter, diffuse_map_color);
+      }
+      branch("TERRAIN_VCOLOR") {
+        out(blend_ter, diffuse_map_color);
+      }
+      branch("TERRAIN_VCOLOR_LIGHTMAP") {
+        out(blend_ter, diffuse_map_color);
+      }
+      branch("TERRAIN_ALPHAMAP_2") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float blend_factor0 = blend_factors.x;
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        out(blend_ter, temp);
+      }
+      branch("TERRAIN_ALPHAMAP_LIGHTMAP_2") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float blend_factor0 = blend_factors.x;
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        out(blend_ter, temp);
+      }
+      branch("TERRAIN_ALPHAMAP_3") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float4 ter2 = sample(terrain2, UV0.xy * uv_transform.z);
+        lowp float blend_factor0 = blend_factors.x;
+        lowp float blend_factor1 = blend_factors.y;
+
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        function BlendColor(temp, ter2, blend_factor1) out(lowp float4 temp1);
+        out(blend_ter, temp1);
+      }
+      branch("TERRAIN_ALPHAMAP_LIGHTMAP_3") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float4 ter2 = sample(terrain2, UV0.xy * uv_transform.z);
+        lowp float blend_factor0 = blend_factors.x;
+        lowp float blend_factor1 = blend_factors.y;
+
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        function BlendColor(temp, ter2, blend_factor1) out(lowp float4 temp1);
+        out(blend_ter, temp1);
+      }
+      branch("TERRAIN_ALPHAMAP_4") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float4 ter2 = sample(terrain2, UV0.xy * uv_transform.z);
+        lowp float4 ter3 = sample(terrain3, UV0.xy * uv_transform.w);
+        lowp float blend_factor0 = blend_factors.x;
+        lowp float blend_factor1 = blend_factors.y;
+        lowp float blend_factor2 = blend_factors.z;
+        
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        function BlendColor(temp, ter2, blend_factor1) out(lowp float4 temp1);
+        function BlendColor(temp1, ter3, blend_factor2) out(lowp float4 temp2);
+        out(blend_ter, temp2);
+      }
+      branch("TERRAIN_ALPHAMAP_LIGHTMAP_4") {
+        lowp float4 ter1 = sample(terrain1, UV0.xy * uv_transform.y);
+        lowp float4 ter2 = sample(terrain2, UV0.xy * uv_transform.z);
+        lowp float4 ter3 = sample(terrain3, UV0.xy * uv_transform.w);
+        lowp float blend_factor0 = blend_factors.x;
+        lowp float blend_factor1 = blend_factors.y;
+        lowp float blend_factor2 = blend_factors.z;
+        
+        function BlendColor(diffuse_map_color, ter1, blend_factor0) out(lowp float4 temp);
+        function BlendColor(temp, ter2, blend_factor1) out(lowp float4 temp1);
+        function BlendColor(temp1, ter3, blend_factor2) out(lowp float4 temp2);
+        out(blend_ter, temp2);
+      }
+    };
+    macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+    {
+      branch("1") {
+        lowp float4 light_map_color = sample(TexLightmap, UV1.xy);
+        mediump float3 final_lightmap_color_inner = light_map_color.xyz * LightMapScale.yzw;
+        out(lightmap_color, final_lightmap_color_inner);
+      }
+      branch("0") {
+        out(lightmap_color, float3(1.0f));
+      }
+    };
+    lowp float4 hei = sample(tex_height, UV0.xy);
+    lowp float4 env = sample(tex_env, UV0.xy);
+
+    mediump float3 final_lightmap_color = blend_ter.xyz * lightmap_color;
+		pixel(float4(final_lightmap_color.xyz, diffuse_map_color.a));
+	}
+}

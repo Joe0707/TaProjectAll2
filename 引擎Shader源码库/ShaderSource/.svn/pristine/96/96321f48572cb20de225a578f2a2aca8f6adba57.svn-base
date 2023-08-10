@@ -1,0 +1,116 @@
+pipeline
+<
+	technique = "Blur"
+>
+{
+	uniform float Width
+	<
+		init = "1.0"
+	>;
+
+	uniform float4 ScreenSize: VIEWPORT_SIZE;
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_t0: TEXTURE0;
+	varying mediump float4 v_t0;
+	varying mediump float4 v_t1;
+	varying mediump float4 v_t2;
+	varying mediump float4 v_t3;
+	varying mediump float4 v_t4;
+	varying mediump float4 v_t5;
+	varying mediump float4 v_t6;
+	varying mediump float4 v_t7;
+	uniform mediump float4 u_rt: RT_SIZE;
+
+	uniform sampler Tex0
+	<
+		export = "0"
+		mag = "LINEAR"
+		min = "LINEAR"
+		mip = "POINT"
+		addressu = "CLAMP"
+		addressv = "CLAMP"
+	>;
+
+	["Bloom宽度"]
+	uniform float BloomWidth
+	<
+		artist = "1"
+		min = "0.0"
+		max = "16.0"
+		uistep = "0.1"
+		init = "1"
+	>;
+
+	["BloomCoeff"]
+	uniform float BloomCoeff
+	<
+		artist = "1"
+		min = "0.0"
+		max = "4.0"
+		uistep = "0.01"
+		init = "1.0"
+	>;
+
+	//横向9次采样
+	vertex vs_main
+	{
+		macro(EDITOR) out (float4 position){
+			branch ("1"){
+				out(position, a_position + float4(-u_rt.z, u_rt.w, 0.0f, 0.0f) * a_position.w);
+			}
+			branch("0"){
+				out(position, a_position);
+			}
+		};
+		vertex(position);
+		highp float2 pixel_size = ScreenSize.zw;
+		highp float2 half_size = pixel_size * 0.5f;
+		highp float2 inc = pixel_size * Width * BloomWidth;
+		out(v_t0, a_t0);
+		out(v_t1, float4(
+			a_t0.xy + inc * float2( 1.0f, 0.0f) ,
+			a_t0.xy + inc * float2( 2.0f,  0.0f) ));
+
+		out(v_t2, float4(
+			a_t0.xy + inc * float2( 3.0f, 0.0f) ,
+			a_t0.xy + inc * float2( 4.0f,  0.0f) ));
+
+		out(v_t3, float4(
+			a_t0.xy + inc * float2( 5.0f, 0.0f) ,
+			a_t0.xy + inc * float2( 6.0f,  0.0f) ));
+
+		out(v_t4, float4(
+			a_t0.xy + inc * float2( 7.0f, 0.0f) ,
+			a_t0.xy + inc * float2( -1.0f,  0.0f) ));
+
+		out(v_t5, float4(
+			a_t0.xy + inc * float2( -2.0f, 0.0f) ,
+			a_t0.xy + inc * float2( -3.0f,  0.0f) ));
+
+		out(v_t6, float4(
+			a_t0.xy + inc * float2( -4.0f, 0.0f) ,
+			a_t0.xy + inc * float2( -5.0f,  0.0f) ));
+
+		out(v_t7, float4(
+			a_t0.xy + inc * float2( -6.0f, 0.0f) ,
+			a_t0.xy + inc * float2( -7.0f,  0.0f) ));
+	}
+
+	pixel ps_main
+	{
+
+		float4 color = sample(Tex0, v_t0.xy) * 1.0f +
+						sample(Tex0, v_t1.xy) * 0.95f + sample(Tex0, v_t1.zw) * 0.85f +
+						sample(Tex0, v_t2.xy) * 0.7f + sample(Tex0, v_t2.zw) * 0.5f +
+						sample(Tex0, v_t3.xy) * 0.35f + sample(Tex0, v_t3.zw) * 0.25f +
+						sample(Tex0, v_t4.xy) * 0.15f +
+						sample(Tex0, v_t4.zw) * 0.95f +	sample(Tex0, v_t5.xy)* 0.85f +
+						sample(Tex0, v_t5.zw) * 0.7f  +sample(Tex0, v_t6.xy)* 0.5f  +
+						sample(Tex0, v_t6.zw) * 0.35f +	sample(Tex0, v_t7.xy) * 0.25f+
+						sample(Tex0, v_t7.zw) * 0.15f;
+
+
+		pixel(color * 0.1176f * BloomCoeff);
+	}
+}

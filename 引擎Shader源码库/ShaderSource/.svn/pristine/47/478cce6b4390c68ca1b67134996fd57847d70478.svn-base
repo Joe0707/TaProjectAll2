@@ -1,0 +1,322 @@
+["fx for duye"]
+pipeline
+<
+	version = "1.0.0"
+	author = "konglingjie"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+
+	["漫反射贴图"]
+	uniform sampler _MainTex: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "repeat"
+		addressv = "clamp"
+		path = "fx\\texture\\noise\\sk_duye_08.png"
+	>;
+	["OffsetX"]
+	uniform float offset_x
+	<
+		artist = "1"
+		init = "0.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["OffsetY"]
+	uniform float offset_y
+	<
+		artist = "1"
+		init = "0.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["TillingX"]
+	uniform float tilling_x
+	<
+		artist = "1"
+		init = "1.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["TillingY"]
+	uniform float tilling_y
+	<
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "5.0"
+		uistep = "0.01"
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+	["Color"]
+	uniform float4 _Color
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["_EmissGain"]
+	uniform float _EmissGain
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+    ["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "repeat"
+		addressv = "clamp"
+		lodbias = "-1.0"
+		path = "fx\\texture\\noise\\sk_duye_08_n.png"
+	>;
+	["法线强度"]
+	uniform float bumpScale
+	<
+		artist = "1"
+		init = "1"
+		//min = "0.0"
+		//max = "10.0"
+		//uistep = "0.01"
+	>;
+    ["材质贴图"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "clamp"
+		addressv = "clamp"
+		path = "common\\textures\\envmap\\eye_matcap.png"
+	>;
+	["材质强度"]
+	uniform float MatcapIntensity
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise贴图"]
+	uniform sampler NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\noise\\noisesmooth.png"
+	>;
+	["Noise OffsetX"]
+	uniform float noise_offset_x
+	<
+		artist = "1"
+		init = "0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise OffsetY"]
+	uniform float noise_offset_y
+	<
+		artist = "1"
+		init = "0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise TillingX"]
+	uniform float noise_tilling_x
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise TillingY"]
+	uniform float noise_tilling_y
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise 平移速度X"]
+	uniform float noise_offset_speed_x
+	<
+		artist = "1"
+		init = "0"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["Noise 平移速度Y"]
+	uniform float noise_offset_speed_y
+	<
+		artist = "1"
+		init = "0"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["Noise强度 For MainTex"]
+	uniform float maintex_noise_intensity
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise强度 For Matcap"]
+	uniform float matcap_noise_intensity
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+
+	["溶解程度"]
+	uniform float _DissolveAmount
+	<
+		artist = "1"
+		init = "0"
+	>;
+	["切换溶解方向"]
+	eitheror SWITCHDISSOLVEDIR;
+	macro(SWITCHDISSOLVEDIR)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+		// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 u_view_poj:VIEW_PROJECTION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	attribute float4 a_position: POSITION;
+	attribute float3 a_normal : NORMAL;
+	attribute float3 a_tangent : TANGENT;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_texture1 : TEXTURE1;
+	// varying
+	varying mediump float2 v_texture0;
+	varying mediump float2 v_texture1; 
+	varying mediump float3 v_NormalWorld;
+	varying mediump float3 v_TangentWorld;
+	varying mediump float3 v_BinormalWorld;
+	varying float v_uv_y;
+
+	vertex{		
+		//out(v_texture0, float2(a_texture0.xy * float2(tilling_x,tilling_y) + float2(offset_x,offset_y));
+		out(v_texture0, float2(a_texture0.x * tilling_x + offset_x,(1.0f - a_texture0.y) * tilling_y + offset_y));
+		out(v_texture1, a_texture0.xy * float2(noise_tilling_x,noise_tilling_y) + float2(noise_offset_x,noise_offset_y) + float2(noise_offset_speed_x,noise_offset_speed_y) * FrameTime);
+		out(v_uv_y,a_texture0.y);
+
+		float4 screen_pos = transform(a_position,wvp);
+		vertex(screen_pos);
+
+		//highp float4 pos_world = transform(a_position, world);
+		
+		float3x3 worldMat = float3x3(world);
+		
+		highp float3 world_normal = float3(normalize(transform(a_normal.xyz, worldMat)));
+					
+		out(v_NormalWorld, world_normal);
+
+		mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+		//highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+		mediump float3 binormal_world = cross(tangentWorld, world_normal);
+
+		out(v_TangentWorld, normalize(tangentWorld));
+		out(v_BinormalWorld, normalize(binormal_world));
+	}
+
+	pixel
+	{	
+		float2 uv = float2(v_texture0.x,v_texture0.y);
+		float2 uv_noise = v_texture1;
+
+		lowp float2 noise_val = float2((sample(NoiseTex, uv_noise)).r);
+		mediump float2 matcapNoise = noise_val * matcap_noise_intensity;
+		mediump float2 maintexNoise = noise_val * maintex_noise_intensity * 0.01f;
+
+		mediump float2 uv_main = uv + maintexNoise;
+
+		lowp float4 texColor0 = sample(_MainTex, uv_main);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 color_out){
+            branch("1"){
+            	lowp float4 sep_color = sample(sepAlphaTex, uv_main);
+                out(color_out, float4(texColor0.xyz, sep_color.w));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+
+        mediump float3 vertex_normal_world = v_NormalWorld;
+		lowp float4 norm = sample(SamplerNormalMap, uv_main);
+		
+		mediump float2 normOff = norm.xy * 2.0f - float2(1.0f);
+
+		mediump float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x * bumpScale + -v_BinormalWorld * normOff.y * bumpScale + vertex_normal_world);
+
+		mediump float3 normal_view = normalize(transform(normalWorld_inner,float3x3(view)));
+
+		mediump float2 matcap_uv = (normal_view.xy) * float2(0.5f, 0.5f) + float2(0.5f);
+		mediump float2 matcap_uv_noise = matcap_uv * matcapNoise;
+		lowp float4 matcap_map_color = sample(MatcapTex, matcap_uv_noise) * float4(MatcapIntensity);
+
+        lowp float3 result_color = color_out.xyz + matcap_map_color.xyz;
+        lowp float result_alpha = color_out.w;
+
+        float dissolve = v_uv_y;
+		macro(SWITCHDISSOLVEDIR) out(mediump float dissolveParam) {
+			branch ("1") {
+				out(dissolveParam,dissolve);
+			}
+			branch ("0"){
+				out(dissolveParam,1.0f - dissolve);
+			}
+		};
+		float dissolveFactor = dissolveParam + noise_val.r - _DissolveAmount;
+		alphatest("<")(dissolveFactor, 0.5f);
+		pixel(float4(result_color,result_alpha));
+	}
+}

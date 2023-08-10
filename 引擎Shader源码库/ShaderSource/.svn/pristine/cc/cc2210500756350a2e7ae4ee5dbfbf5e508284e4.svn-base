@@ -1,0 +1,57 @@
+["outline shader"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang/liuyu"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+    >;
+
+    ["描边粗细"]
+    uniform float outline_wide
+    <
+    	artist = "1"
+    	init = "0.01"
+    	max = "1.0"
+    	min = "0.0"
+    	uistep = "0.1"
+    >;
+
+    ["描边色彩"]
+    uniform float4 outline_color
+    <
+    	artist = "1"
+    	init = "(0.0,0.0,0.0,1.0)"
+    	color = "1"
+    >;
+	
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+  	uniform highp float4 CameraPos : CAMERA_POSITION;
+
+	vertex {
+	    highp float4 normal = a_normal;
+	    highp float4 position = a_position + float4(normal.xyz * outline_wide, 0.0f);
+		highp float4 pos = transform(position, wvp);
+	    vertex(pos);
+	}
+	pixel {
+		pixel(outline_color);
+
+	}
+}

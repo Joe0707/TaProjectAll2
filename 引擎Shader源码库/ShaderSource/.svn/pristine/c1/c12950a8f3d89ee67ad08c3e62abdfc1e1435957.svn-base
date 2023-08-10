@@ -1,0 +1,385 @@
+["模型序列帧特效"]
+pipeline
+<
+	version = "1.0.0"
+	author = "fanyu"
+	company = "Netease"
+	techinque = "TShader"
+	cull = "none"
+>
+{	
+
+	["一张序列帧贴图储存三个通道"]
+	eitheror FRAME_SEPERATED;
+	macro(FRAME_SEPERATED)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	["使用贴图R通道"]
+	eitheror R_ENABLE;
+	macro(R_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;	
+	["使用贴图G通道"]
+	eitheror G_ENABLE;
+	macro(G_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	["使用贴图B通道"]
+	eitheror B_ENABLE;
+	macro(B_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["自定义播放序列帧"]
+	eitheror MANUAL_FRAME;
+	macro(MANUAL_FRAME)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	// ["是否乘顶点色"]
+	// eitheror VCOLOR_ENABLE;
+	// macro(VCOLOR_ENABLE)
+	// <
+	// 	default = "0"
+	// 	customizable = "1"
+	// >;
+	// attribute
+	attribute float4 a_position: POSITION
+	<
+		instance = "0" // 逐实例还是逐顶点？
+	>;
+	attribute float4 a_diffuse: DIFFUSE;// 顶点色
+	attribute float4 a_texture0: TEXTURE0;
+
+	// uniform
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["颜色贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "REPEAT"
+		addressv = "REPEAT"
+
+	>;
+	
+	["ramp"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "clamp"
+		addressv = "clamp"
+	>;
+	
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+
+	
+	uniform mediump float frame_time: FRAME_TIME;
+	// varying
+	varying mediump float4 v_texture0;
+
+
+	varying lowp float4 Color;
+
+	["R通道因子"]
+	uniform float modul_r
+	<
+		uigroup = "特效调色"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["G通道因子"]
+	uniform float modul_g
+	<
+		uigroup = "特效调色"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["B通道因子"]
+	uniform float modul_b
+	<
+		uigroup = "特效调色"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;	
+	["A通道因子"]
+	uniform float modul_a
+	<
+		uigroup = "特效调色"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min ="1.0"
+		max = "10.0"
+	>;
+	["颜色整体缩放"]
+	uniform float color_scale
+	<
+		uigroup = "特效调色"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+	>;
+
+	["灰调子位置"]
+	uniform float lerp_middle
+	<
+		uigroup = "调子渐变"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "1.0"
+	>;
+	["灰调子宽度"]
+	uniform float lerp_width
+	<
+		uigroup = "调子渐变"
+		uistep = "0.001"
+		artist = "1"
+		init = "1.0"
+		min = "-1.0"
+		max = "1.0"
+	>;
+
+	["暗调子染色"]
+	uniform float4 dark_tint
+	<
+		uigroup = "调子渐变"
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	["灰调子染色"]
+	uniform float4 gray_tint
+	<
+		uigroup = "调子渐变"
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+
+	["亮调子染色"]
+	uniform float4 light_tint
+	<
+		uigroup = "调子渐变"
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;	
+
+	["序列帧速度"]
+	uniform float spr_speed
+	<
+		uigroup = "序列帧"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+	>;	
+
+	["spr行数"]
+	uniform float spr_row
+	<
+		uigroup = "序列帧"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+	>;	
+
+	["spr列数"]
+	uniform float spr_col
+	<
+		uigroup = "序列帧"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "10.0"
+	>;	
+	["当前播放帧数"]
+	uniform float mnl_frame_pos
+	<
+		uigroup = "序列帧"
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "60.0"
+		uistep = "0.0001"
+	>;		
+
+	function convert_to_gray in(mediump float3 color) out(mediump float color_gray) {
+		lowp float gray_convert = 0.299f * color.r + 0.587f * color.g + 0.114f * color.b;
+		out(color_gray, gray_convert);
+	};
+
+	vertex
+	{
+		highp float4 position = a_position;
+
+		// constant
+		//lowp float PLAY_TIMES = 1.0f; // 播放次数
+		lowp float ROW_NUM = spr_row;
+		lowp float COL_NUM =spr_col;
+		lowp float TOTAL_FRAME = ROW_NUM * COL_NUM;
+
+		macro(MANUAL_FRAME) out(lowp float frame_pos) {
+			branch ("0") {
+				// 序列帧uv计算
+				//lowp float frame_time_clamp = max(PLAY_TIMES * , );
+				lowp float frame_pos_ = floor(fmod(frame_time * spr_speed, TOTAL_FRAME)); // 计算位于动画的第几帧 [0, TOTAL_FRAME]
+				out(frame_pos, frame_pos_);
+			}
+			branch("1"){
+				lowp float frame_pos_ = max(min(mnl_frame_pos, TOTAL_FRAME), 0.0f);
+				out(frame_pos, floor(frame_pos_));
+			}
+		};
+
+		// 0 1 2 3
+		lowp float col = floor(frame_pos/ROW_NUM);
+		lowp float row = frame_pos - COL_NUM * col;
+		lowp float col_uv = (a_texture0.x + row)/COL_NUM;
+		lowp float row_uv = (a_texture0.y + col)/ROW_NUM;
+
+		lowp float2 frame_uv = float2(col_uv, row_uv);
+
+		// wvp
+		vertex(transform(position, wvp));
+		// uv
+		out(v_texture0, float4(frame_uv.xy, 1.0f, 0.0f) * texTrans0);
+		
+		// macro(VCOLOR_ENABLE){
+		// 	branch ("1") {
+		// 		out(Color, a_diffuse);
+		// 	}
+		// 	branch("0"){
+				
+		// 	}
+		// };
+	}
+
+	pixel
+	{	
+		lowp float4 _rgb_color = sample(Tex0, v_texture0.xy);
+		macro(DIFFUSE_ALPHA_SEPARATE) out(lowp float4 rgb_color)
+		{
+			branch("1")
+			{
+				lowp float4 separateColor = sample(sepAlphaTex, v_texture0.xy);
+				out(rgb_color, float4(_rgb_color.xyz, separateColor.w));
+			}
+			branch("0") {
+				out(rgb_color, _rgb_color);
+			}
+		};
+
+		macro(FRAME_SEPERATED) out(lowp float4 diffuse_color) {
+			branch ("1") {
+				// R
+				macro(R_ENABLE) out(lowp float diffuse_color_R) {
+					branch ("1") {
+						out(diffuse_color_R, rgb_color.r);
+					}
+					branch("0"){
+						out(diffuse_color_R, 0.0f);
+					}
+				};
+				// G
+				macro(G_ENABLE) out(lowp float diffuse_color_G) {
+					branch ("1") {
+						out(diffuse_color_G, rgb_color.g);
+					}
+					branch("0"){
+						out(diffuse_color_G, 0.0f);
+					}
+				};
+				// B
+				macro(B_ENABLE) out(lowp float diffuse_color_B) {
+					branch ("1") {
+						out(diffuse_color_B, rgb_color.b);
+					}
+					branch("0"){
+						out(diffuse_color_B, 0.0f);
+					}
+				};		
+				out(diffuse_color, float4(float3(diffuse_color_R + diffuse_color_G + diffuse_color_B), rgb_color.a));		
+			}
+			branch("0"){
+				out(diffuse_color, rgb_color);
+			}
+		};
+
+		
+
+		//lowp float4 texColor1 = sample(Tex1, float2(level, 0.5f) * ramp_scale + float2(ramp_offset));
+
+		// macro(VCOLOR_ENABLE) out(lowp float4 result) {
+		// 	branch ("1") {
+		// 		out(result, _result * Color);
+		// 	}
+		// 	branch("0"){
+		// 		out(result, _result);
+		// 	}
+		// };
+
+
+		// 特效颜色调整1
+		function convert_to_gray(diffuse_color.rgb) out(lowp float gray_color);
+		lowp float3 color_adjust1_ = lerp(dark_tint.rgb, light_tint.rgb, float3(gray_color));
+		lowp float lerp_a =lerp_middle - lerp_width;
+		lowp float lerp_b =lerp_middle + lerp_width;
+		function linearstep(0.0f, lerp_a, gray_color) out (lowp float color_smooth1);
+		function linearstep(lerp_b, 1.0f, gray_color) out (lowp float color_smooth2);
+		lowp float color_smooth = color_smooth1 - color_smooth2; 
+		lowp float3 color_adjust1 = diffuse_color.rgb * lerp(color_adjust1_, gray_tint.rgb, float3(color_smooth));
+
+
+		// 特效颜色调整2
+		lowp float3 color_adjust2 = color_scale * float3(color_adjust1.r * modul_r, color_adjust1.g * modul_g, color_adjust1.b * modul_b);
+		lowp float alpha_adjust = diffuse_color.a * AlphaMtl * modul_a;
+
+		pixel(float4(color_adjust2, alpha_adjust));
+	}
+}

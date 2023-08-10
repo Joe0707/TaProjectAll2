@@ -1,0 +1,126 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+	// attribute
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 texcoord2 : TEXTURE2;	
+	attribute float4 position : POSITION;
+	attribute float4 diffuse : DIFFUSE;
+	
+	// ps uniform
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float time: FRAME_TIME;
+	
+	["vx_vy_scale1"]
+	uniform mediump float3 vx_vy_scale1
+	<
+		init = "0.0, 0.0, 1.0"
+	>;
+	
+	["vx_vy_scale2"]
+	uniform mediump float3 vx_vy_scale2
+	<
+		init = "0.0, 0.0, 1.0"
+	>;
+	
+	// varying
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float2 UV2;
+	varying lowp float4 Color;
+	
+	// ps uniform
+	uniform lowp float4 tFactor : TFACTOR;
+
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+	>;
+	
+	["偏移贴图1"]
+	uniform sampler Tex1
+	<
+		artist = "1"
+	>;
+	
+	["偏移贴图2"]
+	uniform sampler Tex2
+	<
+		artist = "1"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;	
+	
+	["振幅1"]
+	uniform float amplitude1
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+		uistep = "1.1"
+	>;
+	
+	["振幅2"]
+	uniform float amplitude2
+	<
+		artist = "1"
+		min = "0.0"
+		max = "10.0"
+		init = "0.1"
+		uistep = "1.1"
+	>;
+	
+	["变色"]
+	uniform float Alpha
+	<
+		artist = "1"
+		init = "1.0, 1.0, 1.0, 1.0"
+	>;
+
+	vertex
+	{
+		highp float4 pos = transform(position, wvp);
+		vertex(pos);
+		
+		out(Color, diffuse);
+		mediump float4 texc = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, transform(texc, texTrans0));
+		out(UV1, texcoord0.xy * vx_vy_scale1.z + vx_vy_scale1.xy * time);
+		out(UV2, texcoord0.xy * vx_vy_scale2.z + vx_vy_scale2.xy * time);
+    }
+
+	pixel
+	{
+		lowp float4 tex1 = sample(Tex1, UV1.xy) - float4(0.5f);
+		lowp float4 tex2 = sample(Tex2, UV2.xy) - float4(0.5f);
+		mediump float2 newUV = UV0.xy + tex1.xy * amplitude1 + tex2.xy * amplitude2;
+		lowp float4 texColor0 = sample (Tex0, newUV);
+		
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+		{
+		  branch("1") {
+			lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+			out(alpha, separateColor.w);
+		  }
+		  branch("0") {
+			out(alpha, texColor0.a);
+		  }
+		};
+		
+		pixel(float4(texColor0.xyz, alpha) * Color * tFactor * Alpha * 2.0f);
+	}
+}

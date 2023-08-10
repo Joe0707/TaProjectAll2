@@ -1,0 +1,420 @@
+["lightmap"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "xuxing" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+	
+	["是否闪电"]
+	eitheror THUNDER_ENABLE;
+
+  ["是否打开光"]
+	eitheror LIGHT_ENABLE;
+
+  ["自发光"]
+  eitheror NEOX_EMISSIVE_ENABLE;
+
+	macro(LIGHT_ENABLE)
+	<  
+		default = "1"
+	>;
+	
+
+  ["自发光"]
+  macro(NEOX_EMISSIVE_ENABLE)
+  <
+    customizable = "1"
+  >;
+	
+  ["thunder"]
+	macro(THUNDER_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+  ["开启外发光(烘焙)"]
+  eitheror CLOUDGI_EMISSIVE_MASK_ENABLE;
+  macro(CLOUDGI_EMISSIVE_MASK_ENABLE)
+  <
+    customizable = "1"
+    default = "0"
+  >;
+	
+// 贴图
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	["lightmap贴图"]
+	uniform sampler TexLightmap : LIGHTMAP
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+	
+	["阴影贴图"]
+	uniform sampler SMAP : SHADOW
+	<
+		artist = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "clamp" 
+		addressv = "clamp" 
+	>;
+	
+	["自发光颜色"]
+	uniform mediump float4 emissive_color
+	<
+		artist = "1" 
+    color = "1"
+		init = "1.0,1.0,1.0,1.0"
+	>;
+
+  ["自发光强度"]
+  uniform mediump float change_color_bright
+  <
+    artist = "1"
+    init = "1.5"
+    min = "1.0"
+    max = "5.0"
+  >;
+
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+  ["自发光通道(y)"]
+  uniform sampler SpecMask : SPECULAR
+  <
+    artist = "1"
+  >;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+  ["外发光亮度"]
+  uniform float emissive_mask_intensity
+  <
+		artist = "1" 
+    init="1.0"
+    min="0.0"
+    max="2.0"
+  >;
+
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	uniform highp float4x4 world : WORLD;
+
+  uniform lowp float alphaRef : ALPHA_REF;
+	
+	uniform highp float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform highp float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	
+	
+	uniform lowp float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform mediump float height_fog_density : HEIGHT_FOG_DENSITY;
+	
+	uniform highp float4x4 proj : PROJECTION;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+	uniform float AlphaMtl : ALPHA_MTL
+  <
+    init = "1.0"
+  >;
+
+// varying变量
+	varying mediump float4 UV0;
+	varying mediump float2 UV1;
+	varying mediump float2 ShadowMapUV;
+	varying highp float4 PosWorld;
+	varying lowp float3 NormalWorld;
+
+  function GetPointLight in(mediump float4 light_diffuse_type, mediump float4 light_attr, mediump float4 light_attr_custom, mediump float3 position, lowp float3 normal_dir) out (lowp float3 light_value)
+  {
+    mediump float3 light_dir= position.xyz - light_attr.xyz;
+    mediump float light_atten = clamp(1.0f - pow(abs(dot(light_dir/light_attr.w, light_dir/light_attr.w)), 2.0f/(light_attr_custom.x)), 0.0f, 1.0f);
+    lowp float3 light_normal = normalize(light_dir);
+    lowp float normal_dot_light = clamp(dot(normal_dir, -light_dir), 0.0f, 1.0f);
+    out(light_value, light_atten * light_diffuse_type.xyz * normal_dot_light);
+  };
+	
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 pos_local, highp float4 nor_local)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(pos_local, pos1);
+				out(nor_local, nor1);
+			}
+			branch("0") 
+			{
+				out(pos_local, a_position);
+				out(nor_local, a_normal);
+			}
+		};
+
+    macro(CLOUDGI_EMISSIVE_MASK_ENABLE) out (lowp float tmp)
+    {
+      branch("1") {
+        out(tmp, emissive_mask_intensity);
+      }
+      branch("0") {
+        out(tmp, 0.0f);
+      }
+    };
+
+    highp float4 position = pos_local;
+    highp float4 normal = nor_local;
+
+		highp float4 pos = transform(position, wvp);
+    vertex(pos);
+		mediump float4 uvxyz = float4(texcoord0.xy, 1.0f, 0.0f) * texTrans0;
+		mediump float4 pos_world = position * world;
+
+    macro(LIGHT_ENABLE)
+    {
+      branch("1") {
+    		float3x3 worldNormalMat = float3x3(world);
+		    float3 world_normal = normalize(normal.xyz * worldNormalMat);
+
+				out(PosWorld, pos_world);
+				out(NormalWorld, world_normal);		
+      }
+      branch("0") {
+      }
+    };
+ 
+    // fog
+		macro(FOG_ENABLE) out(mediump float uvw)
+		{
+			branch("1") {
+				mediump float4 m_fog_begin_in_view = float4(0.0f, 0.0f, FogInfo.x, 1.0f) * proj;
+				mediump float fog_begin_in_view = m_fog_begin_in_view.z;
+				mediump float4 m_fog_end_in_view = float4(0.0f, 0.0f, FogInfo.y, 1.0f) * proj;
+				mediump float fog_end_in_view = m_fog_end_in_view.z;
+				mediump float distance_factor = clamp(smoothstep(fog_begin_in_view, fog_end_in_view, pos.z), 0.0f, 1.0f);
+				
+				mediump float fog_begin_in_height = FogInfo.z;
+				mediump float fog_end_in_height = FogInfo.w;
+				//float height_factor = saturate(smoothstep(fog_begin_in_height, fog_end_in_height, vs_general.PosWorld.y));
+				mediump float height_factor = clamp((pos_world.y - fog_begin_in_height) / (fog_end_in_height - fog_begin_in_height), 0.0f, 1.0f);
+
+				out(uvw, max(height_factor * height_fog_density, distance_factor * FogColor.a));
+				// out(uvw, max(height_factor, distance_factor) * FogColor.a);
+			}
+			branch("0") {
+				out(uvw, 0.0f);
+			}
+		};
+
+    
+    // diffuse
+		mediump float4 uv0 = float4(uvxyz.xyz, uvw);
+		out(UV0, uv0);
+   
+
+    macro(LIGHT_MAP_ENABLE)
+    {
+      branch("1") {
+        // lightmap
+        mediump float4 uv1 = float4(texcoord1.xy, 1.0f, 0.0f) * lightmapTrans;
+        out(UV1, uv1.xy);
+      }
+      branch("0") {
+      }
+    };
+
+		macro(SHADOW_MAP_ENABLE)
+		{
+			branch("1") {
+        // shadowmap
+        function calc_shadow_simple(pos_world, lvp) out (mediump float2 shadow_map_uv);
+		    out(ShadowMapUV, shadow_map_uv);
+      }
+      branch("0") {
+      }
+    };
+
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+    {
+      branch("1") {
+        lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+        out(alpha, separateColor.w);
+      }
+      branch("0") {
+        out(alpha, diffuse_map_color.a);
+      }
+    };
+
+    macro(ALPHA_TEST_ENABLE)
+    {
+      branch("1") {
+        alphatest("<")(alpha - alphaRef, 0.0f);
+      }
+      branch("0") {
+      }
+    };
+
+		macro(LIGHT_MAP_ENABLE) out(mediump float3 lightmap_color)
+    {
+      branch("1") {
+        lowp float4 light_map_color = sample(TexLightmap, UV1.xy);
+        mediump float3 final_lightmap_color_inner = light_map_color.xyz * LightMapScale.yzw;
+        out(lightmap_color, final_lightmap_color_inner);
+      }
+      branch("0") {
+        out(lightmap_color, float3(1.0f));
+      }
+    };
+    
+    mediump float3 final_lightmap_color = diffuse_map_color.xyz * lightmap_color;
+
+    macro(NEOX_EMISSIVE_ENABLE) out(mediump float3 color_emissive)
+    {
+      branch("1") {
+        lowp float4 emiss = sample(SpecMask, UV0.xy);
+        mediump float3 color_value = emissive_color.xyz * emiss.y * change_color_bright + float3(1.0f);
+        out(color_emissive, final_lightmap_color * color_value);
+      }
+      branch("0") {
+        out(color_emissive, final_lightmap_color);
+      }
+    };
+
+
+    // point light
+    macro(LIGHT_ENABLE) out(mediump float3 lit_color)
+    {
+      branch("1") {
+        function GetPointLight(PointLightAttrs[1], PointLightAttrs[3], PointLightAttrs[4], PosWorld.xyz, NormalWorld.xyz) out (lowp float3 light_value1);
+        function GetPointLight(PointLightAttrs[6], PointLightAttrs[8], PointLightAttrs[9], PosWorld.xyz, NormalWorld.xyz) out (lowp float3 light_value2);
+        lowp float3 lit = light_value1 + light_value2 + float3(1.0f);
+        out(lit_color, color_emissive * lit);
+      }
+      branch("0") {
+        out(lit_color, color_emissive);
+      }
+    };
+
+    macro(GAME_ENABLE) out(mediump float3 color1)
+    {
+      branch("1") {
+        out(color1, lit_color);
+      }
+      branch("0") {
+        out(color1, color_emissive);
+      }
+    };
+
+    macro(THUNDER_ENABLE) out(mediump float3 final_thunder_color) 
+    {
+      branch("1") {
+        out(final_thunder_color, color1);
+      }
+      branch("0") {
+        out(final_thunder_color, color1); 
+      }
+    };
+
+		macro(GAME_ENABLE) out(mediump float3 final_fog_color)
+		{
+			branch("1") {
+				macro(FOG_ENABLE) out(mediump float3 final_fog_color_inner)
+				{
+					branch("1") {
+						lowp float fogFactor = UV0.w;
+						lowp float3 fog_result = final_thunder_color * (1.0f - fogFactor) + FogColor.xyz * fogFactor;
+						out(final_fog_color_inner, fog_result);
+					}
+					branch("0") {
+						out(final_fog_color_inner, final_thunder_color);
+					}
+				};
+				out(final_fog_color, final_fog_color_inner);
+			}
+			branch("0") {
+				macro(FOG_ENABLE) out(mediump float3 final_fog_color_inner)
+				{
+					branch("1") {
+						highp float temp = length(UV0.w * FogColor.xyz);
+						highp float fogFactor = step(temp, sqrt(3.0f) - 0.0001f) * UV0.w;
+						lowp float3 fog_result = final_thunder_color * (1.0f - fogFactor) + FogColor.xyz * fogFactor;
+						out(final_fog_color_inner, fog_result);
+					}
+					branch("0") {
+						out(final_fog_color_inner, final_thunder_color);
+					}
+				};
+				out(final_fog_color, final_fog_color_inner);
+			}
+		};
+
+		macro(SHADOW_MAP_ENABLE) out(mediump float3 final_shadow_color)
+    {
+      branch("1") {
+        function calc_shadow_simple_ps(SMAP, ShadowMapUV.xy) out (lowp float shadow_color);
+		    out(final_shadow_color, final_fog_color * shadow_color);
+      }
+      branch("0") {
+        out(final_shadow_color, final_fog_color.xyz);
+      }
+    };
+
+    macro(NEOX_DEBUG_MODE) out(lowp float3 final_debug_color)
+    {
+      branch("NEOX_DEBUG_MODE_NONE") {
+        out(final_debug_color, final_shadow_color);
+      }
+      branch("NEOX_DEBUG_MODE_MTL") {
+        out(final_debug_color, diffuse_map_color.xyz);
+      }
+      branch("NEOX_DEBUG_MODE_LIT") {
+        out(final_debug_color, lightmap_color);
+      }
+    };
+		pixel(float4(final_debug_color, alpha * AlphaMtl));
+		// pixel(float4(1.0f));
+	}
+}

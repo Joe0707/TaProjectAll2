@@ -1,0 +1,262 @@
+["smoke effect hero"]
+pipeline
+<
+	version = "1.0.0"
+	author = "xuzhuoliang"
+	company = "Netease"
+	technique = "TShader"
+>
+{
+
+//宏
+	["开启屏幕纹理"]
+	eitheror SSTEXTURE_ENABLE;
+	macro(SSTEXTURE_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启顶点动画"]
+	eitheror VERTEXANIMATION_ENABLE;
+	macro(VERTEXANIMATION_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "1"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	["纹理贴图"]
+	uniform sampler Flowmap
+	<
+		artist = "1"
+		mag = "1"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\effect\\noise_simplex.png"
+	>;
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_color : DIFFUSE;
+
+// uniform变量
+	["屏幕空间纹理uv缩放"]
+	uniform float flow_uv_tiling
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.5"
+		max = "5.0"
+		init = "0.68" 
+	>;
+
+
+	// ["屏幕空间纹理纵向uv缩放"]
+	// uniform float flow_uv_tiling2
+	// <
+	// 	artist = "1"
+	// 	uistep = "1"
+	// 	min = "0.5"
+	// 	max = "5.0"
+	// 	init = "1.0" 
+	// >;
+
+	["屏幕空间纹理横向移动速度"]
+	uniform float flow_uv_panner1
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.0"
+		max = "0.5"
+		init = "0.15" 
+	>;
+
+	["屏幕空间纹理纵向移动速度"]
+	uniform float flow_uv_panner2
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.1"
+		max = "0.5"
+		init = "0.15" 
+	>;
+
+	["边缘虚化起始位置"]
+	uniform float NdotV_smooth1
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "0.12" 
+	>;
+
+	["边缘虚化结束位置"]
+	uniform float NdotV_smooth2
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.0"
+		max = "1.0"
+		init = "1.0" 
+	>;
+
+	["顶点动画周期"]
+	uniform float va_speed
+	<
+		artist = "0"
+		uistep = "1"
+		min = "1.0"
+		max = "5.0"
+		init = "5.0"
+	>;
+
+	["顶点动画幅度"]
+	uniform float va_scale
+	<
+		artist = "0"
+		uistep = "1"
+		min = "0.1"
+		max = "1.0"
+		init = "0.24"
+	>;
+
+	["色彩倾向1"]
+	uniform float4 change_color1
+	<
+		artist = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+		color = "1"
+	>;
+
+	["色彩倾向2"]
+	uniform float4 change_color2
+	<
+		artist = "1"
+		init = "(1.0,1.0,1.0,1.0)"
+		color = "1"
+	>;
+
+	uniform lowp float frame_time : FRAME_TIME;
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4 wv : WORLD_VIEW;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	uniform float AlphaMtl : ALPHA_MTL;
+
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+// varying变量
+	varying mediump float2 UV0;
+	varying lowp float2 flow_uv;
+	varying highp float3 v_normal;
+	varying mediump float4 PosWorld;
+	varying mediump float vertex_color;
+	// varying mediump float3 vertex_offset;
+
+function overlay in(lowp float A,lowp float B) out(lowp float C) {
+	float C1 = A * B * 2.0f;
+	float C2 = 1.0f - (1.0f - A) * (1.0f - B) * 2.0f;
+	out(C, lerp(C1,C2,step(A,0.5f)));
+};
+
+vertex 
+{
+	["是否开启GPU蒙皮"]
+	macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+	{
+		branch("1")
+		{
+			function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+			out(vec, pos1);
+			out(nor, nor1);
+			
+		}
+		branch("0") 
+		{
+			out(vec, a_position);
+			out(nor, a_normal);
+		}
+	};
+	highp float4 normal = nor;
+
+
+	macro(VERTEXANIMATION_ENABLE) out(lowp float3 vertex_offset) {
+		branch ("1") {
+			lowp float va_time = frame_time * va_speed;
+			lowp float3 offset = sin(float3(va_time) + vec.rgb);
+			out(vertex_offset,offset * nor.rgb * va_scale);
+		}
+		branch ("0") {
+			out(vertex_offset,float3(0.0f));
+		}
+	};
+	highp float4 position = float4(vec.rgb + vertex_offset,1.0f);	
+	highp float4 pos = transform(position, wvp);
+	vertex(pos);
+	out(UV0, texcoord0.xy);
+	macro(SSTEXTURE_ENABLE) out(lowp float mask) {
+		branch ("1") {
+			out(flow_uv, texcoord0.xy * float2(flow_uv_tiling) + float2(flow_uv_panner1,flow_uv_panner2) * frame_time);
+
+		}
+		branch ("0") {
+		}
+	};
+	float3x3 worldMat = float3x3(world);
+	lowp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+	out(v_normal,world_normal);
+
+	highp float4 pos_world = transform(position, world);
+	out(PosWorld, float4(pos_world.xyz, 1.0f));
+	// out(vertex_color,a_color.r);
+
+
+
+}
+pixel 
+{
+	lowp float3 normalWorld = v_normal;
+	lowp float4 diffuse_map_color = sample(Tex0,UV0.xy);
+	lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+	lowp float NdotV = saturate(dot(view_dir,normalWorld.xyz));
+	lowp float rim = smoothstep(NdotV_smooth1,NdotV_smooth2,NdotV);
+	// lowp float rim_1 = lerp(rim,1.0f,saturate(vertex_color * 2.0f -1.0f));
+	macro(SSTEXTURE_ENABLE) out(lowp float mask) {
+		branch ("1") {
+			lowp float4 sstex1 = sample(Flowmap,flow_uv);
+			function overlay(sstex1.r,rim) out (lowp float mask1);
+			out(mask,mask1);
+		}
+		branch ("0") {
+			out(mask,rim);
+		}
+	};
+	lowp float3 change_color = lerp(change_color1.rgb, change_color2.rgb, float3(mask));
+	lowp float4 final_color = float4(change_color, mask * AlphaMtl);
+	pixel(final_color);
+
+
+	// lowp float illum = diffuse_map_color.x * 0.299f + diffuse_map_color.y * 0.587f + diffuse_map_color.z * 0.114f;
+	// pixel(float4(float3(illum + mask) * 0.1f,mask * AlphaMtl));
+	// pixel(float4(float3(mask,1.0f)));
+}
+}

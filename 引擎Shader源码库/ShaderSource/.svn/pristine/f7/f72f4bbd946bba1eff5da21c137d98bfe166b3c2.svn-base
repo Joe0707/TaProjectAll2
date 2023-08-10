@@ -1,0 +1,31 @@
+pipeline
+<
+  author = "xuxing"
+  company = "netease"
+>
+{
+	attribute float4 position: POSITION;
+	attribute float4 texcoord0: TEXTURE0;
+
+  uniform sampler tex0
+  <
+    export = "0"
+  >;
+
+  uniform mediump float4 _ZBufferParams: ZBUFFER_PARAMS;
+  
+  varying mediump float2 TexCoord0;
+
+  vertex
+  {
+		vertex(position);
+    out(TexCoord0, texcoord0.xy);
+  }
+
+  pixel
+  {
+    lowp float4 color = sample(tex0, TexCoord0);
+    lowp float depth = 1.0f / (_ZBufferParams.x * color.x + _ZBufferParams.y);
+    pixel(float4(depth, depth, depth, 1.0f));
+  }
+}

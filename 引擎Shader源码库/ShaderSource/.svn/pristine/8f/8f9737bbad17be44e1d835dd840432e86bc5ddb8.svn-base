@@ -1,0 +1,119 @@
+	["cubemap贴图"]
+	uniform sampler SamplerCubeMap
+	<
+		artist = "0"
+		// addressu = "clamp"//2017-6-8修改：cube应该是左右连续的
+		// addressv = "clamp"//2017-6-8新增：cube应该是左右连续的
+		mag = "linear"
+		min = "linear"
+		mip = "linear"
+		addressv = "clamp"
+		addressu = "repeat"
+		thumbnail = "0"
+		path = "common\\textures\\envmap\\sh1_hdri.dds"
+	>;
+
+	["低配版使用的MatCap贴图"]
+	uniform sampler MatcapTex
+	<
+		artist = "0"
+		path = "common\\textures\\envmap\\matcap_env.png"
+	>;
+
+	["亮度"]
+	uniform float ToneFactor
+	<
+		artist = "0"
+		min = "0.3"
+		max = "3.0"
+		uistep = "1"
+		init = "0.7"
+	>;
+
+    uniform mediump float4x4 envSHR
+    <
+        init = "(-0.002744, -0.012950, 0.015503, -0.005409, -0.012950, 0.002744, 0.035148, 0.042910, 0.015503, 0.035148, 0.108343, 0.073370, -0.005409, 0.042910, 0.073370, 0.218106)"
+    >;
+    uniform mediump float4x4 envSHG
+    <
+        init = "(-0.003670, -0.015521, 0.017472, -0.008853, -0.015521, 0.003670, 0.038980, 0.060313, 0.017472, 0.038980, 0.101757, 0.071781, -0.008853, 0.060313, 0.071781, 0.257048)"
+    >;
+    uniform mediump float4x4 envSHB
+    <
+        init = "(-0.013663, -0.021345, 0.016549, -0.013806, -0.021345, 0.013663, 0.043764, 0.094198, 0.016549, 0.043764, 0.084382, 0.069456, -0.013806, 0.094198, 0.069456, 0.327269)"
+    >;
+
+	// —————————————————— 环境光PBR ——————————————————
+	["环境光强度"]
+	uniform mediump float envir_brightness
+	<
+		uigroup = "1 环境光"
+		artist = "1" 
+		min = "0.0" 
+		max = "32.0" 
+		init = "0.6"
+	>;
+
+	["环境光颜色"]
+	uniform lowp float4 env_shadow_factor
+	<
+		uigroup = "1 环境光"
+		artist = "0" 
+		color = "1"
+		// init = "(0.667,0.545,0.761,1.0)"
+		init = "(1.0,1.0,1.0,1.0)"
+	>;
+	
+	["反射边缘强度(envir_fresnel_brightness)"]
+	uniform mediump float envir_fresnel_brightness
+	<
+		uigroup = "1 环境光"
+		uistep = "0.001"
+		min = "0.0" 
+		max = "2.0" 
+		init = "0.64"
+		artist = "0"
+	>;
+
+	// ———————————————— 网格闪烁消融 ————————————————————
+
+	["消融方式（0为出现/1为消失）"]
+	uniform lowp float burn_style
+	<
+		init = "0.0"
+		artist = "1"
+		uistep = "1.0"
+		max = "1.0"
+		min = "0.0"
+		uigroup = "网格闪烁消融"
+	>;
+
+	["角色高度"]
+	uniform mediump float burn_max_height
+	<
+		init = "30.0"
+		artist = "1"
+		uistep = "0.01"
+		max = "50.0"
+		min = "0.01"
+		uigroup = "网格闪烁消融"
+	>;
+
+	
+	["闪烁颜色01（过渡色/较暗）"]
+	uniform mediump float4 burn_color01
+	<
+		color = "1"
+		uigroup = "网格闪烁消融"
+		init = "(0.0, 0.3, 0.8, 1.0)"
+		artist = "1"
+	>;	
+
+	["闪烁颜色02（最终色/较亮）"]
+	uniform lowp float4 burn_color02
+	<
+		artist = "1" 
+		color = "1"
+		init = "(0.23, 0.93, 1.0, 1.0)"
+		uigroup = "网格闪烁消融"
+	>;	

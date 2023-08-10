@@ -1,0 +1,551 @@
+["mmd_pbr"]
+pipeline
+<
+	version = "1.0.0"
+	author = "hzsy2016"
+	company = "Netease"
+	technique = "TShader"
+	//alphablend = "false"
+	//zwritable = "1"
+	//zenable="1"
+>
+{	
+	include(shader\\including\\pbr_include_function.spzs)
+	["AO"]
+	eitheror TEST_AO;
+	macro(TEST_AO)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["NORMAL"]
+	eitheror TEST_NORMAL;
+	macro(TEST_NORMAL)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["BASE"]
+	eitheror TEST_BASE;
+	macro(TEST_BASE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["ROUGNESS"]
+	eitheror TEST_ROUGNESS;
+	macro(TEST_ROUGNESS)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["METALLIC"]
+	eitheror TEST_METALLIC;
+	macro(TEST_METALLIC)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	["DISTORT_ENABLE"]
+	eitheror DISTORT_ENABLE;
+	macro(DISTORT_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["EMISSIVE_MASK"]
+	eitheror EMISSIVE_MASK;
+	macro(EMISSIVE_MASK)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["DISSOLVE_2U"]
+	eitheror DISSOLVE_2U;
+	macro(DISSOLVE_2U)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+
+	["开启丝绸"]
+	eitheror SILK_ENABLE;
+	macro(SILK_ENABLE)
+	<
+		customizable = "1"
+		default = "0"
+	>;
+	eitheror LINEAR_SPACE_ENABLE;
+	macro(LINEAR_SPACE_ENABLE)
+	<
+		default = "0"
+	>;
+
+	eitheror TRANSPARENT_MODE_ENABLE;
+	macro(TRANSPARENT_MODE_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	macro(LIGHT_ATTR_ITEM_NUM)
+	<
+		customizable = "0"
+		cache = "0"
+		default = "LIGHT_ATTR_ITEM_NUM_5"
+	>;
+
+	
+	uniform float SHADER_INDEX2
+	<
+		init = "0"
+		artist = "0"
+	>;
+
+
+	attribute float4 a_position: POSITION;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float2 a_texture0: TEXTURE0;
+	attribute float2 a_texture1: TEXTURE1;
+	attribute float4 a_normal: NORMAL;
+	attribute float4 a_tangent: TANGENT;
+
+	uniform highp float4x4 u_world_view_projection: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 u_world: WORLD;
+	uniform highp float4x4 u_view: VIEW;
+	uniform highp float4x4 u_projection: PROJECTION;
+	uniform highp float4x4 u_world_view: WORLD_VIEW;
+	uniform highp float4 CameraPos: CAMERA_POSITION;
+	uniform highp float4x4 u_texture_trans0: TEXTURE_TRANS0;
+	uniform highp float4x4 u_texture_trans1: TEXTURE_TRANS1;
+	uniform highp float _Time: FRAME_TIME;
+	uniform highp float4 zbufferParams: ZBUFFER_PARAMS;
+	uniform highp float4x4 u_light_view_projection: LIGHT_VIEW_PROJ;
+	["阴影贴图"]
+	uniform samplershadow TexShadow:SHADOW;
+	// uniform highp float4[LIGHT_ATTR_ITEM_NUM] u_dir_light_attr: DIR_LIGHT_ATTR;
+	// uniform highp float4[LIGHT_ATTR_ITEM_NUM] u_point_light_attr: POINT_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] Shadowlight_dir : SHADOW_LIGHT_ATTR;
+
+	["TexFurPatten"]
+	uniform sampler TexFurPatten
+	<
+		artist = "1"
+	>;
+
+	["TexDissort"]
+	uniform sampler TexDissort
+	<
+		artist = "1"
+	>;
+
+	["TexBaseColor"]
+	uniform sampler TexBaseColor
+	<
+		artist = "1"
+	>;
+
+	["TexMask(RG毛方向,B毛区域)"]
+	uniform sampler TexMask
+	<
+		artist = "1"
+	>;
+
+	["TexIrradianceEnv"]
+	uniform samplercube TexIrradianceEnv
+	<
+		artist = "1"
+	>;
+
+	["gi_mod"]
+	uniform float gi_mod
+	<
+		artist = "1"
+	>;
+
+	["rim_color"]
+	uniform highp float4 rim_color
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,1.0,1.0,1.0"
+		uigroup="rim"
+	>;
+	["rim_instenty"]
+	uniform highp float rim_instenty
+	<
+		artist = "1"
+		init = "0.0"
+		uigroup="rim"
+	>;
+	["rim_concentration"]
+	uniform highp float rim_concentration
+	<
+		artist = "1"
+		init = "8.0"
+		uigroup="rim"
+	>;
+	["distort_ref"]
+	uniform highp float distort_ref
+	<
+		artist = "1"
+		init = "0"
+		uistep = "0.05"
+		min = "0.0"
+		max = "1.0"
+		uigroup="distort"
+	>;
+	["BloomFactor"]
+	uniform highp float BloomFactor
+	<
+		artist = "1"
+		color = "1"
+		init = "3.0f"
+		uigroup="control"
+	>;
+
+	uniform float4 Adjust
+	<
+		init = "1.0,1.0,1.0,1.0"
+	>;
+	["env_diffuse_mod"]
+	uniform float env_diffuse_mod
+	<
+		init = "1.0"
+		artist = "1"
+	>;
+
+	["distort_width"]
+	uniform float distort_width
+	<
+		init = "0.0"
+		artist = "1"
+		uigroup="distort"
+	>;
+	["distort_strength"]
+	uniform float distort_strength
+	<
+		init = "10.0"
+		artist = "1"
+		uigroup="distort"
+	>;
+
+	["distort_color"]
+	uniform float4 distort_color
+	<
+		uigroup="distort"
+		artist = "1"
+		color="1"
+	>;
+	["distort_bloom"]
+	uniform float distort_bloom
+	<
+		init = "0.0"
+		artist = "1"
+		uigroup="distort"
+	>;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+	["Fur使用2U"]
+	uniform highp float _FurSample_2U
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["_FurLength"]
+	uniform float _FurLength
+	<
+		init = "0.08"
+		artist  = "1"
+	>;
+	["FurUVTilling"]
+	uniform float FurUVTilling
+	<
+		init = "1.0"
+		artist  = "1"
+	>;
+	["FurUVoffset"]
+	uniform float2 FurUVoffset
+	<
+		init = "(0.0,0.0)"
+		artist  = "1"
+	>;
+	
+	["_WindInfluence"]
+	uniform float4 _WindInfluence
+	<
+		init = "(1.5,0.7,0.5,1.0)"
+		artist  = "1"
+	>;
+	["_WindSpeed"]
+	uniform float _WindSpeed
+	<
+		init = "1.0"
+		artist  = "1"
+	>;
+
+	["_GravityStrength"]
+	uniform float _GravityStrength
+	<
+		init = "1.0"
+		artist  = "1"
+		uistep = "0.001"
+		min = "0"
+		max = "5"
+	>;
+	["_OcclusionA"]
+	uniform float _OcclusionA
+	<
+		artist = "1"
+		init = "0.25"
+	>;
+	["_OcclusionB"]
+	uniform float _OcclusionB
+	<
+		artist = "1"
+		init = "0.75"
+	>;
+	["_SpecColor1"]
+	uniform float4 _SpecColor1
+	<
+		artist  = "1"
+		color = "1"
+	>;
+	["_SpecColor2"]
+	uniform float4 _SpecColor2
+	<
+		artist  = "1"
+		color = "1"
+	>;
+	["_SpecShift1"]
+	uniform float _SpecShift1
+	<
+		artist = "1"
+		init = "0.1"
+		uigroup = "SILK"
+	>;
+	["_SpecShift2"]
+	uniform float _SpecShift2
+	<
+		artist = "1"
+		init = "0.2"
+		uigroup = "SILK"
+	>;
+	["_SpecSmooth1"]
+	uniform float _SpecSmooth1
+	<
+		artist = "1"
+		init = "200.0"
+		uigroup = "SILK"
+	>;
+	["_SpecSmooth2"]
+	uniform float _SpecSmooth2
+	<
+		artist = "1"
+		init = "60.0"
+		uigroup = "SILK"
+	>;
+		["_Glossiness1"]
+	uniform float _Glossiness1
+	<
+		artist = "1"
+		init = "0.2"
+		uigroup = "SILK"
+	>;
+	["_Glossiness2"]
+	uniform float _Glossiness2
+	<
+		artist = "1"
+		init = "0.3"
+		uigroup = "SILK"
+	>;
+	["_OcclusionColor"]
+	uniform highp float4 _OcclusionColor
+	<
+		artist = "1"
+		color = "1"
+		init = "1.0,1.0,1.0,1.0"
+	>;
+	["Rim强度"]
+	uniform highp float _FresnelLV
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["_Thickness"]
+	uniform highp float _Thickness
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+
+	["Fur SSS"]
+	uniform highp float _LightFilter
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+	
+	["_FurMaskBlur"]
+	uniform highp float _FurMaskBlur
+	<
+		artist = "1"
+		init = "0.0"
+	>;
+	["_FurLightExposure"]
+	uniform highp float _FurLightExposure
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+
+	varying highp float4 v_texture0: TEXTURE0;
+	varying highp float4 v_position_world;
+	varying highp float3 v_normal_world;
+	varying highp float3 v_tangent_world;
+	varying highp float3 v_binormal_world;
+
+
+	vertex
+	{
+		float FUR_OFFSET = SHADER_INDEX2 * 0.1f;
+
+		float3 gravity = float3(0.0f, -1.0f, 0.0f) * _GravityStrength;
+		float3 b= a_position.xyz * _WindInfluence.xyz;
+		float v = _Time * _WindSpeed; 
+		float3 wind_effect =  float3(1.5f, 0.5f, 0.7f) * v + b;
+		float y = cos(wind_effect.y);
+		float2 xz = float2(sin(wind_effect.x), sin(wind_effect.z));
+		float3 compose = _WindInfluence.w * float3(xz.x, y, xz.y) + gravity;
+		float3 real_direction = a_normal.xyz + compose * FUR_OFFSET;
+		float3 offset = real_direction.rgb * _FurLength * FUR_OFFSET;
+
+		float4 pos_local = float4(a_position.xyz + offset,a_position.a);
+		highp float4 pos_world = transform(pos_local, u_world);
+		out(v_position_world,pos_world);
+		highp float4 pos = transform(pos_local, u_world_view_projection);
+
+		// macro(LINEAR_DEPTH_ENABLE) out(float4 pos_proj)
+		// {
+		// 	branch("1")
+		// 	{
+		// 		out(pos_proj, float4(pos.x, pos.y, lerp(pos.z,  (pos.z * zbufferParams.x + zbufferParams.y) * pos.w, zbufferParams.z), pos.w));
+		// 	}
+		// 	branch("0")
+		// 	{
+		// 		out(pos_proj, pos);
+		// 	}
+		// };
+		float4 pos_proj = pos;
+		vertex(pos_proj);
+
+		
+		//mediump float2 uvoffset = FurUVoffset.xy  * FUR_OFFSET * 0.1f;
+
+		// float2 uv_xy = 1.0f / FurUVTilling * uvoffset + a_texture0.xy; //越细偏移越小，估计是效果
+		// float2 uv_zw = a_texture0.xy * FurUVTilling + uvoffset;//subTexUV越大越细
+
+		out(v_texture0, float4(a_texture0, a_texture1));
+
+		highp float3x3 world_normal_mat = float3x3(u_world);
+		highp float3 normal_world = normalize(transform(a_normal.xyz, world_normal_mat));
+		out(v_normal_world, normal_world);
+		// mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * world_normal_mat));
+		// float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+		// mediump float3 binormal_world = cross(tangentWorld, normal_world) * tan_coef;
+		// out(v_tangent_world, normalize(tangentWorld));
+		// out(v_binormal_world, normalize(binormal_world));
+	}
+	pixel
+	{	
+		lowp float FUR_OFFSET = SHADER_INDEX2 * 0.1f;
+
+		mediump float2 uv0 = v_texture0.xy;
+		mediump float2 uv1 = v_texture0.zw;
+
+		lowp float4 FurFlowMask_var = sample(TexMask ,uv0);
+		lowp float2 flowdir = FurFlowMask_var.xy * 2.0f - float2(1.0f);
+		mediump float2 uvoffset = FurUVoffset.xy * FUR_OFFSET * 0.01f * flowdir;
+		mediump float2 fur_uv_ = lerp(uv0,uv1,float2(_FurSample_2U));
+		mediump float2 fur_uv = fur_uv_ * FurUVTilling + uvoffset;
+		lowp float FurMask = 1.0f - FurFlowMask_var.z;
+
+		highp float4 position_ws = v_position_world;
+		// highp float3 tangent_ws = v_tangent_world;
+		// highp float3 binormal_ws = v_binormal_world;
+		highp float3 normaldir_WS =  normalize( v_normal_world.xyz );
+
+		highp float4 lightcolor = Shadowlight_dir[1];
+		highp float4 light_dir = Shadowlight_dir[3];
+		highp float3 lightdir_WS = normalize( -light_dir.rgb  );
+		highp float3 viewdir_WS = normalize( CameraPos.xyz - position_ws.xyz );
+
+		highp float3 srgb = sample(TexBaseColor,uv0).rgb;
+		lowp float3 baseColor = srgb * srgb;
+		float Noise = sample( TexFurPatten ,fur_uv).r;
+
+		// float FurMask = lerp(1.0f - fur_mask.r, fur_mask.r, step(shaderidx, 0.2f));
+
+		float n_dot_v = saturate( dot(normaldir_WS,viewdir_WS ) );
+		float n_dot_l = saturate( dot(normaldir_WS,lightdir_WS ) );
+
+		//毛发光照模型与遮蔽性
+		float3 normaldir_VS = normalize(transform(float4(normaldir_WS,0.0f),u_view).xyz);
+		float3 SH = float3( saturate(normaldir_VS.y * _OcclusionA + _OcclusionB) );//模拟球谐做上下关系
+		float Occlusion = FUR_OFFSET * FUR_OFFSET + 0.04f; //伽马转线性最精简版
+		float3 SHL = lerp (_OcclusionColor.rgb * SH,SH,float3( Occlusion )) ;
+
+		//毛发的边缘光
+		float Fresnel = 1.0f - n_dot_v;
+		float RimLight =Fresnel * Occlusion; //AO的深度剔除 很重要
+		float RimLightA =RimLight*RimLight; //fresnel~pow简化版
+		float3 RimLightB =float3( RimLightA*_FresnelLV )*SH; //加上环境光因数
+  		float3 SHLL = SHL + RimLightB;//与环境光结合
+
+		//毛发的次表面散射
+		float DirLightA =   saturate (n_dot_l * FUR_OFFSET + n_dot_l + (1.0f - n_dot_l) * _LightFilter);//模拟光线穿透
+		float3 DirLightB = DirLightA * _FurLightExposure * lightcolor.rgb;
+
+		// float3 tangent = normalize( cross( normaldir_WS,tangent_ws )  )	* -1.0f;
+		// function ShiftTangent (tangent, normaldir_WS, -0.5f + _SpecShift1) out(float3 T1);
+		// function ShiftTangent (tangent, normaldir_WS,  Noise+ _SpecShift2) out(float3 T2);
+		// //高光值
+		// function StrandSpecular(T1,viewdir_WS, lightdir_WS, _SpecSmooth1) out(highp float spec1) ;
+		// function StrandSpecular(T2,viewdir_WS, lightdir_WS, _SpecSmooth2) out(highp float spec2) ;
+
+		// // function srgb_to_linear(_SpecColor1.rgb) out(float3 _SpecColor1_linear);
+		// // function srgb_to_linear(_SpecColor2.rgb) out(float3 _SpecColor2_linear);
+		// lowp float3 _SpecColor1_linear = _SpecColor1.rgb * _SpecColor1.rgb;
+		// lowp float3 _SpecColor2_linear = _SpecColor2.rgb * _SpecColor2.rgb;
+
+		// mediump float3 specular1 = _SpecColor1_linear.rgb * spec1 * _Glossiness1;
+		// mediump float3 specular2 = _SpecColor2_linear.rgb * spec2 * _Glossiness2;
+		// mediump float3 specular = specular1*Noise*Noise + specular2*Noise*Noise ;
+
+		lowp float alpha = (Noise * 2.0f - (FUR_OFFSET *FUR_OFFSET +(FUR_OFFSET * FurMask * _FurMaskBlur))) * _Thickness ;//衰减曲线调整
+		macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(saturate(alpha) - 0.5f, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+		// float color_a = saturate(alpha) ;
+		// float color_b = color_a * (dot(normaldir_WS,viewdir_WS ) - _Blur);
+		// float color_c=  color_b + step(shaderidx, 0.2f);
+		// float final_alpha = color_b;
+
+		// float3 final_rgb = specular + baseColor* SHLL *DirLightB;
+		float3 final_rgb = baseColor * SHL * DirLightB + RimLightB * baseColor;
+
+		float3 decode_color = final_rgb/(final_rgb + float3(0.187f)) * 1.035f;
+		float decode_alpha =  saturate(alpha) * AlphaMtl;
+
+		lowp float4 res_color = float4(float3(decode_color),decode_alpha);
+		pixel(res_color);
+	}
+}

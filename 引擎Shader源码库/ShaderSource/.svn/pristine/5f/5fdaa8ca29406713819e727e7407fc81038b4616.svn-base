@@ -1,0 +1,395 @@
+["fx teleportation fast version"]
+pipeline
+<
+	version = "1.0.0"
+	author = "konglingjie"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	["Pattern贴图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		path = "fx\\texture\\pattern\\hexagon_nopack.png"
+	>;
+	["NoiseMap"]
+	uniform sampler _NoiseMap
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		path = "fx\\texture\\noise\\noisesmooth02.png"
+	>;
+	["TintColor"]
+	uniform float4 _TintColor
+	<
+		artist = "1"
+		color = "1"
+		init = "(0.294, 0.654, 0.956, 1.0)"
+	>;
+
+	["TintIntensity"]
+	uniform float _TintIntensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["PatternEmiss Intensity"]
+	uniform float _PatternEmissIntensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["NoiseEmiss Intensity"]
+	uniform float _NoiseEmissIntensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["EdgeEmiss Intensity"]
+	uniform float _EdgeEmissIntensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["PatternTilling"]
+	uniform float PatternTilling
+	<
+		artist = "1"
+		init = "3.0"
+	>;
+	["TriplanarFalloff"]
+	uniform float _Triplanar_Falloff
+	<
+		artist = "1"
+		init = "5"
+	>;
+	["NoiseMap Tilling"]
+	uniform float _NoiseMap_Tilling
+	<
+		artist = "1"
+		init = "1.0"
+	>;
+	["NoiseMap Speed"]
+	uniform lowp float2 NoiseMap_Speed
+	<
+		artist = "1"
+		init = "(0,-0.5)"
+	>;
+	["RimPower"]
+	uniform float _RimPower
+	<
+		artist = "1"
+		init = "2"
+	>;
+	["RimIntensity"]
+	uniform float _RimIntensity
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["RimScale"]
+	uniform float _RimScale
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["Center Point"]
+	uniform float4 _CenterPoint
+	<
+		artist = "1"
+		init = "(0.0, 5.0, 0.0, 1.0)"
+	>;
+	["World Scale"]
+	uniform float _WorldScale
+	<
+		artist = "1"
+		init = "2.5"
+	>;
+	["Radius"]
+	uniform float _Radius
+	<
+		artist = "1"
+		init = "12"
+	>;
+	["PatternSpread"]
+	uniform float _PatternSpread
+	<
+		artist = "1"
+		init = "5"
+	>;
+	["SpreadWeight"]
+	uniform float _SpreadWeight
+	<
+		artist = "1"
+		init = "0.5"
+	>;
+	["Edge Distance"]
+	uniform float Edge_Distance
+	<
+		artist = "1"
+		init = "2.0"
+	>;
+	["Edge Width"]
+	uniform float Edge_Width
+	<
+		artist = "1"
+		init = "3.0"
+	>;
+	["Edge Smoothness"]
+	uniform float Edge_Smoothness
+	<
+		artist = "1"
+		init = "1"
+	>;
+	["Tele_DissolveAmounts Min"]
+	uniform float _Tele_DissolveAmountMin
+	<
+		artist = "1"
+		init = "30"
+		min = "-30.0"
+		max = "30.0"
+		uistep = "0.01"
+	>;
+	["Tele_DissolveAmounts Max"]
+	uniform float _Tele_DissolveAmountMax
+	<
+		artist = "1"
+		init = "-15"
+		min = "-30.0"
+		max = "30.0"
+		uistep = "0.01"
+	>;
+	["Tele_DissolveAmounts TimeScale"]
+	uniform float _Tele_DissolveAmountTimeScale
+	<
+		artist = "1"
+		init = "0.35"
+		min = "0.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["Tele_NoiseSize"]
+	uniform float _Tele_NoiseSize
+	<
+		artist = "1"
+		init = "1000"
+	>;
+	["Tele_Direction"]
+	uniform float4 _Tele_Direction
+	<
+		artist = "1"
+		init = "(0.0, 1.0, 0.0, 1.0)"
+	>;
+	["_FrashFreq"]
+	uniform float _FrashFreq
+	<
+		init = "20.0"
+		artist = "1"
+	>;
+	["_Alpha"]
+	uniform float _Alpha
+	<
+		init = "1.0"
+		artist = "1"
+	>;
+	["Debug ShpereMask"]
+	uniform float _Debug_ShpereMask
+	<
+		artist = "1"
+		init = "0"
+		min = "0.0"
+		max = "1.0"
+		uistep = "1.0"
+	>;
+	["Debug OpacityMask"]
+	uniform float _Debug_OpacityMask
+	<
+		artist = "1"
+		init = "0"
+		min = "0.0"
+		max = "1.0"
+		uistep = "1.0"
+	>;
+	["Debug EmissMask"]
+	uniform float _Debug_EmissMask
+	<
+		artist = "1"
+		init = "0"
+		min = "0.0"
+		max = "1.0"
+		uistep = "1.0"
+	>;
+	["变身程度"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "变身"
+		uistep = "1.0"
+		init = "0.0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["变身速率"]
+	uniform lowp float ChangeSpeed
+	<
+		uigroup = "变身"
+		init = "1.0"
+		artist = "1"
+	>;
+	["最后过渡纯色"]
+	uniform float4 _EaseoutColor
+	<
+		artist = "1"
+		color = "1"
+		init = "(0.294, 0.654, 0.956, 1.0)"
+	>;
+	["最后过渡纯色的强度"]
+	uniform lowp float EaseoutIntensity
+	<
+		init = "2"
+		artist = "1"
+	>;
+	["最后过渡纯色的时刻"]
+	uniform lowp float EaseoutTime
+	<
+		uistep = "0.001"
+		init = "0.98"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+	["ToneMapping亮度"]
+	uniform float ToneFactor
+	<
+		artist = "0"
+		min = "0.3"
+		max = "3.0"
+		uistep = "1"
+		init = "0.7"
+	>;
+	
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 world_inv : INV_WORLD;
+	uniform mediump float FrameTime: FRAME_TIME;
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+
+	attribute float4 a_position: POSITION;
+	attribute float3 a_normal : NORMAL;
+	attribute float4 a_texture0: TEXTURE0;
+	// varying
+	varying mediump float4 v_texture0;
+	varying highp float3 v_localpos;
+	varying highp float3 v_worldpos;
+	varying mediump float3 v_worldnormal; 
+	varying mediump float2 v_screen_uv;
+
+
+	function random in(float2 input) out(float randomFactor)
+	{
+		float factor = fractional(sin(dot(input, float2(12.9898f,78.233f)))* 43758.5453123f);
+		out(randomFactor,factor);
+	};
+	vertex{		
+	    float3 worldpos =  transform(a_position,world).xyz;
+	    out(v_worldpos,worldpos.xyz);
+	    out(v_localpos,a_position.xyz);
+	    float3x3 worldMat = float3x3(world);
+	    float3 worldnormal = transform(a_normal,worldMat);
+	    out(v_worldnormal,worldnormal);
+	    out(v_texture0,a_texture0);
+	    float changePrecent = ChangeAmount * ChangeSpeed;
+        float test = ((dot(a_position.xyz, float3(0.0f, -1.0f, 0.0f)) + 1.0f) / 2.0f) - lerp(_Tele_DissolveAmountMin,_Tele_DissolveAmountMax,saturate(changePrecent / _Tele_DissolveAmountTimeScale));
+        float squaresStep = step(test,0.0f);
+        function random(a_position.xy) out(float random_pos_factor);
+        float3 mdlpos = a_position.xyz + _Tele_Direction.xyz * float3(squaresStep * random_pos_factor * abs(test));
+		//float3 mdlpos = a_position.xyz;
+		float4 screen_pos = transform(float4(mdlpos,1.0f),wvp);
+		vertex(screen_pos);
+	}
+
+	pixel
+	{	
+
+
+		float changePrecent = ChangeAmount * ChangeSpeed;
+		float2 uv_NoiseMap = v_texture0.xy * float2(_NoiseMap_Tilling) + float2(FrameTime) * NoiseMap_Speed;
+		lowp float noisemap_var = sample( _NoiseMap, uv_NoiseMap ).r;
+		// float AnimateStep1 = smoothstep(0.7f, 0.85f,changePrecent);
+		// float AnimateStep2 = smoothstep(0.85f, 0.95f,changePrecent);
+		//float AnimateStep = smoothstep(0.9f, 1.0f,changePrecent);
+		//float pattern_intensity = lerp(_PatternEmissIntensity, 2.0f, ( AnimateStep1 + AnimateStep2));
+		float pattern_intensity = _PatternEmissIntensity;
+
+		float3 abs_worldNormal = abs(v_worldnormal);
+		float3 projNormal = float3(pow(abs_worldNormal.x,_Triplanar_Falloff),pow(abs_worldNormal.y,_Triplanar_Falloff),pow(abs_worldNormal.z,_Triplanar_Falloff));
+		float3 blendFactor = projNormal/float3(projNormal.x + projNormal.y + projNormal.z + 0.00001f);
+		float3 nsign = sign(v_worldnormal);
+		lowp float4 xNorm = sample(Tex0,PatternTilling * float2(0.1f) * v_worldpos.zy * float2(nsign.x, 1.0f));
+		lowp float4 yNorm = sample(Tex0,PatternTilling * float2(0.1f) * v_worldpos.xz * float2(nsign.y, 1.0f));
+		lowp float4 zNorm = sample(Tex0,PatternTilling * float2(0.1f) * v_worldpos.xy * float2(-nsign.z, 1.0f));
+		float4 triplanarmap_value = xNorm * float4(blendFactor.x) + yNorm * float4(blendFactor.y) + zNorm * float4(blendFactor.z);
+
+		float EmissPattern = triplanarmap_value.z;
+		float BlinkPattern = triplanarmap_value.x;
+
+		float BlinkFactor = clamp((fractional((BlinkPattern + FrameTime)) - 1.0f), -0.5f, 0.5f);
+		float pattern_emiss_factor = saturate((EmissPattern + BlinkFactor));
+
+		float3 view_dir = normalize(camera_pos.xyz - v_worldpos);
+
+		float NdotV = dot( normalize(v_worldnormal), view_dir );
+		float RimFactor = saturate(_RimScale * pow( 1.0f - NdotV, _RimPower)) * _RimIntensity;
+		float control_factor = ( _Radius * changePrecent );
+		float ShpereMask = (1.0f - (length(((_CenterPoint.xyz - v_localpos)/float3(_WorldScale))) - control_factor));
+
+		float edge_distance = abs(Edge_Distance - (ShpereMask - (BlinkPattern * ((control_factor * _SpreadWeight) + _PatternSpread)))) / Edge_Width;
+		float edge_mask_factor = smoothstep(1.0f, 0.0f,edge_distance);
+		float EmissMask = saturate(pow(edge_mask_factor,Edge_Smoothness)) * _EdgeEmissIntensity;
+
+		lowp float4 CombinedColor = _TintColor * float4(noisemap_var * _NoiseEmissIntensity + pattern_intensity * pattern_emiss_factor + RimFactor + EmissMask);
+		// float4 frash_color = float4(clamp(floor(sin((AnimateStep1 * _FrashFreq))), -0.5f, 0.5f));
+		//float4 anim_state = lerp(CombinedColor , (CombinedColor + float4(BlinkFactor + 1.0f)) ,float4(AnimateStep));
+		// float4 anim_state2 = lerp( anim_state1,CombinedColor,float4(AnimateStep2));
+		// float4 anim_state3 = lerp(anim_state2,_TintColor * 2.0f,float4(AnimateStep3));
+
+		//float4 color_debug_shperemask = lerp(CombinedColor , float4(ShpereMask) ,float4(_Debug_ShpereMask));
+		lowp float OpacityMask = saturate(ShpereMask - BlinkPattern * _PatternSpread);
+		// float4 color_debug_opacitymask = lerp(color_debug_shperemask , float4(OpacityMask) , float4(_Debug_OpacityMask));
+		// float4 color_debug_emissmask = lerp(color_debug_opacitymask , float4(EmissMask) , float4(_Debug_EmissMask));
+
+		lowp float3 final_color = CombinedColor.rgb;
+
+		lowp float Alpha = saturate((EmissMask + OpacityMask) * noisemap_var * _Alpha + (EmissMask + OpacityMask) * RimFactor);
+		//float alpha_ainm = lerp(Alpha,Alpha + BlinkFactor + 1.0f,AnimateStep);
+		// float alpha_ainm2 = lerp(alpha_ainm,Alpha + BlinkFactor + 1.0f,AnimateStep2);
+		// float Alpha_debug_spheremask = lerp( Alpha , 1.0f, _Debug_ShpereMask);
+		// float Alpha_debug_opacitymask = lerp( Alpha_debug_spheremask , 1.0f, _Debug_OpacityMask);
+		// float Alpha_debug_emissmask = lerp( Alpha_debug_opacitymask , 1.0f, _Debug_EmissMask);
+
+		// float2 noise_input = floor(v_texture0.xy * _Tele_NoiseSize);
+		// function random(noise_input) out(float squares);
+		// float test = ((dot(v_localpos,float3(0.0f,1.0f,0.0f)) + 1.0f) / 2.0f) - lerp(_Tele_DissolveAmountMin,_Tele_DissolveAmountMax,saturate(changePrecent / _Tele_DissolveAmountTimeScale));
+		// float squares_step = step(lerp(_Tele_DissolveAmountMin,_Tele_DissolveAmountMax,saturate(changePrecent / _Tele_DissolveAmountTimeScale)) * squares, test);
+		// alphatest("<")(Alpha_debug_emissmask * squares_step, 0.01f);
+
+		lowp float final_alpha = Alpha;
+
+		pixel(float4(final_color,final_alpha));
+	}
+}

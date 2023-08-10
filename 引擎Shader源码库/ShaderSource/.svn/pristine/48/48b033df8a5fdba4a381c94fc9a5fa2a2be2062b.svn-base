@@ -1,0 +1,472 @@
+["common no light"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "konglingjie" 
+	category = "common" 
+	company = "netease"
+  	merge = "1"
+  	techinque = "TShader"
+>
+{
+	// 宏
+	["雾效"]
+	eitheror SCENE_FOG;
+	macro(SCENE_FOG)
+	<
+		customizable = "1"
+		default = "1"
+	>;
+
+	["云层"]
+	eitheror SCENE_CLOUD;
+	macro(SCENE_CLOUD)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	["云层使用世界坐标"]
+	eitheror CLOUD_WORLDUV;
+	macro(CLOUD_WORLDUV)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	["边缘渐隐"]
+	eitheror CLOUD_EDGE_FADE;
+	macro(CLOUD_EDGE_FADE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+	
+	["diffuse贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+	>;
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+	["雾气纹理"]
+	uniform sampler _FogDetailTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		lodbias = "-0.5"
+		path = "shader\\core\\texture\\fog\\fog_detail.png"
+	>;
+	["云层贴图"]
+	uniform sampler _CloudMask
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "repeat"
+		addressv = "clamp"
+		lodbias = "-0.5"
+	>;
+
+	["_FogDepthStart"]
+	uniform highp float _FogDepthStart
+	<
+		artist = "1"    
+		init = "0.0"
+		min = "-10.0"
+		max = "10.0"
+		uistep = "0.0001"
+	>;
+
+
+	["_FogHeightStart"]
+	uniform highp float _FogHeightStart
+	<
+		artist = "1"    
+		init = "0.0"
+		min = "-20.0"
+		max = "20.0"
+		uistep = "0.0001"
+	>;
+	["_FogHeightEnd"]
+	uniform highp float _FogHeightEnd
+	<
+		artist = "1"    
+		init = "0.0"
+		min = "-20.0"
+		max = "20.0"
+		uistep = "0.0001"
+	>;
+	["_FogFixStart"]
+	uniform highp float _FogFixStart
+	<
+		artist = "1"    
+		init = "0.0"
+	>;
+	["_FogFixEnd"]
+	uniform highp float _FogFixEnd
+	<
+		artist = "1"    
+		init = "50.0"
+	>;
+	["指定雾颜色"]
+	uniform mediump float4 fogfix_color
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(1.0,1.0,1.0,1.0)" 
+		artist = "1"
+		color = "1"
+	>;	
+	["fog_detail_tilling"]
+	uniform mediump float2 fog_detail_tilling
+	<
+		artist = "1"    
+		init = "(0.02,0.02)"
+	>;
+
+	["fog_detail_speed"]
+	uniform mediump float2 fog_detail_speed
+	<
+		artist = "1"    
+		init = "(-0.2,0.0)"
+	>;
+	
+	["cloudhorizontal"]
+	uniform mediump float cloudhorizontal
+	<
+		artist = "1"    
+		init = "0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	["cloudoffset"]
+	uniform mediump float cloudoffset
+	<
+		artist = "1"    
+		init = "0"
+		uistep = "0.001"
+		min = "-1.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	["cloudspeed"]
+	uniform mediump float cloudspeed
+	<
+		artist = "1"    
+		init = "1"
+		uigroup = "云"
+	>;
+	["cloudblendhorizontal"]
+	uniform mediump float cloudblendhorizontal
+	<
+		artist = "1"    
+		init = "0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	["cloudblend"]
+	uniform mediump float cloudblend
+	<
+		artist = "1"    
+		init = "1"
+		uistep = "0.001"
+		min = "0.0"
+		max = "2.0"
+		uigroup = "云"
+	>;
+	["cloudVTilling"]
+	uniform mediump float cloudVTilling
+	<
+		artist = "1"    
+		init = "1"
+		uigroup = "云"
+	>;
+	["cloudBaseTilling"]
+	uniform mediump float cloudBaseTilling
+	<
+		artist = "1"    
+		init = "1"
+		uigroup = "云"
+	>;
+	["cloudSecondTilling"]
+	uniform mediump float cloudSecondTilling
+	<
+		artist = "1"    
+		init = "1"
+		uigroup = "云"
+	>;
+	["cloudfadehorizontal"]
+	uniform mediump float cloudfadehorizontal
+	<
+		artist = "1"    
+		init = "0"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	["cloudopacity"]
+	uniform mediump float cloudopacity
+	<
+		artist = "1"    
+		init = "1"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	["云层颜色"]
+	uniform mediump float4 _CloudColor
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "(1.0,1.0,1.0,1.0)" 
+		artist = "1"
+		color = "1"
+		uigroup = "云"
+	>;
+	["云层亮度"]
+	uniform mediump float _CloudIntensity
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "1.0" 
+		artist = "1"
+		color = "1"
+		uigroup = "云"
+	>;
+	["边缘淡出"]
+	uniform mediump float Edge_Fade
+	<
+		//init = "(1.0, 0.4274, 0.3882, 1.0)" 
+		init = "0.5" 
+		artist = "1"
+		color = "1"
+		uistep = "0.001"
+		min = "0.0"
+		max = "1.0"
+		uigroup = "云"
+	>;
+	
+
+// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 diffuse : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	
+// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform lowp float alphaRef : ALPHA_REF;
+	uniform lowp float4 u_fog_color : FOG_COLOR;
+	uniform mediump float4 u_fog_info : FOG_INFO;
+	uniform lowp float HeightFogDensity: HEIGHT_FOG_DENSITY; 
+	uniform highp float frame_time : FRAME_TIME;
+	uniform highp float4 CameraPos: CAMERA_POSITION;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;	
+	// varying变量
+	varying mediump float4 UV0;
+	varying highp float4 PosWorld;
+	varying lowp float fog_distance;
+	// varying lowp float fog_height_factor;
+
+	["计算线性雾"]
+	function get_fog_mix in (
+	highp float fog_begin, // 雾的起始位置, view空间
+	highp float fog_end, // 雾的结束位置, view空间
+	highp float wvp_z // 顶点在投影空间的深度
+	) out (mediump float fog_linear_factor) // 计算雾效因子
+	{
+		out(fog_linear_factor, saturate(smoothstep(fog_begin, fog_end, wvp_z)));
+	};
+
+	["计算高度雾"]
+	function get_fog_height1 in(
+	highp float fog_height_begin, // 雾的起始位置，世界空间
+	highp float fog_height_end, // 雾的结束位置，世界空间
+	highp float view_y // 顶点在世界空间的高度
+	) out (mediump float fog_height_factor) // 计算雾效因子
+	{
+		highp float fromEnd = fog_height_end - view_y;
+		mediump float delta = fog_height_end - fog_height_begin;
+		mediump float height_factor = saturate( fromEnd / delta );
+		
+		out(fog_height_factor, height_factor);
+		// out(fog_factor, 1.0f - height_factor);
+		// out(fog_factor, max(linear_fog_factor, 1.0f - height_factor));
+	};
+
+	function ACESFilm in(float3 inColor) out(lowp float3 outColor)
+	{
+	    lowp float3 a = float3(2.51f);
+	    lowp float3 b = float3(0.03f);
+	    lowp float3 c = float3(2.43f);
+	    lowp float3 d = float3(0.59f);
+	    lowp float3 e = float3(0.14f);
+	    lowp float3 encode_color_ = saturate((inColor*(a*inColor+b))/(inColor*(c*inColor+d)+e));
+	    lowp float3 encode_color = sqrt(encode_color_);
+	    out(outColor,encode_color);
+	};
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, wvp);
+	    vertex(pos);
+
+	    highp float4 pos_world = transform(a_position,world);
+	    out(PosWorld,pos_world);
+    	// diffuse
+		mediump float4 uv0 = float4(texcoord0.xy, 1.0f, 0.0f);
+		out(UV0, uv0);
+	}
+
+	pixel
+	{
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+		highp float4 pos_world = PosWorld;
+
+	    macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float alpha)
+	    {
+			branch("1") {
+				lowp float4 separateColor = sample(sepAlphaTex, UV0.xy);
+				out(alpha, separateColor.w);
+			}
+			branch("0") {
+				out(alpha, diffuse_map_color.a);
+			}
+	    };
+
+	    macro(ALPHA_TEST_ENABLE)
+		{
+		  	branch("1") {
+				alphatest("<")(alpha - alphaRef, 0.0f);
+		  	}
+			branch("0") {
+		 	}
+		};
+
+		macro(LEVEL_HIGH) out(float3 cloud_combined_color)
+		{
+			branch("1")
+			{
+				macro(SCENE_CLOUD) out(float3 cloud_combined_color_)
+				{
+					branch("1")
+					{
+						macro(CLOUD_WORLDUV) out(float2 clouduv)
+						{
+							branch("1")
+							{
+								float2 clouduv_ = float2(-pos_world.x+50.0f,-pos_world.y + 40.0f) / float2(100.0f,45.0f);
+								out(clouduv,clouduv_);
+							}
+							branch("0")
+							{
+								out(clouduv,UV0.xy);
+							}
+						};
+
+						float2 uniform_speed = float2(0.002f,0.0f);
+						mediump float2 cloud_base_uv = clouduv * float2(cloudBaseTilling,cloudVTilling) + cloudspeed * frame_time * uniform_speed + float2(cloudoffset,cloudhorizontal);
+						lowp float cloud_base_layer = sample(_CloudMask,cloud_base_uv).r;
+
+						mediump float2 cloud_flow_uv = clouduv * float2(cloudSecondTilling,cloudVTilling) + cloudspeed * frame_time * uniform_speed * 5.0f + float2(cloudoffset,cloudhorizontal);
+						lowp float cloud_flow_layer = sample(_CloudMask,cloud_flow_uv).g;
+
+						// mediump float3 view_dir = normalize(CameraPos.xyz - pos_world.xyz);
+						// lowp float cloud_blend_factor = saturate(dot(view_dir,float3(0.0f,-1.0f,0.0f)));
+						lowp float cloud_blend_factor = 1.0f - saturate(saturate(clouduv.y - cloudblendhorizontal + cloudhorizontal)/ cloudblend); 
+
+						lowp float cloud_blend = lerp(cloud_base_layer,cloud_flow_layer,cloud_blend_factor);
+
+						lowp float cloud_fade_factor = saturate(clouduv.y - cloudfadehorizontal + cloudhorizontal) / cloudopacity; 
+						lowp float cloud_fade = lerp(0.0f,cloud_blend,cloud_fade_factor);
+
+						lowp float cloud_shape = sample(_CloudMask, clouduv * float2(cloudBaseTilling,cloudVTilling) + float2(cloudoffset,cloudhorizontal)).g;
+						lowp float cloud_contrast = lerp(1.0f,4.0f,cloud_shape);
+
+						mediump float cloud_intensity = pow(cloud_fade,cloud_contrast);
+						mediump float3 cloud_color_ = cloud_intensity * _CloudColor.rgb * _CloudColor.rgb * _CloudIntensity;
+						// mediump float3 cloud_add_color = diffuse_map_color.rgb + cloud_color_ * diffuse_map_color.rgb
+						function ACESFilm(cloud_color_) out(float3 cloud_color);
+						lowp float cloud_final_lerpfactor = saturate(cloud_intensity * cloud_intensity);
+						macro(CLOUD_EDGE_FADE) out(float edge_fade)
+						{
+							branch("1")
+							{
+								lowp float falloff_h = smoothstep(0.0f,Edge_Fade,(1.0f - abs(UV0.x - 0.5f) * 2.0f));
+								out(edge_fade,falloff_h);
+							}
+							branch("0")
+							{
+								out(edge_fade,1.0f);
+							}
+						};
+						lowp float3 cloud_combined_color0 = lerp(diffuse_map_color.rgb,cloud_color,float3(cloud_final_lerpfactor * edge_fade));
+						out(cloud_combined_color_,float3(cloud_combined_color0));
+					}
+					branch("0")
+					{
+						out(cloud_combined_color_,diffuse_map_color.rgb);
+					}
+				};
+				out(cloud_combined_color,cloud_combined_color_);
+			}
+			branch("0")
+			{
+				out(cloud_combined_color,diffuse_map_color.rgb);
+			}
+		};
+
+		macro(LEVEL_MIDDLE) out(float3 fog_combined_color)
+		{
+			branch("1")
+			{
+				macro(SCENE_FOG) out(float3 fog_combined_color_)
+				{
+					branch("1")
+					{
+						// highp float fog_uniform = 0.00001f;
+						// lowp float fog_depth = smoothstep(-80.50f , -82.0f, PosWorld.z);
+						lowp float fog_height = smoothstep(u_fog_info.z + _FogHeightStart,u_fog_info.w + _FogHeightEnd, PosWorld.y);
+
+						float2 fog_uv = PosWorld.xy * fog_detail_tilling + fog_detail_speed * frame_time;
+						mediump float4 cloud = sample(_FogDetailTex, fog_uv);
+						mediump float fog_height_factor = saturate(fog_height - cloud.r);
+						mediump float fog_factor = u_fog_color.a * fog_height_factor;
+						lowp float fog_height_fix = smoothstep(_FogFixStart,_FogFixEnd, PosWorld.y);
+						lowp float3 fog_fixed_color = lerp(u_fog_color.rgb,fogfix_color.rgb,float3(fog_height_fix));
+						lowp float3 fog_combined_color0 = lerp(cloud_combined_color.rgb, fog_fixed_color, float3(fog_factor));
+						out(fog_combined_color_,fog_combined_color0);
+					}
+					branch("0")
+					{
+						out(fog_combined_color_,cloud_combined_color.rgb);
+					}
+				};
+				out(fog_combined_color,fog_combined_color_);
+			}
+			branch("0")
+			{
+				out(fog_combined_color,cloud_combined_color.rgb);
+			}
+		};
+		pixel(float4(float3(fog_combined_color), alpha * AlphaMtl));
+	}
+}

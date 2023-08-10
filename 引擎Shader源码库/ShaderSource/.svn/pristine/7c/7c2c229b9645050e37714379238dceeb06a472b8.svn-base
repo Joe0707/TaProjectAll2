@@ -1,0 +1,196 @@
+["lightflow"]
+
+pipeline
+<
+	version = "1.0.0" 
+	author = "zhangliang" 
+	category = "common" 
+	company = "netease"
+  merge = "1"
+>
+{
+// 宏
+
+	["使用裁剪平面"]
+	eitheror CLIPPLANE_ENABLE;
+	macro(CLIPPLANE_ENABLE)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	["diffuse贴图"]
+	uniform sampler Tex1 : DIFFUSE
+	<
+		artist = "1"
+	>;
+	
+	uniform sampler TexMask : LIGHTMAP
+	<
+		artist = "1"
+	>;	
+	
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+	
+	attribute float4 texcoord0 : TEXTURE0;
+	
+attribute float4 position: POSITION;
+uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;	
+	
+uniform mediump float FrameTime: FRAME_TIME;
+uniform mediump float frame_rate
+<
+	init = "1.0"
+>;
+uniform highp float texTransDiff_u;
+uniform highp float texTransDiff_v;
+
+["u速度"]
+uniform lowp float u_speed
+<
+	artist = "1"
+	min = "0.0"
+	max = "1.0"
+	init = "0.0"
+>;
+
+["v速度"]
+uniform lowp float v_speed
+<
+	artist = "1"
+	min = "0.0"
+	max = "1.0"
+	init = "0.0"
+>;
+
+["u_scale"]
+uniform lowp float u_scale
+<
+	artist = "1"
+	min = "0.0"
+	max = "100.0"
+	init = "1.0"
+>;
+
+["v_scale"]
+uniform lowp float v_scale
+<
+	artist = "1"
+	min = "0.0"
+	max = "100.0"
+	init = "1.0"
+>;
+
+varying mediump float4 UV0;
+varying mediump float2 ANIM_UV;
+varying highp float4 v_pos_world;
+
+uniform lowp float alphaRef : ALPHA_REF;
+
+["亮度"]
+uniform mediump float brightness
+<
+	artist = "1" 
+	min = "0.0"
+	max = "5.0"
+	init = "2.0"
+>;
+uniform mediump float4 change_color
+<
+	artist = "1" 
+    color = "1"
+	init = "1.0,1.0,1.0,1.0"
+>;
+
+uniform float AlphaMtl : ALPHA_MTL
+<
+  init = "1.0"
+>;
+
+	uniform highp float4x4 u_world: WORLD;
+
+	uniform highp float4 u_clipplane1
+	<
+		init = "(0.0, 0.0, 0.0, 0.0)"
+	>;
+	uniform highp float4 u_clipplane2
+	<
+		init = "(0.0, 0.0, 0.0, 0.0)"
+	>;
+    uniform highp float soft_edge_width
+    <
+    	init = "10.0"
+    >;
+	vertex
+	{
+	   vertex(transform(position, wvp));
+	   mediump float4 _uv0 = float4(texcoord0.x + texTransDiff_u, texcoord0.y + texTransDiff_v, texcoord0.z, texcoord0.w);
+       out(UV0, _uv0);
+	   out(ANIM_UV, float2((_uv0.x + frame_rate * FrameTime * u_speed) * u_scale , (_uv0.y + frame_rate * FrameTime * v_speed) * v_scale));
+
+		macro(CLIPPLANE_ENABLE)
+		{
+			branch("1")
+			{
+				float4 pos_world = transform(position, u_world);
+				out(v_pos_world, pos_world);
+			}
+			branch("0")
+			{}
+		};
+	}
+	
+	pixel
+	{
+	  lowp float4 _texColor1 = sample(Tex1, ANIM_UV.xy);
+	  
+	  mediump float mask = sample(TexMask, UV0.xy).r;
+	  
+	  macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 texColor1)
+	  {
+	    branch("1") {
+		  mediump float sepAlpha = mask*sample(sepAlphaTex, ANIM_UV.xy).a;
+	  	  out(texColor1, float4(_texColor1.rgb, sepAlpha));
+	    }
+		branch("0") {
+	      out(texColor1, _texColor1);
+		}
+	  };
+	  
+	  mediump float alpha = AlphaMtl*mask*texColor1.w;
+	  
+      macro(ALPHA_TEST_ENABLE)
+      {
+        branch("1") {
+          alphatest("<")(alpha - alphaRef, 0.0f);
+        }
+          branch("0") {
+        }
+      };
+
+        // 裁剪平面
+        macro(CLIPPLANE_ENABLE) out(lowp float clipAlpha)
+        {
+            branch("1")
+            {
+                highp float2 p1_1 = u_clipplane1.xy;
+                highp float2 p2_1 = u_clipplane1.zw;
+                function bcross(p1_1, p2_1, v_pos_world.xz, soft_edge_width) out(highp float t_value1);
+                highp float2 p1_2 = u_clipplane2.xy;
+                highp float2 p2_2 = u_clipplane2.zw;
+                function bcross(p1_2, p2_2, v_pos_world.xz, soft_edge_width) out(highp float t_value2);
+
+				out(clipAlpha, t_value1 * t_value2);
+            }
+            branch("0")
+            {
+                out(clipAlpha, 1.0f);
+            }
+        };
+
+      pixel(float4(mask*change_color.xyz*brightness*texColor1.xyz, alpha * clipAlpha));
+	}
+	
+}

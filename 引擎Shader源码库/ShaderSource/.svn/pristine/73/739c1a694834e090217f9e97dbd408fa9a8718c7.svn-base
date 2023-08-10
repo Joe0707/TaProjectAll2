@@ -1,0 +1,54 @@
+pipeline
+<
+	author = "zhangliang"
+>
+{
+	uniform sampler Tex0
+	<
+		export = "0"
+	>;
+	
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+	
+	uniform float4 ViewportSize : VIEWPORT_SIZE;
+	
+	varying mediump float2 TexCoord0;
+	varying mediump float2 TexCoord1;
+	varying mediump float2 TexCoord2;
+	varying mediump float2 TexCoord3;
+	varying mediump float2 TexCoord4;
+	varying mediump float2 TexCoord5;
+	
+	vertex vs_main
+	{
+		vertex(a_position);
+		mediump float radio = 1.0f / ViewportSize.y;
+		
+		out(TexCoord0, a_texture0.xy + float2( 0.0f, -4.0909f * radio));
+		out(TexCoord1, a_texture0.xy + float2( 0.0f, -2.2727f * radio));
+		out(TexCoord2, a_texture0.xy + float2( 0.0f, -0.625f * radio));
+		out(TexCoord3, a_texture0.xy + float2( 0.0f, 0.625f * radio));
+		out(TexCoord4, a_texture0.xy + float2( 0.0f, 2.2727f * radio));
+		out(TexCoord5, a_texture0.xy + float2( 0.0f, 4.0909f * radio));
+	}
+	
+	pixel ps_main
+	{
+		lowp float3 color0 = sample(Tex0, TexCoord0.xy).xyz * 0.01074f;
+		lowp float3 color1 = sample(Tex0, TexCoord1.xy).xyz * 0.16113f;
+		lowp float3 color2 = sample(Tex0, TexCoord2.xy).xyz * 0.32812f;
+		lowp float3 color3 = sample(Tex0, TexCoord3.xy).xyz * 0.32812f;
+		lowp float3 color4 = sample(Tex0, TexCoord4.xy).xyz * 0.16113f;
+		lowp float3 color5 = sample(Tex0, TexCoord5.xy).xyz * 0.01074f;
+		
+		mediump float3 result = (color0 + color1 + color2 + color3 + color4 + color5);
+		
+		// Tweak here to adjust glow
+		// mediump float3 r3 = result * 3.0f;
+		// mediump float3 result_new = r3 * r3 / (float3(1.0f) + r3);
+		// pixel(float4(result_new, 1.0f));
+	
+		pixel(float4(result, 1.0f));
+	}
+}

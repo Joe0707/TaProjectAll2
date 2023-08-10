@@ -1,0 +1,64 @@
+["fog of war blur"]
+pipeline
+<
+	author = "ly"
+	company = "netease"
+	technique = "TShader"
+	zenable = "0"
+	zwritable = "0"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float4 a_texture0: TEXTURE0;
+
+	varying mediump float4 TexCoord0;
+	varying mediump float4 TexCoord1;
+
+
+	uniform mediump float4 rtSize:RT_SIZE;
+
+	uniform mediump float4 blur_dir1
+	<
+		artist = "1"
+		init = "(0.001798561, 0, -0.001798561, 0)"
+	>;
+
+	uniform mediump float4 blur_dir2
+	<
+		artist = "1"
+		init = "(0.005395683, 0, -0.005395683, 0)"
+	>;
+
+	function calc_half_pixel in(mediump float4 rtsize) out (mediump float2 res)
+	{
+	    out(res, float2(0.5f) * rtsize.zw); 
+	};
+
+	["原来图"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		export = "0"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+	>;
+
+	vertex
+	{
+		["后处理对顶点不做变换"]
+		vertex(a_position);
+		function calc_half_pixel(rtSize) out (mediump float2 half_pixel);
+		out(TexCoord0, a_texture0.xyxy + float4(half_pixel.x * 2.0f, 0.0f, -half_pixel.x * 2.0f, 0.0f));
+		out(TexCoord1, a_texture0.xyxy + float4(0.0f, half_pixel.y * 2.0f, 0.0f, -half_pixel.y * 2.0f));
+	}
+	
+	pixel
+	{
+		lowp float4 color_1 = sample(Tex0, TexCoord0.xy);
+		lowp float4 color_2 = sample(Tex0, TexCoord0.zw);
+		lowp float4 color_3 = sample(Tex0, TexCoord1.xy);
+		lowp float4 color_4 = sample(Tex0, TexCoord1.zw);
+		lowp float4 res = (color_1 + color_2) * 0.3f + (color_3 + color_4) * 0.2f;
+		pixel(res);
+	}
+}

@@ -1,0 +1,256 @@
+["vertex animation"]
+pipeline
+<
+	version = "1.0.0"
+	author = "konglingjie"
+	company = "Netease"
+	techinque = "TShader"
+	merge = "1"
+>
+{
+	uniform lowp float alphaRef : ALPHA_REF;
+
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+
+	["漫反射贴图"]
+	uniform sampler _MainTex: DIFFUSE
+	<
+		artist = "1"
+		mip = "linear"
+		min = "linear"
+		mag = "linear"
+		addressu = "repeat"
+		addressv = "clamp"
+		path = "fx\\texture\\noise\\sk_duye_08.png"
+	>;
+	["OffsetX"]
+	uniform float offset_x
+	<
+		artist = "1"
+		init = "0.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["OffsetY"]
+	uniform float offset_y
+	<
+		artist = "1"
+		init = "0.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["TillingX"]
+	uniform float tilling_x
+	<
+		artist = "1"
+		init = "1.0"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["TillingY"]
+	uniform float tilling_y
+	<
+		artist = "1"
+		init = "1.0"
+		min = "0.0"
+		max = "5.0"
+		uistep = "0.01"
+	>;
+	["alpha通道 贴图"]
+    uniform sampler sepAlphaTex:DIFFUSE_ALPHA
+    <
+    >;
+	["Color"]
+	uniform float4 _Color
+	<
+		artist = "1"
+		color = "1"
+		init = "(1.0, 1.0, 1.0, 1.0)"
+	>;
+
+	["_EmissGain"]
+	uniform float _EmissGain
+	<
+		artist = "1"
+		init = "1"
+	>;
+
+    ["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		addressu = "repeat"
+		addressv = "clamp"
+		lodbias = "-1.0"
+		path = "fx\\texture\\noise\\sk_duye_08_n.png"
+	>;
+	["法线强度"]
+	uniform float bumpScale
+	<
+		artist = "1"
+		init = "1"
+		//min = "0.0"
+		//max = "10.0"
+		//uistep = "0.01"
+	>;
+    ["材质贴图"]
+	uniform sampler MatcapTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		addressu = "clamp"
+		addressv = "clamp"
+		path = "common\\textures\\envmap\\eye_matcap.png"
+	>;
+	["材质强度"]
+	uniform float MatcapIntensity
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise贴图"]
+	uniform sampler NoiseTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		path = "fx\\texture\\noise\\noisesmooth.png"
+	>;
+	["_OffsetPower"]
+	uniform float _OffsetPower
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise TillingX"]
+	uniform float noise_tilling_x
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise TillingY"]
+	uniform float noise_tilling_y
+	<
+		artist = "1"
+		init = "1"
+		// min = "0.0"
+		// max = "1.0"
+		// uistep = "0.01"
+	>;
+	["Noise 平移速度X"]
+	uniform float noise_offset_speed_x
+	<
+		artist = "1"
+		init = "0"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	["Noise 平移速度Y"]
+	uniform float noise_offset_speed_y
+	<
+		artist = "1"
+		init = "0"
+		min = "-1.0"
+		max = "1.0"
+		uistep = "0.01"
+	>;
+	
+	["wvp变换"]
+	uniform highp float4x4 wvp: WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 view : VIEW;
+	uniform highp float4x4 u_view_poj:VIEW_PROJECTION;
+	uniform mediump float FrameTime: FRAME_TIME;
+
+	attribute float4 a_position: POSITION;
+	attribute float3 a_normal : NORMAL;
+	attribute float3 a_tangent : TANGENT;
+	attribute float4 a_diffuse: DIFFUSE;
+	attribute float4 a_texture0: TEXTURE0;
+	attribute float4 a_texture1 : TEXTURE1;
+	// varying
+	varying mediump float2 v_texture0;
+	varying mediump float2 v_matcap_uv;
+	//varying mediump float2 v_texture1; 
+	//varying mediump float3 v_NormalWorld;
+	//varying mediump float3 v_TangentWorld;
+	//varying mediump float3 v_BinormalWorld;
+
+	vertex{		
+		//out(v_texture0, float2(a_texture0.xy * float2(tilling_x,tilling_y) + float2(offset_x,offset_y));
+		out(v_texture0, float2(a_texture0.x * tilling_x + offset_x,a_texture0.y * tilling_y + offset_y));
+		//out(v_texture1, a_texture0.xy * float2(noise_tilling_x,noise_tilling_y) + float2(noise_offset_x,noise_offset_y) + float2(noise_offset_speed_x,noise_offset_speed_y) * FrameTime);
+		
+        float4 objPos = transform(float4(0.0f,0.0f,0.0f,1.0f),world);
+        float3 blendfactor = abs(a_normal) * abs(a_normal);
+        float3 blendPos = transform(a_position,world).xyz - objPos.xyz;
+
+        float2 nodeX_uv = float2(blendPos.y,blendPos.z) + float2(FrameTime) * float2(-0.5f,0.0f);
+        float nodeX = samplelod(NoiseTex,nodeX_uv * float2(noise_tilling_x,noise_tilling_y),0.0f).r;
+
+        float2 nodeY_uv = float2(blendPos.z,blendPos.x) + float2(FrameTime) * float2(-0.5f,0.0f);
+        float nodeY = samplelod(NoiseTex,nodeY_uv * float2(noise_tilling_x,noise_tilling_y),0.0f).r;
+
+        float2 nodeZ_uv = float2(blendPos.x,blendPos.y) + float2(FrameTime) * float2(0.25f,0.25f);
+		float nodeZ = samplelod(NoiseTex,nodeZ_uv * float2(noise_tilling_x,noise_tilling_y),0.0f).r;
+
+		float3 offsetFactor = float3((blendfactor.r * nodeX + blendfactor.g * nodeY + blendfactor.b * nodeZ) * _OffsetPower * a_diffuse.r);
+        float3 mdlPos = a_position.xyz + offsetFactor * a_normal;
+        float4 localPos = float4(mdlPos,1.0f);
+		float4 screen_pos = transform(localPos,wvp);
+
+		float3x3 worldMat = float3x3(world);
+		float3 normalDir = normalize(transform(a_normal,worldMat));
+		mediump float3 normal_view = normalize(transform(normalDir,float3x3(view)));
+		mediump float2 matcap_uv = (normal_view.xy) * float2(0.5f, 0.5f) + float2(0.5f);
+		out(v_matcap_uv,matcap_uv);
+		vertex(screen_pos);
+	}
+
+	pixel
+	{	
+		float2 uv = float2(v_texture0.x,v_texture0.y);
+
+		lowp float4 texColor0 = sample(_MainTex, uv);
+
+		macro(DIFFUSE_ALPHA_SEPARATE) out (lowp float4 color_out){
+            branch("1"){
+            	lowp float4 sep_color = sample(sepAlphaTex, uv);
+                out(color_out, float4(texColor0.xyz, sep_color.w));
+            }
+            branch("0")
+            {
+                out(color_out, texColor0);
+            }
+        };
+		lowp float4 matcap_map_color = sample(MatcapTex, v_matcap_uv) * float4(MatcapIntensity);
+
+        lowp float3 result_color = color_out.xyz + matcap_map_color.xyz;
+        lowp float result_alpha = color_out.w;
+
+		pixel(float4(result_color,result_alpha));
+	}
+}

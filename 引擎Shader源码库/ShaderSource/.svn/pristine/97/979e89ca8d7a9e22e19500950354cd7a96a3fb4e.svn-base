@@ -1,0 +1,599 @@
+["VBR shader for DM106"]
+pipeline
+<
+	category = "common" 
+	company = "netease"
+	merge = "1"
+	stencilenable = "1"
+	stencilmask = "0"
+	stencilwritemask = "255"
+	stencilref = "0"
+	stencilfunc= "1"
+	stencilfail = "Replace"
+	zfail = "Replace"
+	stencilpass = "Replace"
+>
+{
+
+	["开启法线贴图(XNORMAL_MAP_ENABLE)"]
+	eitheror XNORMAL_MAP_ENABLE;
+	
+
+	["开启网格闪烁消融"]
+	eitheror WEB_SHINING_ENABLE;
+	macro(WEB_SHINING_ENABLE)
+	<
+		default = "0"
+		customizable = "1"
+	>;
+
+	macro(XNORMAL_MAP_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["开启特效材质"]
+	eitheror FX_ENABLE;
+	macro(FX_ENABLE)
+	<
+		default = "1"
+		customizable = "1"
+	>;
+
+	["是否溶解"]
+	eitheror DISSOLVE_EFFECT;
+	macro(DISSOLVE_EFFECT)
+	<  
+		default = "0"
+		customizable = "1"
+	>;
+
+	// 贴图
+	["漫反射贴图"]
+	uniform sampler Tex0 : DIFFUSE
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	
+	["法线贴图"]
+	uniform sampler SamplerNormalMap
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+	["遮罩(R发光,G星空,B发光肌理)"]
+	uniform sampler ComposeMaskTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+	>;
+
+	["流光贴图"]
+	uniform sampler EmissTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "common\\textures\\emissnoise.png"
+	>;
+
+	["宇宙星空贴图"]
+	uniform sampler SpaceTex
+	<
+		artist = "1"
+		mag = "linear"
+		mip = "linear"
+		min = "linear"
+		lodbias = "-1.0"
+		path = "common\\textures\\space_tex.png"
+	>;
+
+	["特殊效果贴图"]
+	uniform sampler BuffTex
+	<
+		artist = "1"
+		mag = "LINEAR"
+		mip = "LINEAR"
+		min = "LINEAR"
+		// path = "fx\\texture\\effect\\fire_buff.png"// 燃烧贴图
+		// path = "fx\\texture\\noise\\noise_yd_26.tga"// 金身贴图
+		// path = "fx\\texture\\noise\\noise_yd_26.tga" //灵体贴图
+		path = "fx\\texture\\effect\\dissolve.png" //溶解贴图
+		// path = "fx\\texture\\effect\\petrify_buff.png" //石化贴图
+	>;
+	
+	["自发光强度"]
+	uniform mediump float emissive_intensity
+	<
+		init = "1.0"
+		artist = "1"
+	>;
+	["自发光bloom强度"]
+	uniform mediump float emissive_bloom
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "0.0"
+		max = "5.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["bloom强度"]
+	uniform mediump float illum_multi
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "1"
+		max = "10.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["bloom阈值"]
+	uniform lowp float bloom_threshold
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "1.0"
+		max = "5.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+	["bloom范围"]
+	uniform lowp float bloom_range
+	<
+		uigroup = "bloom"
+		uistep = "0.001"
+		init = "0.0"
+		max = "1.0"
+		min = "-1.0"
+		artist = "1"
+	>;
+
+	// 特效
+
+	["发光肌理控制"]
+	uniform mediump float3 _Rim_Control
+	<
+		uigroup = "特效"
+		init = "(0.0,0.5,0.0)"
+		artist = "1"
+	>;
+	["边缘流光控制"]
+	uniform mediump float3 _Emiss_Fresnel_Control
+	<
+		uigroup = "特效"
+		init = "(0.0,1.5,2.0)"
+		artist = "1"
+	>;
+	["流光Tilling"]
+	uniform mediump float2 _EmissTilling
+	<
+		uigroup = "特效"
+		init = "(2.0,2.0)"
+		artist = "1"
+	>;
+	["流光速度"]
+	uniform mediump float2 _EmissSpeed
+	<
+		uigroup = "特效"
+		init = "(-0.1,0.2)"
+		artist = "1"
+	>;
+	["流光扭曲"]
+	uniform mediump float _Emiss_ParallaxHeight
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "-50"
+	>;
+	["_RampOffset1"]
+	uniform mediump float _RampOffset1
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "0.5"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+	>;
+	["_RampColor1"]
+	uniform mediump float4 _RampColor1
+	<
+		uigroup = "特效"
+		artist = "1"
+		color = "1"
+		init = "(0.255,0.2,0.427,1.0)"
+	>;
+	["_RampOffset2"]
+	uniform mediump float _RampOffset2
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "0.2"
+		max = "1.0"
+		min = "0.0"
+		uistep = "0.001"
+	>;
+	["_RampColor2"]
+	uniform mediump float4 _RampColor2
+	<
+		uigroup = "特效"
+		artist = "1"
+		color = "1"
+		init = "(0.8,0.95,1.0,1.0)"
+	>;
+	["发光亮度"]
+	uniform mediump float _CombinedRimIntensity
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "1.5"
+	>;
+	["星云图Tilling"]
+	uniform mediump float2 SpaceTilling
+	<
+		uigroup = "特效"
+		init = "(1.0,1.0)"
+		artist = "1"
+	>;
+	["星云图纵深"]
+	uniform mediump float _SpaceHeight
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "1.0"
+	>;
+	["星云图亮度"]
+	uniform mediump float _SpaceIntensity
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "1.2"
+	>;
+	["闪烁星星Tilling"]
+	uniform mediump float2 _StarTilling
+	<
+		uigroup = "特效"
+		init = "(1.0,1.0)"
+		artist = "1"
+	>;
+	["闪烁星星纵深"]
+	uniform mediump float _StarHeight
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "0.2"
+	>;
+	["闪烁星星频率"]
+	uniform mediump float _StarrySpeed
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "1.5"
+	>;
+	["闪烁星星强度"]
+	uniform mediump float _StarIntensity
+	<
+		uigroup = "特效"
+		artist = "1"
+		init = "5.0"
+	>;
+
+	["ChangeAmount"]
+	uniform lowp float ChangeAmount
+	<
+		uigroup = "3 rim"
+		uistep = "0.001"
+		init = "0"
+		max = "1.0"
+		min = "0.0"
+		artist = "1"
+	>;
+
+	["半透"]
+	uniform lowp float _SpecAlpha
+	<
+		artist = "1"
+		init = "1"
+		uistep = "0.001"
+		max = "1.0"
+		min = "0.0"
+	>;
+	["溶解边界颜色"]
+	uniform lowp float4 u_dissolve_color
+	<
+		color = "1"
+		artist = "1"
+		init = "(1.0, 0.1, 0.1, 1.0)"
+		uigroup = "溶解"
+	>;
+	["叠加色"]
+	uniform mediump float3 change_color
+	<
+		color = "1"
+		init = "1.0,1.0,1.0"
+	>;
+
+	["poisson uniform values"]
+	uniform lowp float4[8] poissonDisk
+	<
+		init = "(0.0, 0.0, -0.94201624, -0.39906216, 0.94558609, -0.76890725, -0.094184101, -0.92938870, 0.34495938, 0.29387760, -0.91588581, 0.45771432, -0.81544232, -0.87912464, -0.38277543, 0.27676845, 0.97484398, 0.75648379, 0.44323325, -0.97511554, 0.53742981, -0.47373420, -0.26496911, -0.41893023, 0.79197514, 0.19090188, -0.24188840, 0.99706507, -0.81409955, 0.91437590, 0.19984126, 0.78641367)"
+	>;
+	
+	uniform lowp float u_tonemapping_factor
+	<
+		min = "0.0"
+		max = "1.0"
+		init = "1.0"
+		artist = "1"
+	>;
+	["蒙皮数据"]
+	uniform highp float4[BONE_VEC_COUNT] u_bone_vec: BONE_VEC;
+
+	// attribute变量
+	attribute float4 texcoord0 : TEXTURE0;
+	attribute float4 texcoord1 : TEXTURE1;
+	attribute float4 a_color : DIFFUSE;
+	attribute float4 a_position : POSITION;
+	attribute float4 a_normal : NORMAL;
+	attribute float4 a_tangent : TANGENT;
+	["gpu蒙皮的索引"]
+	attribute float4 a_blendindices: BLENDINDICES;
+	["gpu蒙皮的权重"]
+	attribute float4 a_blendweight: BLENDWEIGHT;
+
+	
+	// varying变量
+	varying mediump float4 UV;
+	// varying mediump float v_char_height; 
+	varying highp float4 PosWorld;	
+	varying mediump float4 pos_local;
+	varying lowp float3 v_TangentWorld;
+	varying lowp float3 v_BinormalWorld;
+	varying lowp float3 v_NormalWorld;
+	varying lowp float3 GiLightColor;
+	varying highp float4 PosLightProj;
+	varying highp float4 v_dissolve_uv;
+	
+	// varying mediump float4 v_light_proj_pos;
+	uniform mediump float4 u_shadowmap_info: SHADOW_INFO;
+	uniform mediump float2 shadow_bias_factor
+	<
+		// ios(0.002, 0.0002)
+		// 其他(0.004, 0.001)
+		init = "(0.004, 0.001)"
+	>;
+
+	// uniform变量
+	uniform highp float4x4 wvp : WORLD_VIEW_PROJECTION;
+	uniform highp float4x4 world : WORLD;
+	uniform highp float4x4 wv: WORLD_VIEW;
+	
+	uniform mediump float FrameTime: FRAME_TIME;
+	
+	uniform mediump float4x4 texTrans0 : TEXTURE_TRANS0;
+	uniform mediump float4x4 lightmapTrans : TEXTURE_TRANS1;
+	
+	uniform mediump float4 LightMapScale : LIGHT_MAP_SCALE;
+	uniform highp float4x4 lv : LIGHT_VIEW;
+	
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] DirLightAttr : DIR_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] ShadowLightAttr : SHADOW_LIGHT_ATTR;
+	uniform mediump float4[LIGHT_ATTR_ITEM_NUM] PointLightAttrs : POINT_LIGHT_ATTR;
+
+	uniform mediump float4 camera_pos : CAMERA_POSITION;
+	
+	uniform mediump float4x4 inverse_view : INV_VIEW;
+	
+	uniform mediump float4x4 view_mat : VIEW;
+	
+	uniform highp float4x4 lvp : LIGHT_VIEW_PROJ;
+	
+	uniform mediump float4 ZBufferParams: ZBUFFER_PARAMS;
+
+	uniform float alphaRef : ALPHA_REF
+	<
+		init = "0.0"
+	>;
+	uniform float AlphaMtl : ALPHA_MTL
+	<
+		init = "1.0"
+	>;
+
+	// uniform mediump float4x4 envSHR
+	// <
+	//	 init = "(0.014678, -0.012044, -0.040482, -0.029212, -0.012044, -0.014678, 0.022421, 0.014336, -0.040482, 0.022421, 0.136843, 0.068306, -0.029212, 0.014336, 0.068306, 0.175862)"
+	// >;
+	// uniform mediump float4x4 envSHG
+	// <
+	//	 init = "(0.008648, -0.017736, -0.028054, -0.027763, -0.017736, -0.008648, 0.025042, 0.036537, -0.028054, 0.025042, 0.103563, 0.055276, -0.027763, 0.036537, 0.055276, 0.206319)"
+	// >;
+	// uniform mediump float4x4 envSHB
+	// <
+	//	 init = "(-0.002828, -0.022570, -0.018314, -0.026353, -0.022570, 0.002828, 0.025450, 0.066163, -0.018314, 0.025450, 0.069045, 0.040577, -0.026353, 0.066163, 0.040577, 0.261003)"
+	// >;
+
+	
+	uniform lowp float4 FogColor : FOG_COLOR;
+	uniform mediump float4 FogInfo : FOG_INFO;
+	uniform highp float4x4 proj : PROJECTION;
+
+
+	function ParallaxOffset in(float h, float height, float3 viewDir) out(float2 parallaxoffset)
+	{
+	    float h_bias = h * height - height / 2.0f;
+	    float3 v = normalize(viewDir);
+	    float v_z = v.z + 0.42f;
+	    float2 offset = h_bias * (v.xy / float2(v_z));
+	    //float2 offset = h_bias * v.xy
+	    out(parallaxoffset,float2(offset.x,-offset.y));
+	};
+	vertex
+	{
+		["是否开启GPU蒙皮"]
+		macro(GPU_SKIN_ENABLE) out (highp float4 vec, highp float4 nor)
+		{
+			branch("1")
+			{
+				function get_skin_pos_normal(a_blendweight, uint4(a_blendindices), a_position, a_normal, u_bone_vec) out (highp float4 pos1, highp float4 nor1);
+				out(vec, pos1);
+				out(nor, nor1);
+			}
+			branch("0") 
+			{
+				out(vec, a_position);
+				out(nor, a_normal);
+			}
+		};
+
+		
+		highp float4 position = vec;
+		highp float4 normal = nor;
+		
+		// 计算顶点位置
+		highp float4 screen_pos = float4(transform(position, wvp));
+		vertex(screen_pos);
+		
+		highp float4 pos_world = transform(position, world);
+		
+		float3x3 worldMat = float3x3(world);
+		
+		highp float3 world_normal = float3(normalize(transform(normal.xyz, worldMat)));
+		
+		out(UV, float4(texcoord0.xy, texcoord0.xy));
+		
+		out(PosWorld, float4(pos_world.xyz, 1.0f));
+		
+		out(v_NormalWorld, world_normal);
+
+		mediump float3 tangentWorld = float3(normalize(a_tangent.xyz * worldMat));
+
+		// 通过uv空间来判断是否是镜像模型，如果是镜像模型则反转法线
+		//mediump float test_sign = float(sign(step(length(tangent.xyz), 1.0f) - 0.5f));
+		//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+		//mediump float3 binormal_world = cross(world_normal, tangentWorld);
+		highp float tan_coef = 1.0f - 2.0f * step(1.5f, length(a_tangent.xyz));
+		mediump float3 binormal_world = cross(tangentWorld, world_normal) * tan_coef;
+
+		out(v_TangentWorld, normalize(tangentWorld));
+		out(v_BinormalWorld, normalize(binormal_world));
+	}
+
+
+	pixel
+	{	
+		// —————————————————— 法线 ——————————————————	
+		mediump float3 vertex_normal_world = v_NormalWorld;
+		mediump float3 vertex_tangent_world = v_TangentWorld;
+		mediump float3 vertex_binormal_world = v_BinormalWorld;
+		mediump float2 UV0 = UV.xy;
+		mediump float2 UV1 = UV.zw;
+		// macro(XNORMAL_MAP_ENABLE) out(lowp float3 normalWorld, lowp float occlusion) {
+		// 	branch("1") {
+		// 		lowp float4 norm = sample(SamplerNormalMap, UV0.xy);
+				
+		// 		lowp float2 normOff = norm.xy * 2.0f - float2(1.0f);
+		// 		// lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+		// 		lowp float3 normalWorld_inner = normalize(v_TangentWorld * normOff.x + v_BinormalWorld * normOff.y + vertex_normal_world);
+		// 		out(normalWorld, normalWorld_inner);
+		// 		out(occlusion, norm.z);
+		// 	}	
+		// 	branch("0") {
+		// 		out(normalWorld, vertex_normal_world);
+		// 		out(occlusion, 1.0f);
+		// 	}
+		// };
+		mediump float3 normalWorld = normalize(v_NormalWorld);
+		lowp float occlusion = 1.0f;
+		// ——————————————————★★★ 基础设置 ★★★——————————————————	
+		// 采样贴图
+		lowp float4 diffuse_map_color = sample(Tex0, UV0.xy);
+
+		// 视线方向
+		lowp float3 view_dir = normalize(camera_pos.xyz - PosWorld.xyz);
+
+		mediump float NoV = dot(view_dir, normalWorld);
+		mediump float NdotV = saturate(NoV);
+
+		macro(FX_ENABLE) out(float3 final_emiss_color)
+		{
+			branch("1")
+			{
+				lowp float4 compose_mask = sample(ComposeMaskTex,UV0.xy);
+				lowp float flowemiss_mask = compose_mask.r;
+				lowp float space_mask = compose_mask.g;
+				lowp float rim_mask = compose_mask.b;
+
+				mediump float _Rim_Bias = _Rim_Control.x;
+				mediump float _Rim_Scale = _Rim_Control.y;
+				mediump float _Rim_Power = _Rim_Control.z;
+				mediump float fresnel_factor_ = _Rim_Bias + _Rim_Scale * pow(1.0f - NoV, _Rim_Power);
+				mediump float fresnel_factor = fresnel_factor_ * rim_mask;
+
+				mediump float _Emiss_Fresnel_Bias = _Emiss_Fresnel_Control.x;
+				mediump float _Emiss_Fresnel_Scale = _Emiss_Fresnel_Control.y;
+				mediump float _Emiss_Fresnel_Power = _Emiss_Fresnel_Control.z;
+				mediump float emiss_fresnel_factor = _Emiss_Fresnel_Bias + _Emiss_Fresnel_Scale * pow(1.0f - NoV, _Emiss_Fresnel_Power);
+
+				mediump float3x3 tangentTransform = transpose(float3x3(v_TangentWorld,v_BinormalWorld,v_NormalWorld));
+				mediump float3 view_dir_tangent = normalize(transform(view_dir,tangentTransform));
+				function ParallaxOffset(0.0f,_Emiss_ParallaxHeight * 0.01f,view_dir_tangent) out(float2 parallax_offset0);
+				lowp float flowemiss_value = sample(EmissTex,UV1 * _EmissTilling + FrameTime * _EmissSpeed + parallax_offset0).r;
+				mediump float combined_emiss_factor_ = fresnel_factor + emiss_fresnel_factor * flowemiss_value;
+				lowp float combined_emiss_factor = saturate(combined_emiss_factor_ / (1.0f + combined_emiss_factor_));
+
+				lowp float3 combined_emiss_factor0 = lerp(float3(0.0f),_RampColor1.xyz,float3(smoothstep(0.0f,_RampOffset1,combined_emiss_factor)));
+				lowp float3 combined_emiss_factor1 = lerp(combined_emiss_factor0,_RampColor2.xyz,float3(smoothstep(_RampOffset2,1.0f,combined_emiss_factor)));
+				mediump float3 combined_emiss_color = combined_emiss_factor1 * _CombinedRimIntensity * flowemiss_mask;
+
+				function ParallaxOffset(0.0f,_SpaceHeight,view_dir_tangent) out(float2 space_parallax_offset);
+				mediump float2 space_uv = UV0.xy * SpaceTilling + space_parallax_offset;
+				lowp float4 space_tex_value = sample(SpaceTex,space_uv);
+				lowp float3 space_color = space_tex_value.rgb * _SpaceIntensity * space_mask;
+
+				mediump float3 final_emiss_color_ = combined_emiss_color + space_color;
+				out(final_emiss_color,final_emiss_color_);
+			}
+			branch("0")
+			{
+				out(final_emiss_color,float3(0.0f));
+			}
+		};
+
+		lowp float3 rescolor = diffuse_map_color.rgb + final_emiss_color.rgb;
+
+		macro(DISSOLVE_EFFECT) out(lowp float3 combine_dissolve)
+		{
+			branch("1") {
+				lowp float4 diss_samp = sample(BuffTex, UV0.xy);
+				lowp float ClipAmount = diss_samp.x - ChangeAmount;
+				alphatest("<")(ClipAmount, 0.0f);
+				lowp float3 dest = u_dissolve_color.rgb * ClipAmount * 2.0f / 0.1f;
+				lowp float num1 = step(0.1f, ClipAmount);
+				lowp float3 combine_dissolve_ = (num1 * 0.5f + 0.5f) * rescolor.rgb + (1.0f - num1) * dest;
+				out(combine_dissolve, combine_dissolve_);
+			}
+			branch("0") {
+				out(combine_dissolve,rescolor);
+			}
+		};
+
+		pixel(float4(combine_dissolve,AlphaMtl));
+	}
+}
+

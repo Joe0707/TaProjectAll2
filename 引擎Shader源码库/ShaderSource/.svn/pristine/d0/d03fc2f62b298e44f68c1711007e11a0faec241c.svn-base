@@ -1,0 +1,58 @@
+["天空盒子的材质"]
+pipeline
+<
+	version = "1.0.0"
+	author = "liuyu"
+	category = "sky"
+	company = "netease"
+	zenable = "true"
+	zwritable = "false"
+>
+{
+	attribute float4 a_position: POSITION;
+	attribute float2 a_texture0: TEXTURE0;
+	
+	uniform highp float4x4 u_world_view_projection: WORLD_VIEW_PROJECTION;
+	
+	["diffuse0"]
+	uniform sampler Tex0: DIFFUSE
+	<
+		artist = "1"
+		addressu = "repeat"
+		addressv = "clamp"
+		mag = "linear"
+		min = "linear"
+		map = "linear"
+		lodbias = "-0.5"
+	>;
+	
+	["分开的alpha贴图"]
+	uniform sampler sepAlphaTex: DIFFUSE_ALPHA
+	<
+	>;
+
+    uniform lowp float scene_illum : SCENE_ILLUM
+    <
+		init = "1.0"
+		artist = "0"    
+    >; 
+
+	varying mediump float2 v_texture0: TEXTURE0;
+	
+	vertex
+	{
+		highp float4 pos = transform(a_position, u_world_view_projection);
+		highp float w = pos.w;
+		vertex(float4(pos.xy, w - 0.01f, w));
+		out(v_texture0, a_texture0);
+	}
+	
+	pixel
+	{
+		lowp float4 diffuse = sample(Tex0, v_texture0);
+		lowp float4 res = float4(diffuse.xyz * float3(scene_illum), diffuse.w);
+		
+		pixel(res);
+	}
+	
+}
